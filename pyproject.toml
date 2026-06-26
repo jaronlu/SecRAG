@@ -23,7 +23,7 @@ dependencies = [
     "pydantic-settings>=2,<3",
     "pandas>=2,<3",
     "langchain-unstructured>=1.0.1",
-    "unstructured>=0.23.1",
+    "unstructured[docx,pdf]>=0.23.1",
 ]
 
 [project.optional-dependencies]

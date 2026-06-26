@@ -1,6 +1,6 @@
 from pathlib import Path
 from importlib.resources import files
-from src.ingestion.loaders import load_pdf
+from src.ingestion.loaders import load_pdf, load_word
 
 # 测试 load_pdf
 def test_load_pdf():
@@ -14,5 +14,13 @@ def test_load_pdf():
         print(f"document.metadata: {document.metadata}")
         print("-" * 100)
 
+
+def test_word():
+    word_path = Path(__file__).parent.parent / 'src/data/local-docx.docx'
+    print(f'word_path: {word_path}')
+
+    load_word(Path(str(word_path)))
+
+
 if __name__ == "__main__":
-    test_load_pdf()
+    test_word()
