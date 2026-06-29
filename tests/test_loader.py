@@ -16,7 +16,7 @@ def test_load_pdf():
 
 
 def test_word():
-    word_path = Path(__file__).parent.parent / 'src/data/local-docx.docx'
+    word_path = Path(__file__).parent.parent / 'src/data/announcements/local-word.docx'
     print(f'word_path: {word_path}')
 
     load_word(Path(str(word_path)))

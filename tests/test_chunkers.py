@@ -1,19 +1,21 @@
-from pathlib import Path
-from importlib.resources import files
 from langchain_core.documents import Document
 
 from src.ingestion.chunkers import create_financial_splitter, chunk_documents
 
 
-def _sample_document(content: str = "这是一段测试文本。这是第二句。", metadata: dict | None = None) -> Document:
+def _sample_document(
+    content: str = "这是一段测试文本。这是第二句。", metadata: dict | None = None
+) -> Document:
     return Document(page_content=content, metadata=metadata or {"source": "test"})
 
 
 # --- create_financial_splitter ---
 
+
 def test_create_financial_splitter_returns_splitter():
     splitter = create_financial_splitter()
     from langchain_text_splitters import RecursiveCharacterTextSplitter
+
     assert isinstance(splitter, RecursiveCharacterTextSplitter)
 
 
@@ -31,12 +33,15 @@ def test_create_financial_splitter_custom_params():
 
 def test_create_financial_splitter_chinese_aware():
     splitter = create_financial_splitter(chunk_size=30, chunk_overlap=5)
-    doc = _sample_document("第一句很长很长很长。第二句也很长很长很长。第三句同样很长。第四句也很长。第五句结束。")
+    doc = _sample_document(
+        "第一句很长很长很长。第二句也很长很长很长。第三句同样很长。第四句也很长。第五句结束。"
+    )
     chunks = splitter.split_documents([doc])
     assert len(chunks) > 1
 
 
 # --- chunk_documents ---
+
 
 def test_chunk_documents_research_report():
     doc = _sample_document("研究内容。")
