@@ -154,3 +154,20 @@ CONFIDENCE_HIGH_THRESHOLD = 0.75
 CONFIDENCE_MEDIUM_THRESHOLD = 0.5
 CONFIDENCE_HIGH_MIN_RESULTS = 3
 HALLUCINATION_THRESHOLD = 0.3
+
+# ══════════════════════════════════════════════════════════════════════
+# LLM 提供方默认值  (SCHEMA-REFERENCE §4)
+# ══════════════════════════════════════════════════════════════════════
+
+OPENAI_DEFAULT_API_BASE = "https://api.stepfun.com/step_plan/v1"
+OPENAI_DEFAULT_MODEL = "step-3.7-flash"
+OLLAMA_DEFAULT_BASE_URL = "http://localhost:11434"
+OLLAMA_DEFAULT_MODEL = "llama3.1:8b"
+LLM_DEFAULT_TEMPERATURE = 0.1
+
+# ══════════════════════════════════════════════════════════════════════
+# LLM 提供方标识  (SCHEMA-REFERENCE §2.7)
+# ══════════════════════════════════════════════════════════════════════
+
+LLM_PROVIDER_OPENAI = "openai"
+LLM_PROVIDER_OLLAMA = "ollama"

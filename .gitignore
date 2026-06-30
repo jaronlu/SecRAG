@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 .venv/
 data/
+
+# 环境变量（含 API Key）
+.env

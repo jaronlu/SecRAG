@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 import chromadb
 
 # ⚡ 字段统一：使用常量而非裸字符串
+from src.config import config
 from src.schemas.constants import (
     CHROMA_COLLECTION_NAME,
     CHROMA_DEFAULT_PERSIST_DIR,
@@ -43,7 +44,7 @@ class FinancialVectorRetriever(BaseRetriever):
         """调用配置的 embedding 模型"""
         from src.ingestion.embedder import get_embedding_model
 
-        model = get_embedding_model("BAAI/bge-m3")
+        model = get_embedding_model(config.embedding.model)
         # TODO: 每次检索都重新加载模型；Phase 2 改为应用启动时单例
         return model.embed_query(text)
 
