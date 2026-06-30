@@ -116,7 +116,7 @@ class FakeRetriever:
 @pytest.fixture(autouse=False)
 def mock_dependencies(monkeypatch):
     """mock 所有外部依赖：retriever + LLM + ChromaDB"""
-    # 1) mock ChromaDB（防止 import chain 时 FinancialVectorRetriever 连真实 ChromaDB）
+    # 1) mock ChromaDB（防止 import chain 时 ChromaVectorRetriever 连真实 ChromaDB）
     monkeypatch.setattr("chromadb.PersistentClient", lambda **_: MagicMock())
 
     # 2) 导入 chain 模块（此时 ChromaDB 已 mock，retriever 创建时不会连真实 DB）

@@ -116,7 +116,7 @@ def ingest_directory(directory: Path, doc_type: str):
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("用法: python scripts/ingest.py <目录路径> <文档类型>")
-        print("文档类型: research_report / announcement / regulation / financial_data / meeting_minutes")
+        print("文档类型: research_report / announcement / regulation / financial_data / meeting_minutes / product / faq")
         sys.exit(1)
 
     directory = Path(sys.argv[1])

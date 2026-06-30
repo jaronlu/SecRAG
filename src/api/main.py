@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.config import config
 from src.rag.chain import build_rag_chain, format_docs
 from src.rag.formatter import estimate_confidence, format_citations
-from src.retrieval.vector_retriever import FinancialVectorRetriever
+from src.retrieval.vector_retriever import ChromaVectorRetriever
 from src.schemas.constants import META_SOURCE, RR_METADATA
 from src.schemas.request_response import QARequest, QAResponse
 
@@ -25,7 +25,7 @@ app.add_middleware(
 rag_chain = build_rag_chain()
 
 # 检索器全局复用，避免反复创建 ChromaDB 客户端
-retriever = FinancialVectorRetriever(persist_directory=config.chroma.persist_directory)
+retriever = ChromaVectorRetriever(persist_directory=config.chroma.persist_directory)
 
 # 审计日志记录器（结构化 JSON，可对接 ELK / Loki）
 audit_logger = logging.getLogger("secrag.audit")

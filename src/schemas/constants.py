@@ -25,6 +25,7 @@ META_INSTITUTION = "institution"
 META_PERMISSION_LEVEL = "permission_level"
 META_PAGE_NUMBER = "page_number"
 META_RETRIEVAL_PATH = "retrieval_path"
+META_PRODUCT_TYPE = "product_type"
 META_ERROR = "error"
 
 # ══════════════════════════════════════════════════════════════════════
@@ -38,6 +39,17 @@ RR_DENIED = "denied"
 RR_REASON = "reason"
 
 # ══════════════════════════════════════════════════════════════════════
+# retrieval_plan step 键名  (SCHEMA-REFERENCE §1.3)
+# ══════════════════════════════════════════════════════════════════════
+
+PLAN_SOURCE = "source"
+PLAN_QUERY = "query"
+PLAN_TOP_K = "top_k"
+PLAN_FILTERS = "filters"
+PLAN_DENIED = "denied"
+PLAN_REASON = "reason"
+
+# ══════════════════════════════════════════════════════════════════════
 # doc_type 枚举  (SCHEMA-REFERENCE §2.1)
 # ══════════════════════════════════════════════════════════════════════
 
@@ -46,6 +58,8 @@ DOC_TYPE_ANNOUNCEMENT = "announcement"
 DOC_TYPE_REGULATION = "regulation"
 DOC_TYPE_FINANCIAL_DATA = "financial_data"
 DOC_TYPE_MEETING_MINUTES = "meeting_minutes"
+DOC_TYPE_PRODUCT = "product"
+DOC_TYPE_FAQ = "faq"
 
 DocType = Literal[
     DOC_TYPE_RESEARCH_REPORT,
@@ -53,6 +67,8 @@ DocType = Literal[
     DOC_TYPE_REGULATION,
     DOC_TYPE_FINANCIAL_DATA,
     DOC_TYPE_MEETING_MINUTES,
+    DOC_TYPE_PRODUCT,
+    DOC_TYPE_FAQ,
 ]
 
 ALL_VALID_DOC_TYPES: set[str] = {
@@ -61,6 +77,8 @@ ALL_VALID_DOC_TYPES: set[str] = {
     DOC_TYPE_REGULATION,
     DOC_TYPE_FINANCIAL_DATA,
     DOC_TYPE_MEETING_MINUTES,
+    DOC_TYPE_PRODUCT,
+    DOC_TYPE_FAQ,
 }
 
 # ══════════════════════════════════════════════════════════════════════
@@ -111,6 +129,26 @@ SOURCE_REPORT = "report_search"
 SOURCE_FAQ = "faq_search"
 
 # ══════════════════════════════════════════════════════════════════════
+# query_type 枚举  (SCHEMA-REFERENCE §2.5)
+# ══════════════════════════════════════════════════════════════════════
+
+QT_PRODUCT_INQUIRY = "product_inquiry"
+QT_RULE_INQUIRY = "rule_inquiry"
+QT_REGULATION_INQUIRY = "regulation_inquiry"
+QT_REPORT_INQUIRY = "report_inquiry"
+QT_FAQ_INQUIRY = "faq_inquiry"
+QT_TECHNICAL_INQUIRY = "technical_inquiry"
+
+QueryType = Literal[
+    QT_PRODUCT_INQUIRY,
+    QT_RULE_INQUIRY,
+    QT_REGULATION_INQUIRY,
+    QT_REPORT_INQUIRY,
+    QT_FAQ_INQUIRY,
+    QT_TECHNICAL_INQUIRY,
+]
+
+# ══════════════════════════════════════════════════════════════════════
 # ChromaDB 配置  (SCHEMA-REFERENCE §4)
 # ══════════════════════════════════════════════════════════════════════
 
@@ -135,11 +173,11 @@ ROLE_ALLOWED_SOURCES: dict[str, list[str]] = {
 # ══════════════════════════════════════════════════════════════════════
 
 ROLE_DATA_PERMISSIONS: dict[str, list[str]] = {
-    ROLE_ADVISOR: ["public", PERMISSION_INTERNAL],
-    ROLE_INSTITUTIONAL_SALES: ["public", PERMISSION_INTERNAL],
-    ROLE_COMPLIANCE: ["public", PERMISSION_INTERNAL, PERMISSION_CONFIDENTIAL],
-    ROLE_OPERATIONS: ["public", PERMISSION_INTERNAL],
-    ROLE_TECHNICAL: ["public", PERMISSION_INTERNAL, PERMISSION_CONFIDENTIAL],
+    ROLE_ADVISOR: [PERMISSION_PUBLIC, PERMISSION_INTERNAL],
+    ROLE_INSTITUTIONAL_SALES: [PERMISSION_PUBLIC, PERMISSION_INTERNAL],
+    ROLE_COMPLIANCE: [PERMISSION_PUBLIC, PERMISSION_INTERNAL, PERMISSION_CONFIDENTIAL],
+    ROLE_OPERATIONS: [PERMISSION_PUBLIC, PERMISSION_INTERNAL],
+    ROLE_TECHNICAL: [PERMISSION_PUBLIC, PERMISSION_INTERNAL, PERMISSION_CONFIDENTIAL],
 }
 
 # ══════════════════════════════════════════════════════════════════════

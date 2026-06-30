@@ -1,4 +1,4 @@
-"""FinancialVectorRetriever 单元测试（mock ChromaDB + embedding）"""
+"""ChromaVectorRetriever 单元测试（mock ChromaDB + embedding）"""
 
 from typing import Dict, List
 from unittest.mock import MagicMock
@@ -34,16 +34,16 @@ def mock_embedding(monkeypatch) -> None:
         return [0.1] * 768  # bge-m3 输出 768 维
 
     monkeypatch.setattr(
-        "src.retrieval.vector_retriever.FinancialVectorRetriever._embed", fake_embed
+        "src.retrieval.vector_retriever.ChromaVectorRetriever._embed", fake_embed
     )
 
 
 @pytest.fixture
 def retriever(mock_chromadb, mock_embedding):
-    """返回 FinancialVectorRetriever 实例，依赖均已 mock"""
-    from src.retrieval.vector_retriever import FinancialVectorRetriever
+    """返回 ChromaVectorRetriever 实例，依赖均已 mock"""
+    from src.retrieval.vector_retriever import ChromaVectorRetriever
 
-    return FinancialVectorRetriever()
+    return ChromaVectorRetriever()
 
 
 # ── _format ──────────────────────────────────────────────────────────────
@@ -128,9 +128,9 @@ class TestEmbed:
 
         monkeypatch.setattr(embedder_module, "HuggingFaceEmbeddings", FakeModel)
 
-        from src.retrieval.vector_retriever import FinancialVectorRetriever
+        from src.retrieval.vector_retriever import ChromaVectorRetriever
 
-        retriever = FinancialVectorRetriever()
+        retriever = ChromaVectorRetriever()
         embedding = retriever._embed("测试查询")
         assert isinstance(embedding, list)
         assert len(embedding) > 0

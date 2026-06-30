@@ -6,6 +6,7 @@ import chromadb
 
 # ⚡ 字段统一：使用常量而非裸字符串
 from src.config import config
+from src.retrieval.base import BaseRetriever
 from src.schemas.constants import (
     CHROMA_COLLECTION_NAME,
     CHROMA_DEFAULT_PERSIST_DIR,
@@ -16,10 +17,8 @@ from src.schemas.constants import (
     RR_SCORE,
 )
 
-from .base import BaseRetriever
 
-
-class FinancialVectorRetriever(BaseRetriever):
+class ChromaVectorRetriever(BaseRetriever):
     def __init__(self, persist_directory: str = CHROMA_DEFAULT_PERSIST_DIR):
         self.client = chromadb.PersistentClient(
             path=persist_directory,

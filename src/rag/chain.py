@@ -5,21 +5,28 @@ from langchain_core.runnables import RunnableLambda
 
 from src.config import config
 from src.rag.prompts import prompt
-from src.retrieval.vector_retriever import FinancialVectorRetriever
-from src.schemas.constants import DEFAULT_TOP_K, LLM_PROVIDER_OPENAI
+from src.retrieval.vector_retriever import ChromaVectorRetriever
+from src.schemas.constants import (
+    DEFAULT_TOP_K,
+    LLM_PROVIDER_OPENAI,
+    META_DATE,
+    META_TITLE,
+    RR_CONTENT,
+    RR_METADATA,
+)
 
-retriever = FinancialVectorRetriever()
+retriever = ChromaVectorRetriever()
 
 
 def format_docs(docs: List[Dict]) -> str:
     """把检索结果拼接成 context"""
     lines = []
     for i, doc in enumerate(docs, 1):
-        meta = doc["metadata"]
+        meta = doc.get(RR_METADATA, {})
         lines.append(
-            f"[来源{i}] {meta.get('title', '未知文档')} "
-            f"({meta.get('date', '')})\n"
-            f"{doc['content']}\n"
+            f"[来源{i}] {meta.get(META_TITLE, '未知文档')} "
+            f"({meta.get(META_DATE, '')})\n"
+            f"{doc.get(RR_CONTENT, '')}\n"
         )
     return "\n".join(lines)
 
