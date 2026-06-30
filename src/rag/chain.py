@@ -1,5 +1,5 @@
 from operator import itemgetter
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableLambda
@@ -24,6 +24,11 @@ def format_docs(docs: List[Dict]) -> str:
     return "\n".join(lines)
 
 
+def _retrieve_by_question(x: Dict[str, Any]) -> List[Dict]:
+    """RunnableLambda 包装函数，类型标注让 Pylance 能推断"""
+    return retriever.retrieve(x["question"], top_k=5)
+
+
 def build_rag_chain():
     llm = ChatOllama(
         base_url="http://localhost:11434",
@@ -34,8 +39,7 @@ def build_rag_chain():
     chain = (
         {
             "context": (
-                RunnableLambda(lambda x: retriever.retrieve(x["question"], top_k=5))
-                | RunnableLambda(format_docs)
+                RunnableLambda(_retrieve_by_question) | RunnableLambda(format_docs)
             ),
             "question": itemgetter("question"),
         }

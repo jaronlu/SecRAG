@@ -1,6 +1,6 @@
 """rag/chain.py 单元测试"""
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 from unittest.mock import MagicMock
 
 import pytest
@@ -100,7 +100,7 @@ class FakeChatOllama:
 class FakeRetriever:
     """替换模块级 retriever，避免真实 _embed 加载 HuggingFace 模型"""
 
-    def retrieve(self, query: str, top_k: int = 5, filters: Dict = None) -> List[Dict]:
+    def retrieve(self, query: str, top_k: int = 5, filters: Optional[Dict] = None) -> List[Dict]:
         return [
             {"content": "mock结果", "metadata": {"title": "mock", "date": "2025"}}
         ]
