@@ -1,6 +1,6 @@
 """ChromaDB 向量检索器"""
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import chromadb
 
@@ -47,7 +47,7 @@ class FinancialVectorRetriever(BaseRetriever):
         # TODO: 每次检索都重新加载模型；Phase 2 改为应用启动时单例
         return model.embed_query(text)
 
-    def _format(self, results: Dict) -> List[Dict]:
+    def _format(self, results: Any) -> List[Dict]:
         formatted = []
         for doc, meta, dist in zip(
             results["documents"][0],
