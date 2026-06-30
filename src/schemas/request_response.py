@@ -29,3 +29,25 @@ class QAResponse(BaseModel):
     citations: list[dict]  # 序列化后的 Citation（SCHEMA-REFERENCE §3.1）
     confidence: str  # CONFIDENCE_HIGH / CONFIDENCE_MEDIUM / CONFIDENCE_LOW（SCHEMA-REFERENCE §2.3）
     retrieval_path: list[str]
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Agent 接口（impl-03 §7）
+# ══════════════════════════════════════════════════════════════════════
+
+
+class AssistantQARequest(BaseModel):
+    query: str = Field(..., min_length=1, max_length=500)
+    user_id: str
+    user_role: str  # advisor | institutional_sales | compliance | operations | technical
+    department: str
+    client_id: Optional[str] = None
+    thread_id: Optional[str] = None
+
+
+class AssistantQAResponse(BaseModel):
+    answer: str
+    citations: list[dict]  # 序列化 Citation（SCHEMA-REFERENCE §3.1）
+    confidence: str  # SCHEMA-REFERENCE §2.3
+    compliance: dict  # {passed, flags, risk_disclosure}
+    audit_trail: dict  # 序列化 AuditEntry（SCHEMA-REFERENCE §3.3）

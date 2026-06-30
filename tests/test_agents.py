@@ -1,21 +1,23 @@
 """Agent Graph 节点和路由函数单元测试"""
 
+from __future__ import annotations
+
+from typing import Any, cast
 from unittest.mock import MagicMock
 
-import pytest
-
+from src.agents.state import AssistantState
+from src.agents.graph import (
+    build_agent_graph,
+    is_compliant,
+    should_reason_again,
+    should_retry_retrieval,
+)
 from src.agents.nodes import (
     audit_log,
     compliance_check,
     compose,
     grade_and_filter,
     verify,
-)
-from src.agents.graph import (
-    build_agent_graph,
-    is_compliant,
-    should_reason_again,
-    should_retry_retrieval,
 )
 from src.schemas.constants import (
     CONFIDENCE_HIGH,
@@ -45,7 +47,7 @@ from src.schemas.constants import (
 )
 
 
-def _result(content: str, score: float = 0.9, meta: dict | None = None) -> dict:
+def _result(content: str, score: float = 0.9, meta: dict[str, Any] | None = None) -> dict[str, Any]:
     """快捷构造检索结果 dict"""
     return {
         RR_CONTENT: content,
@@ -54,16 +56,16 @@ def _result(content: str, score: float = 0.9, meta: dict | None = None) -> dict:
     }
 
 
-def _state(**overrides) -> dict:
+def _state(**overrides: Any) -> AssistantState:
     """快捷构造最小 AssistantState"""
-    return {
+    return cast(AssistantState, {
         STATE_RETRIEVAL_RESULTS: [],
         STATE_FINAL_ANSWER: "",
         STATE_USER_ROLE: ROLE_OPERATIONS,
         STATE_VERIFICATION: {},
         STATE_COMPLIANCE: {},
         **overrides,
-    }
+    })
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -126,7 +128,10 @@ class TestVerify:
             STATE_FINAL_ANSWER: "正常回答",
             STATE_DATA_PERMISSIONS: [PERMISSION_PUBLIC],
             STATE_RETRIEVAL_RESULTS: [
-                _result("机密内容", meta={META_PERMISSION_LEVEL: "confidential", META_SOURCE: "secret.pdf"}),
+                _result(
+                    "机密内容",
+                    meta={META_PERMISSION_LEVEL: "confidential", META_SOURCE: "secret.pdf"},
+                ),
             ],
         })
         result = verify(state)
@@ -252,11 +257,14 @@ class TestCompose:
         state = _state(**{
             STATE_FINAL_ANSWER: "茅台净利润为747亿",
             STATE_RETRIEVAL_RESULTS: [
-                _result("茅台净利润747亿", meta={
-                    META_TITLE: "2024年报",
-                    META_SOURCE: "report.pdf",
-                    META_CHUNK_ID: "chunk_001",
-                }),
+                _result(
+                    "茅台净利润747亿",
+                    meta={
+                        META_TITLE: "2024年报",
+                        META_SOURCE: "report.pdf",
+                        META_CHUNK_ID: "chunk_001",
+                    },
+                ),
             ],
         })
         result = compose(state)
@@ -325,7 +333,14 @@ class TestAuditLog:
         state = _state()
         result = audit_log(state)
         entry = result["audit_trail"]
-        for section in ("query", "retrieval", "reasoning", "verification", "compliance", "response"):
+        for section in (
+            "query",
+            "retrieval",
+            "reasoning",
+            "verification",
+            "compliance",
+            "response",
+        ):
             assert section in entry, f"audit entry missing section: {section}"
 
 
