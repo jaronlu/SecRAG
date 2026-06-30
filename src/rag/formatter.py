@@ -7,26 +7,26 @@
 from typing import Dict, List
 
 from src.schemas.constants import (
+    # 枚举 (§2.3, §2.4)
+    CONFIDENCE_HIGH,
+    CONFIDENCE_HIGH_MIN_RESULTS,
+    # 阈值
+    CONFIDENCE_HIGH_THRESHOLD,
+    CONFIDENCE_LOW,
+    CONFIDENCE_MEDIUM,
+    CONFIDENCE_MEDIUM_THRESHOLD,
+    META_CHUNK_ID,
+    META_DOC_TYPE,
+    META_PAGE_NUMBER,
+    META_PERMISSION_LEVEL,
+    META_SOURCE,
+    # metadata 键名 (§1.1)
+    META_TITLE,
+    PERMISSION_PUBLIC,
     # retrieval_results 键名 (§1.2)
     RR_CONTENT,
     RR_METADATA,
     RR_SCORE,
-    # metadata 键名 (§1.1)
-    META_TITLE,
-    META_SOURCE,
-    META_DOC_TYPE,
-    META_CHUNK_ID,
-    META_PAGE_NUMBER,
-    META_PERMISSION_LEVEL,
-    # 枚举 (§2.3, §2.4)
-    CONFIDENCE_HIGH,
-    CONFIDENCE_MEDIUM,
-    CONFIDENCE_LOW,
-    PERMISSION_PUBLIC,
-    # 阈值
-    CONFIDENCE_HIGH_THRESHOLD,
-    CONFIDENCE_HIGH_MIN_RESULTS,
-    CONFIDENCE_MEDIUM_THRESHOLD,
 )
 
 
@@ -62,7 +62,10 @@ def estimate_confidence(retrieval_results: List[Dict]) -> str:
         return CONFIDENCE_LOW
 
     top_score = retrieval_results[0][RR_SCORE]
-    if top_score >= CONFIDENCE_HIGH_THRESHOLD and len(retrieval_results) >= CONFIDENCE_HIGH_MIN_RESULTS:
+    if (
+        top_score >= CONFIDENCE_HIGH_THRESHOLD
+        and len(retrieval_results) >= CONFIDENCE_HIGH_MIN_RESULTS
+    ):
         return CONFIDENCE_HIGH
     elif top_score >= CONFIDENCE_MEDIUM_THRESHOLD:
         return CONFIDENCE_MEDIUM

@@ -10,14 +10,14 @@ from langchain_unstructured import UnstructuredLoader
 
 # ⚡ 字段统一：metadata 键名和枚举值见 src/schemas/constants.py
 from src.schemas.constants import (
+    DOC_TYPE_FINANCIAL_DATA,
+    META_DATE,
+    META_DOC_ID,
     META_DOC_TYPE,
+    META_PERMISSION_LEVEL,
     META_SOURCE,
     META_STOCK_CODE,
     META_TITLE,
-    META_DATE,
-    META_DOC_ID,
-    META_PERMISSION_LEVEL,
-    DOC_TYPE_FINANCIAL_DATA,
     PERMISSION_INTERNAL,
 )
 

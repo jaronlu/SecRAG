@@ -1,5 +1,5 @@
-import uuid
 import logging
+import uuid
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -65,10 +65,7 @@ async def qa(request: QARequest):
             answer=answer,
             citations=citations,
             confidence=confidence,
-            retrieval_path=[
-                r.get(RR_METADATA, {}).get(META_SOURCE, "")
-                for r in retrieval_results
-            ],
+            retrieval_path=[r.get(RR_METADATA, {}).get(META_SOURCE, "") for r in retrieval_results],
         )
     except Exception:
         audit_logger.exception("QA 请求处理失败: request_id=%s", request_id)

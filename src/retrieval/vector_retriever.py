@@ -13,6 +13,7 @@ from src.schemas.constants import (
     RR_METADATA,
     RR_SCORE,
 )
+
 from .base import BaseRetriever
 
 
