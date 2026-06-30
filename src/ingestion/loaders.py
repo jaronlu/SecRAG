@@ -28,9 +28,7 @@ logger = logging.getLogger(__name__)
 def load_pdf(file_path: Path) -> List[Document]:
     """加载 PDF 文档，优先使用 UnstructuredLoader，失败时回退到 pypdf"""
     try:
-        loader = UnstructuredLoader(
-            file_path=str(file_path)
-        )
+        loader = UnstructuredLoader(file_path=str(file_path))
         return loader.load()
     except Exception as e:
         logger.warning("PDF 解析失败，将跳过此文件: %s — %s", file_path, e)
