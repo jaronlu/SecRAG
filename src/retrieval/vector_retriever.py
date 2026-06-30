@@ -1,8 +1,13 @@
 """ChromaDB 向量检索器"""
 
-from typing import Dict, List, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 import chromadb
+
+if TYPE_CHECKING:
+    from chromadb.api.types import QueryResult
 
 # ⚡ 字段统一：使用常量而非裸字符串
 from src.config import config
@@ -51,12 +56,17 @@ class ChromaVectorRetriever(BaseRetriever):
             self._model = get_embedding_model(config.embedding.model)
         return self._model.embed_query(text)
 
-    def _format(self, results: Dict) -> List[Dict]:
+    def _format(self, results: QueryResult) -> List[Dict]:
         formatted = []
+        documents = results.get("documents")
+        metadatas = results.get("metadatas")
+        distances = results.get("distances")
+        if not documents or not metadatas or not distances:
+            return formatted
         for doc, meta, dist in zip(
-            results["documents"][0],
-            results["metadatas"][0],
-            results["distances"][0],
+            documents[0],
+            metadatas[0],
+            distances[0],
         ):
             formatted.append({
                 RR_CONTENT: doc,

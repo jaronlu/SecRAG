@@ -66,17 +66,20 @@ def chunk_documents(
         DOC_TYPE_REGULATION: _default(),
         # 公告：小块快速切分，适合短公告
         DOC_TYPE_ANNOUNCEMENT: RecursiveCharacterTextSplitter(
-            chunk_size=300, chunk_overlap=50,
+            chunk_size=300,
+            chunk_overlap=50,
             separators=["\n\n", "\n", "。", "；", " ", ""],
         ),
         # 财务数据：大块保留完整财务数据段
         DOC_TYPE_FINANCIAL_DATA: RecursiveCharacterTextSplitter(
-            chunk_size=800, chunk_overlap=200,
+            chunk_size=800,
+            chunk_overlap=200,
             separators=["\n\n", "\n", "。", "；", " ", ""],
         ),
         # 会议纪要：偏小 chunk，纪要结构松散
         DOC_TYPE_MEETING_MINUTES: RecursiveCharacterTextSplitter(
-            chunk_size=400, chunk_overlap=80,
+            chunk_size=400,
+            chunk_overlap=80,
             separators=["\n\n", "\n", "。", "；", " ", ""],
         ),
     }

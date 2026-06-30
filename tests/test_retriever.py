@@ -1,15 +1,13 @@
 """ChromaVectorRetriever 单元测试（mock ChromaDB + embedding）"""
 
-from typing import Dict, List
+from typing import List
 from unittest.mock import MagicMock
 
 import pytest
 
 from src.schemas.constants import (
     DOC_TYPE_FINANCIAL_DATA,
-    META_DATE,
     META_DOC_TYPE,
-    META_TITLE,
     RR_CONTENT,
     RR_METADATA,
     RR_SCORE,
@@ -33,9 +31,7 @@ def mock_embedding(monkeypatch) -> None:
     def fake_embed(self, text: str) -> List[float]:
         return [0.1] * 768  # bge-m3 输出 768 维
 
-    monkeypatch.setattr(
-        "src.retrieval.vector_retriever.ChromaVectorRetriever._embed", fake_embed
-    )
+    monkeypatch.setattr("src.retrieval.vector_retriever.ChromaVectorRetriever._embed", fake_embed)
 
 
 @pytest.fixture
@@ -109,7 +105,6 @@ class TestFormat:
 class TestEmbed:
     def test_embed_returns_float_list(self, monkeypatch):
         """真实调用 _embed，mock 底层模型避免下载"""
-        import chromadb
 
         # mock chromadb 连接
         mock_collection = MagicMock()

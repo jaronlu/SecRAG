@@ -2,8 +2,8 @@
 
 from typing import Dict, List, Optional
 
-from src.retrieval.filters import build_chroma_where
 from src.retrieval.base import BaseRetriever
+from src.retrieval.filters import build_chroma_where
 from src.retrieval.vector_retriever import ChromaVectorRetriever
 from src.schemas.constants import DEFAULT_TOP_K, DOC_TYPE_RESEARCH_REPORT
 
@@ -21,5 +21,7 @@ class ReportRetriever(BaseRetriever):
         filters: Optional[Dict] = None,
     ) -> List[Dict]:
         return self._engine.retrieve(
-            query, top_k=top_k, filters=build_chroma_where(DOC_TYPE_RESEARCH_REPORT, filters),
+            query,
+            top_k=top_k,
+            filters=build_chroma_where(DOC_TYPE_RESEARCH_REPORT, filters),
         )

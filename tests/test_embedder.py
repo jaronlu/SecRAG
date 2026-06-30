@@ -1,3 +1,5 @@
+from typing import Any
+
 from langchain_core.documents import Document
 
 from src.ingestion import embedder
@@ -24,7 +26,7 @@ def test_get_embedding_model_uses_financial_defaults(monkeypatch):
 
 def test_embed_and_store_uses_provided_embedding_model(monkeypatch, tmp_path):
     chunks = [Document(page_content="测试内容", metadata={"source": "unit-test"})]
-    embedding_model = object()
+    embedding_model: Any = object()
     expected_vectorstore = object()
     captured = {}
 
