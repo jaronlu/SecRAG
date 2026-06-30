@@ -28,6 +28,7 @@ class FinancialVectorRetriever(BaseRetriever):
             name=CHROMA_COLLECTION_NAME,
             metadata={"hnsw:space": CHROMA_SPACE},
         )
+        self._model = None
 
     def retrieve(
         self,
@@ -44,12 +45,12 @@ class FinancialVectorRetriever(BaseRetriever):
         return self._format(results)
 
     def _embed(self, text: str) -> List[float]:
-        """调用配置的 embedding 模型"""
-        from src.ingestion.embedder import get_embedding_model
+        """调用配置的 embedding 模型（懒加载，首次使用时加载，之后复用）"""
+        if self._model is None:
+            from src.ingestion.embedder import get_embedding_model
 
-        model = get_embedding_model(config.embedding.model)
-        # TODO: 每次检索都重新加载模型；Phase 2 改为应用启动时单例
-        return model.embed_query(text)
+            self._model = get_embedding_model(config.embedding.model)
+        return self._model.embed_query(text)
 
     def _format(self, results: Any) -> List[Dict]:
         formatted = []

@@ -29,6 +29,12 @@ def build_chunk_id(source: str, index: int, content: str) -> str:
     return digest[:24]
 
 
+def _sanitize_metadata(meta: dict) -> dict:
+    """过滤 ChromaDB 不支持的复杂 metadata 类型（bbox 坐标等）"""
+    SIMPLE_TYPES = (str, int, float, bool, type(None))
+    return {k: v for k, v in meta.items() if isinstance(v, SIMPLE_TYPES)}
+
+
 def normalize_chunks(chunks, file_path: Path, doc_type: str):
     """补齐 Chroma 过滤和去重所需的基础元数据。"""
     source = str(file_path)
@@ -45,6 +51,7 @@ def normalize_chunks(chunks, file_path: Path, doc_type: str):
     )
 
     for index, chunk in enumerate(chunks):
+        chunk.metadata = _sanitize_metadata(chunk.metadata)
         chunk_id = build_chunk_id(source, index, chunk.page_content)
         chunk.id = chunk_id
         chunk.metadata.setdefault(META_CHUNK_ID, chunk_id)
