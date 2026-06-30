@@ -5,6 +5,16 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from src.schemas.constants import (
+    DOC_TYPE_FINANCIAL_DATA,
+    META_DATE,
+    META_DOC_TYPE,
+    META_TITLE,
+    RR_CONTENT,
+    RR_METADATA,
+    RR_SCORE,
+)
+
 
 @pytest.fixture
 def mock_chromadb(monkeypatch) -> MagicMock:
@@ -53,9 +63,9 @@ class TestFormat:
         }
         formatted = retriever._format(results)
         assert len(formatted) == 1
-        assert formatted[0]["content"] == "茅台净利润747亿"
-        assert formatted[0]["metadata"] == {"title": "年报", "date": "2024"}
-        assert formatted[0]["score"] == pytest.approx(0.85)
+        assert formatted[0][RR_CONTENT] == "茅台净利润747亿"
+        assert formatted[0][RR_METADATA] == {"title": "年报", "date": "2024"}
+        assert formatted[0][RR_SCORE] == pytest.approx(0.85)
 
     def test_multiple_results(self, retriever):
         results = {
@@ -66,9 +76,9 @@ class TestFormat:
         formatted = retriever._format(results)
         assert len(formatted) == 3
         for i, doc in enumerate(formatted):
-            assert doc["content"] == f"doc{i + 1}"
-            assert doc["metadata"]["a"] == i + 1
-            assert doc["score"] == pytest.approx(1 - (i + 1) * 0.1)
+            assert doc[RR_CONTENT] == f"doc{i + 1}"
+            assert doc[RR_METADATA]["a"] == i + 1
+            assert doc[RR_SCORE] == pytest.approx(1 - (i + 1) * 0.1)
 
     def test_score_upper_bound(self, retriever):
         """distance=0 → score=1（完全匹配）"""
@@ -78,7 +88,7 @@ class TestFormat:
             "distances": [[0.0]],
         }
         formatted = retriever._format(results)
-        assert formatted[0]["score"] == pytest.approx(1.0)
+        assert formatted[0][RR_SCORE] == pytest.approx(1.0)
 
     def test_score_lower_bound(self, retriever):
         """distance=1 → score=0（完全不匹配）
@@ -90,7 +100,7 @@ class TestFormat:
             "distances": [[1.0]],
         }
         formatted = retriever._format(results)
-        assert formatted[0]["score"] == pytest.approx(0.0)
+        assert formatted[0][RR_SCORE] == pytest.approx(0.0)
 
 
 # ── _embed ───────────────────────────────────────────────────────────────
@@ -143,8 +153,8 @@ class TestRetrieve:
         results = retriever.retrieve("茅台2024净利润")
 
         assert len(results) == 2
-        assert results[0]["content"] == "茅台净利润747亿"
-        assert results[0]["score"] == pytest.approx(0.88)
+        assert results[0][RR_CONTENT] == "茅台净利润747亿"
+        assert results[0][RR_SCORE] == pytest.approx(0.88)
 
         # 验证 ChromaDB query 被正确调用
         mock_chromadb.query.assert_called_once()
@@ -172,7 +182,7 @@ class TestRetrieve:
             "distances": [[]],
         }
 
-        filters = {"doc_type": {"$eq": "financial_report"}}
+        filters = {META_DOC_TYPE: {"$eq": DOC_TYPE_FINANCIAL_DATA}}
         retriever.retrieve("查询", filters=filters)
 
         assert mock_chromadb.query.call_args[1]["where"] == filters

@@ -3,11 +3,11 @@ from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 
 # ⚡ 字段统一：配置常量见 src/schemas/constants.py
-from src.schemas.constants import CHROMA_COLLECTION_NAME, CHROMA_SPACE
+from src.schemas.constants import CHROMA_COLLECTION_NAME, CHROMA_SPACE, DEFAULT_EMBEDDING_MODEL
 
 
 def get_embedding_model(
-    model_name: str = "BAAI/bge-m3",
+    model_name: str = DEFAULT_EMBEDDING_MODEL,
 ) -> HuggingFaceEmbeddings:
     """
     返回一个 Embedding 转换器实例。

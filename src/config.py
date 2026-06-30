@@ -54,8 +54,8 @@ class Settings(BaseSettings):
     openai_model: str = OPENAI_DEFAULT_MODEL
     openai_api_key: str = ""
 
-    # Embedding
-    embedding_model: str = "BAAI/bge-m3"
+    # Embedding：DEFAULT_EMBEDDING_MODEL
+    embedding_model: str = "BAAI/bge-small-zh-v1.5"
 
     # Chroma
     chroma_persist_directory: str = CHROMA_DEFAULT_PERSIST_DIR

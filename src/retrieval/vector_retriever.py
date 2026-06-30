@@ -9,6 +9,8 @@ from src.config import config
 from src.schemas.constants import (
     CHROMA_COLLECTION_NAME,
     CHROMA_DEFAULT_PERSIST_DIR,
+    CHROMA_SPACE,
+    DEFAULT_TOP_K,
     RR_CONTENT,
     RR_METADATA,
     RR_SCORE,
@@ -24,13 +26,13 @@ class FinancialVectorRetriever(BaseRetriever):
         )
         self.collection = self.client.get_or_create_collection(
             name=CHROMA_COLLECTION_NAME,
-            metadata={"hnsw:space": "cosine"},
+            metadata={"hnsw:space": CHROMA_SPACE},
         )
 
     def retrieve(
         self,
         query: str,
-        top_k: int = 5,
+        top_k: int = DEFAULT_TOP_K,
         filters: Optional[Dict] = None,
     ) -> List[Dict]:
         query_embedding = self._embed(query)

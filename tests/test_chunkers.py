@@ -1,6 +1,11 @@
 from langchain_core.documents import Document
 
 from src.ingestion.chunkers import create_financial_splitter, chunk_documents
+from src.schemas.constants import (
+    DOC_TYPE_ANNOUNCEMENT,
+    DOC_TYPE_FINANCIAL_DATA,
+    DOC_TYPE_RESEARCH_REPORT,
+)
 
 
 def _sample_document(
@@ -45,7 +50,7 @@ def test_create_financial_splitter_chinese_aware():
 
 def test_chunk_documents_research_report():
     doc = _sample_document("研究内容。")
-    chunks = chunk_documents([doc], "research_report")
+    chunks = chunk_documents([doc], DOC_TYPE_RESEARCH_REPORT)
     assert len(chunks) >= 1
     assert all(c.page_content for c in chunks)
 
@@ -53,22 +58,22 @@ def test_chunk_documents_research_report():
 def test_chunk_documents_announcement_smaller_chunks():
     content = "公告正文。段落二。段落三。段落四。段落五。段落六。"
     doc = _sample_document(content)
-    chunks = chunk_documents([doc], "announcement")
+    chunks = chunk_documents([doc], DOC_TYPE_ANNOUNCEMENT)
     assert len(chunks) >= 1
 
 
 def test_chunk_documents_financial_report_larger_chunks():
     content = "财务报告" * 200
     doc = _sample_document(content)
-    chunks_ann = chunk_documents([doc], "announcement")
-    chunks_fin = chunk_documents([doc], "financial_report")
+    chunks_ann = chunk_documents([doc], DOC_TYPE_ANNOUNCEMENT)
+    chunks_fin = chunk_documents([doc], DOC_TYPE_FINANCIAL_DATA)
     assert len(chunks_fin) < len(chunks_ann)
 
 
 def test_chunk_documents_preserves_metadata():
     meta = {"source": "annual_report.pdf", "year": "2024"}
     doc = _sample_document("年报内容。", metadata=meta)
-    chunks = chunk_documents([doc], "financial_report")
+    chunks = chunk_documents([doc], DOC_TYPE_FINANCIAL_DATA)
     for chunk in chunks:
         assert chunk.metadata["source"] == "annual_report.pdf"
         assert chunk.metadata["year"] == "2024"

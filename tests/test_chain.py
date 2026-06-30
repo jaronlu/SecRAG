@@ -5,6 +5,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from src.schemas.constants import (
+    META_DATE,
+    META_TITLE,
+    RR_CONTENT,
+    RR_METADATA,
+)
+
 
 # ── format_docs ──────────────────────────────────────────────────────────
 
@@ -16,8 +23,8 @@ class TestFormatDocs:
         from src.rag.chain import format_docs
 
         docs = [
-            {"content": "茅台净利润747亿", "metadata": {"title": "年报", "date": "2024"}},
-            {"content": "五粮液净利润302亿", "metadata": {"title": "年报", "date": "2024"}},
+            {RR_CONTENT: "茅台净利润747亿", RR_METADATA: {META_TITLE: "年报", META_DATE: "2024"}},
+            {RR_CONTENT: "五粮液净利润302亿", RR_METADATA: {META_TITLE: "年报", META_DATE: "2024"}},
         ]
         result = format_docs(docs)
         assert "[来源1]" in result
@@ -36,7 +43,7 @@ class TestFormatDocs:
         from src.rag.chain import format_docs
 
         docs = [
-            {"content": "单条结果", "metadata": {"title": "测试", "date": "2025"}}
+            {RR_CONTENT: "单条结果", RR_METADATA: {META_TITLE: "测试", META_DATE: "2025"}}
         ]
         result = format_docs(docs)
         assert "[来源1] 测试 (2025)" in result
@@ -47,8 +54,8 @@ class TestFormatDocs:
         from src.rag.chain import format_docs
 
         docs = [
-            {"content": "无标题", "metadata": {}},
-            {"content": "无日期", "metadata": {"title": "报告"}},
+            {RR_CONTENT: "无标题", RR_METADATA: {}},
+            {RR_CONTENT: "无日期", RR_METADATA: {META_TITLE: "报告"}},
         ]
         result = format_docs(docs)
         assert "未知文档" in result  # title 回退
@@ -60,7 +67,7 @@ class TestFormatDocs:
         """metadata={'title': '文档'} 时 key lookup 使用传递值"""
         from src.rag.chain import format_docs
 
-        docs = [{"content": "内容", "metadata": {"title": "文档"}}]
+        docs = [{RR_CONTENT: "内容", RR_METADATA: {META_TITLE: "文档"}}]
         result = format_docs(docs)
         assert "文档" in result
         assert "内容" in result
@@ -70,9 +77,9 @@ class TestFormatDocs:
         from src.rag.chain import format_docs
 
         docs = [
-            {"content": "a", "metadata": {"title": "A"}},
-            {"content": "b", "metadata": {"title": "B"}},
-            {"content": "c", "metadata": {"title": "C"}},
+            {RR_CONTENT: "a", RR_METADATA: {META_TITLE: "A"}},
+            {RR_CONTENT: "b", RR_METADATA: {META_TITLE: "B"}},
+            {RR_CONTENT: "c", RR_METADATA: {META_TITLE: "C"}},
         ]
         result = format_docs(docs)
         assert "[来源1]" in result
@@ -102,13 +109,13 @@ class FakeRetriever:
 
     def retrieve(self, query: str, top_k: int = 5, filters: Optional[Dict] = None) -> List[Dict]:
         return [
-            {"content": "mock结果", "metadata": {"title": "mock", "date": "2025"}}
+            {RR_CONTENT: "mock结果", RR_METADATA: {META_TITLE: "mock", META_DATE: "2025"}}
         ]
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=False)
 def mock_dependencies(monkeypatch):
-    """mock 所有外部依赖：retriever + ChatOllama + ChromaDB"""
+    """mock 所有外部依赖：retriever + LLM + ChromaDB"""
     # 1) mock ChromaDB（防止 import chain 时 FinancialVectorRetriever 连真实 ChromaDB）
     monkeypatch.setattr("chromadb.PersistentClient", lambda **_: MagicMock())
 
@@ -118,12 +125,14 @@ def mock_dependencies(monkeypatch):
     # 3) 替换模块级 retriever 实例为 FakeRetriever（避免 _embed 加载 HuggingFace）
     monkeypatch.setattr(chain_module, "retriever", FakeRetriever())
 
-    # 4) mock ChatOllama（不连 localhost:11434）
-    monkeypatch.setattr(chain_module, "ChatOllama", FakeChatOllama)
+    # 4) 替换 _build_llm，无论 provider 配置如何都返回 fake
+    monkeypatch.setattr(chain_module, "_build_llm", lambda: FakeChatOllama())
+
+    return chain_module
 
 
 class TestBuildRagChain:
-    def test_returns_runnable(self):
+    def test_returns_runnable(self, mock_dependencies):
         """build_rag_chain 返回一个 LangChain Runnable"""
         from src.rag.chain import build_rag_chain
 
@@ -132,7 +141,7 @@ class TestBuildRagChain:
 
         assert isinstance(chain, Runnable)
 
-    def test_invoke_returns_string(self):
+    def test_invoke_returns_string(self, mock_dependencies):
         """chain invoke 后返回字符串"""
         from src.rag.chain import build_rag_chain
 
@@ -142,7 +151,7 @@ class TestBuildRagChain:
         assert len(result) > 0
         assert result == "模拟回答"
 
-    def test_invoke_with_empty_question(self):
+    def test_invoke_with_empty_question(self, mock_dependencies):
         """空问题也能正常走通"""
         from src.rag.chain import build_rag_chain
 

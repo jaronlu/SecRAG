@@ -6,6 +6,7 @@ from pathlib import Path
 
 from src.ingestion.chunkers import chunk_documents
 from src.ingestion.embedder import embed_and_store, get_embedding_model
+from src.config import config
 from src.schemas.constants import (
     META_CHUNK_ID,
     META_DOC_ID,
@@ -84,8 +85,8 @@ def ingest_document(file_path: Path, doc_type: str):
     chunks = normalize_chunks(chunks, file_path, doc_type)
     print(f"  分块数: {len(chunks)}")
 
-    # 3. 向量化并存储
-    embedding_model = get_embedding_model()
+    # 3. 向量化并存储（从 config 读取 embedding 模型名称）
+    embedding_model = get_embedding_model(config.embedding.model)
     embed_and_store(
         chunks=chunks,
         persist_directory=CHROMA_DEFAULT_PERSIST_DIR,

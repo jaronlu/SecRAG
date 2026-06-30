@@ -17,7 +17,7 @@ def test_get_embedding_model_uses_financial_defaults(monkeypatch):
     assert isinstance(model, FakeHuggingFaceEmbeddings)
     assert captured == {
         "model_name": "test-model",
-        "model_kwargs": {"device": "cpu"},
+        "model_kwargs": {"device": "mps"},
         "encode_kwargs": {"normalize_embeddings": True},
     }
 
