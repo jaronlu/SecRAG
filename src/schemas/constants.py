@@ -50,6 +50,34 @@ PLAN_DENIED = "denied"
 PLAN_REASON = "reason"
 
 # ══════════════════════════════════════════════════════════════════════
+# AssistantState 字段键名  (SCHEMA-REFERENCE §3.4)
+# ══════════════════════════════════════════════════════════════════════
+
+STATE_USER_ID = "user_id"
+STATE_USER_ROLE = "user_role"
+STATE_DEPARTMENT = "department"
+STATE_DATA_PERMISSIONS = "data_permissions"
+STATE_CLIENT_ID = "client_id"
+STATE_ORIGINAL_QUERY = "original_query"
+STATE_REWRITTEN_QUERY = "rewritten_query"
+STATE_INTENT = "intent"
+STATE_ENTITIES = "entities"
+STATE_AMBIGUITY = "ambiguity"
+STATE_QUERY_TYPE = "query_type"
+STATE_RETRIEVAL_PLAN = "retrieval_plan"
+STATE_RETRIEVAL_RESULTS = "retrieval_results"
+STATE_MESSAGES = "messages"
+STATE_TOOL_CALLS = "tool_calls"
+STATE_INTERMEDIATE_STEPS = "intermediate_steps"
+STATE_VERIFICATION = "verification"
+STATE_COMPLIANCE = "compliance"
+STATE_FINAL_ANSWER = "final_answer"
+STATE_CITATIONS = "citations"
+STATE_CONFIDENCE = "confidence"
+STATE_RISK_DISCLOSURE = "risk_disclosure"
+STATE_AUDIT_TRAIL = "audit_trail"
+
+# ══════════════════════════════════════════════════════════════════════
 # doc_type 枚举  (SCHEMA-REFERENCE §2.1)
 # ══════════════════════════════════════════════════════════════════════
 
@@ -186,6 +214,7 @@ ROLE_DATA_PERMISSIONS: dict[str, list[str]] = {
 
 DEFAULT_TOP_K = 5
 DEFAULT_MAX_HOPS = 3
+GRADE_TOP_K = 10
 DEFAULT_RERANK_TOP_K = 5
 
 CONFIDENCE_HIGH_THRESHOLD = 0.75
