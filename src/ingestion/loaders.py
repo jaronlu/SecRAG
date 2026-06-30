@@ -1,15 +1,25 @@
+import hashlib
 from pathlib import (
     Path,
-)  # ≈ NSString filePath — 跨平台路径操作，类似 NSSearchPathForDirectoriesInDomains 返回的路径字符串
-from typing import List  # ≈ NSArray<id> — 类型注解，声明返回值是 Document 对象的数组
+)
+from typing import List
 
-import pandas as pd  # ≈ Core Data 的 NSFetchedResultsController + 表格解析 — 把 CSV 读成结构化表格
-from langchain_core.documents import (
-    Document,
-)  # ≈ @interface Document : NSObject — 文档块，.page_content 是 NSString，.metadata 是 NSDictionary
-from langchain_unstructured import (
-    UnstructuredLoader,
-)  # ≈ NSXMLParser / NSAttributedString 文档解析器 — 把 PDF/Word/HTML 文件解析成结构化文本
+import pandas as pd
+from langchain_core.documents import Document
+from langchain_unstructured import UnstructuredLoader
+
+# ⚡ 字段统一：metadata 键名和枚举值见 src/schemas/constants.py
+from src.schemas.constants import (
+    META_DOC_TYPE,
+    META_SOURCE,
+    META_STOCK_CODE,
+    META_TITLE,
+    META_DATE,
+    META_DOC_ID,
+    META_PERMISSION_LEVEL,
+    DOC_TYPE_FINANCIAL_DATA,
+    PERMISSION_INTERNAL,
+)
 
 
 def load_pdf(file_path: Path) -> List[Document]:
@@ -59,50 +69,36 @@ def load_directory(directory: Path) -> List[Document]:
     return documents  # 返回合并后的所有文档块列表
 
 
-def load_html(url: str) -> List[Document]:
-    """加载公告文档 HTML"""
-    # UnstructuredLoader 支持 web_url 参数，直接抓取 URL 内容并解析
-    # ObjC 类比：≈ [NSData dataWithContentsOfURL:url] 然后用 NSAttributedString 解析 HTML
-    # 适合加载上市公司公告网页、证监会披露页等
-    loader = UnstructuredLoader(web_url=url)
+def load_html(file_path: Path) -> List[Document]:
+    """加载本地公告 HTML"""
+    loader = UnstructuredLoader(file_path=str(file_path))
     return loader.load()
 
 
 def load_financial_csv(file_path: Path) -> List[Document]:
-    """加载财务数据 CSV"""
-    # pandas.read_csv 把 CSV 文件读成 DataFrame（行×列的表格）
-    # ObjC 类比：≈ 用 NSRegularExpression 逐行解析 CSV，或使用 NSManagedObject 批量从 CSV 导入
+    """加载财务数据 CSV，每行生成一个 Document"""
     df = pd.read_csv(file_path)
-    documents = []  # 累积转换后的 Document 列表
+    documents = []
+    source = str(file_path)
+    doc_id = hashlib.sha1(source.encode("utf-8")).hexdigest()[:16]
 
-    # iterrows() 逐行遍历 DataFrame，每行是一个 Series（列名→值的映射）
-    # ObjC 类比：≈ for (NSDictionary *row in csvRows)
     for _, row in df.iterrows():
-        # 把一行数据转成纯文本：每列用 "列名: 值" 的格式，列之间用换行分隔
-        # 示例输出：
-        #   code: 600519
-        #   year: 2024
-        #   net_profit: 747.3
-        #   total_assets: 3720.5
         content = "\n".join([f"{col}: {val}" for col, val in row.items()])
-        # 构造 Document 对象（LangChain 的标准文档格式）
-        # ObjC 类比：≈ [[Document alloc] initWithContent:content metadata:meta]
         documents.append(
             Document(
-                page_content=content,  # 文档正文文本；≈ NSString *content — 将被 embedding 模型向量化的内容
-                metadata={  # 元数据字典；≈ NSDictionary — 不参与向量化，但会被存入向量库供后续过滤/溯源
-                    "doc_type": "financial_data",  # 文档类型标记，用于检索时过滤（如只搜财务数据）
-                    "source": str(file_path),  # 数据来源文件路径，用于引用溯源
-                    "stock_code": row.get("code", ""),  # 股票代码，如 "600519"，用于按标的检索
-                    "year": row.get("year", ""),  # 年份，如 "2024"，用于按年度筛选
-                    "net_profit": row.get(
-                        "net_profit", ""
-                    ),  # 净利润，结构化字段，供 Agent 做数值计算
-                    "total_assets": row.get("total_assets", ""),  # 总资产，同上
+                page_content=content,
+                metadata={
+                    META_DOC_TYPE: DOC_TYPE_FINANCIAL_DATA,
+                    META_SOURCE: source,
+                    META_DOC_ID: doc_id,
+                    META_TITLE: file_path.stem,
+                    META_DATE: str(row.get("year", "")),
+                    META_STOCK_CODE: str(row.get("code", "")),
+                    META_PERMISSION_LEVEL: PERMISSION_INTERNAL,
                 },
             )
         )
-    return documents  # 返回 CSV 每一行转换成的 Document 列表
+    return documents
 
 
 # __main__ 块：直接运行此文件时执行的测试/演示代码

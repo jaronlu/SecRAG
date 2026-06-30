@@ -1,17 +1,27 @@
+"""ChromaDB 向量检索器"""
+
 from typing import Dict, List, Optional
 
 import chromadb
 
+# ⚡ 字段统一：使用常量而非裸字符串
+from src.schemas.constants import (
+    CHROMA_COLLECTION_NAME,
+    CHROMA_DEFAULT_PERSIST_DIR,
+    RR_CONTENT,
+    RR_METADATA,
+    RR_SCORE,
+)
 from .base import BaseRetriever
 
 
 class FinancialVectorRetriever(BaseRetriever):
-    def __init__(self):
+    def __init__(self, persist_directory: str = CHROMA_DEFAULT_PERSIST_DIR):
         self.client = chromadb.PersistentClient(
-            path="./data/chroma",
+            path=persist_directory,
         )
         self.collection = self.client.get_or_create_collection(
-            name="securities_docs",
+            name=CHROMA_COLLECTION_NAME,
             metadata={"hnsw:space": "cosine"},
         )
 
@@ -34,8 +44,7 @@ class FinancialVectorRetriever(BaseRetriever):
         from src.ingestion.embedder import get_embedding_model
 
         model = get_embedding_model("BAAI/bge-m3")
-
-        # TODO:：每次检索都重新加载模型；Phase 2 改为应用启动时单例
+        # TODO: 每次检索都重新加载模型；Phase 2 改为应用启动时单例
         return model.embed_query(text)
 
     def _format(self, results: Dict) -> List[Dict]:
@@ -46,8 +55,8 @@ class FinancialVectorRetriever(BaseRetriever):
             results["distances"][0],
         ):
             formatted.append({
-                "content": doc,
-                "metadata": meta,
-                "score": 1 - dist,  # cosine distance -> similarity
+                RR_CONTENT: doc,
+                RR_METADATA: meta,
+                RR_SCORE: 1 - dist,  # cosine distance -> similarity
             })
         return formatted

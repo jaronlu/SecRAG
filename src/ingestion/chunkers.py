@@ -1,8 +1,17 @@
 """金融文档分块策略"""
 
-from langchain_core.documents import Document                       # ≈ @interface Document : NSObject — 文档块对象，.page_content 是 NSString，.metadata 是 NSDictionary
-from langchain_text_splitters import RecursiveCharacterTextSplitter # ≈ NSScanner / NSAttributedString 文本切分工具 — 把长文本按规则切成多个小块（chunk）
-from typing import List                                             # ≈ NSArray<id> — 类型注解，声明参数/返回值是对象数组
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from typing import List
+
+# ⚡ 字段统一：doc_type 枚举值见 src/schemas/constants.py
+from src.schemas.constants import (
+    DOC_TYPE_RESEARCH_REPORT,
+    DOC_TYPE_ANNOUNCEMENT,
+    DOC_TYPE_REGULATION,
+    DOC_TYPE_FINANCIAL_DATA,
+    DOC_TYPE_MEETING_MINUTES,
+)
 
 
 def create_financial_splitter(
@@ -49,38 +58,31 @@ def chunk_documents(
     # ObjC 类比：≈ NSDictionary<NSString *, NSScanner *> — 用 doc_type 作为 key 查找对应的切分器配置
     splitters = {
         # 研究报告：中等 chunk，保留较多上下文
-        "research_report": RecursiveCharacterTextSplitter(
-            chunk_size=500, chunk_overlap=100,     # 500 字符/chunk，100 重叠
+        DOC_TYPE_RESEARCH_REPORT: RecursiveCharacterTextSplitter(
+            chunk_size=500, chunk_overlap=100,
             separators=["\n\n", "\n", "。", "；", " ", ""],
         ),
         # 公告：小块快速切分，适合短公告
-        "announcement": RecursiveCharacterTextSplitter(
-            chunk_size=300, chunk_overlap=50,      # 300 字符/chunk，50 重叠
+        DOC_TYPE_ANNOUNCEMENT: RecursiveCharacterTextSplitter(
+            chunk_size=300, chunk_overlap=50,
             separators=["\n\n", "\n", "。", "；", " ", ""],
         ),
-        # 财务报告：大块保留完整财务数据段
-        "financial_report": RecursiveCharacterTextSplitter(
-            chunk_size=800, chunk_overlap=200,     # 800 字符/chunk，200 重叠
+        # 财务数据：大块保留完整财务数据段
+        DOC_TYPE_FINANCIAL_DATA: RecursiveCharacterTextSplitter(
+            chunk_size=800, chunk_overlap=200,
             separators=["\n\n", "\n", "。", "；", " ", ""],
         ),
         # 法规：中等 chunk，平衡精度和召回
-        "regulation": RecursiveCharacterTextSplitter(
+        DOC_TYPE_REGULATION: RecursiveCharacterTextSplitter(
             chunk_size=500, chunk_overlap=100,
             separators=["\n\n", "\n", "。", "；", " ", ""],
         ),
         # 会议纪要：偏小 chunk，因为纪要结构松散
-        "meeting_minutes": RecursiveCharacterTextSplitter(
+        DOC_TYPE_MEETING_MINUTES: RecursiveCharacterTextSplitter(
             chunk_size=400, chunk_overlap=80,
             separators=["\n\n", "\n", "。", "；", " ", ""],
         ),
     }
 
-    # splitters.get(doc_type, create_financial_splitter())
-    # ObjC 类比：≈ [dict objectForKey:type] ?: [self defaultSplitter]
-    # 如果 doc_type 在字典中，返回对应的 splitter；否则回退到默认的金融分块器
-    splitters = splitters.get(doc_type, create_financial_splitter())
-
-    # split_documents() 执行实际切分
-    # ObjC 类比：≈ [scanner scanDocuments:documents intoChunks:] — 遍历 documents，对每个 doc 按规则切分
-    # 输出：List[Document]，每个 chunk 继承原始 metadata，page_content 是被切分的文本片段
-    return splitters.split_documents(documents)
+    splitter = splitters.get(doc_type, create_financial_splitter())
+    return splitter.split_documents(documents)

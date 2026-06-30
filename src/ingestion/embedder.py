@@ -1,6 +1,9 @@
-from langchain_chroma import Chroma                       # ≈ #import <CoreData/CoreData.h> — 向量数据库（类比 Core Data 的 NSPersistentContainer）
-from langchain_core.documents import Document             # ≈ @interface Document : NSObject — 一个文档块，有 content（NSString）和 metadata（NSDictionary）两个属性
-from langchain_huggingface import HuggingFaceEmbeddings   # ≈ NSValueTransformer — 把 NSString 转成 float[]（embedding 向量）的转换器
+from langchain_chroma import Chroma
+from langchain_core.documents import Document
+from langchain_huggingface import HuggingFaceEmbeddings
+
+# ⚡ 字段统一：配置常量见 src/schemas/constants.py
+from src.schemas.constants import CHROMA_COLLECTION_NAME, CHROMA_SPACE
 
 
 def get_embedding_model(
@@ -38,17 +41,12 @@ def embed_and_store(
     # 2. 向量 + 原文 + metadata 写入 Chroma 集合
     # 3. 持久化到 persist_directory
     vectorstore = Chroma.from_documents(
-        documents=chunks,                             # 要入库的文档块；≈ 要保存的 NSManagedObject 列表
-        embedding=embedding_model,                    # 文本→向量的转换器；≈ NSExpression/NSValueTransformer
-        persist_directory=persist_directory,          # 向量数据存到哪个目录；≈ NSPersistentStoreDescription URL
-        collection_name="securities_docs",             # 集合名称；≈ Core Data 的 Entity Name / 数据库表名
-        # collection_metadata 是集合级配置，ChromaDB 在创建集合时读取
-        # 类比：建表时指定索引类型（如 CREATE INDEX ... USING HNSW）
+        documents=chunks,
+        embedding=embedding_model,
+        persist_directory=persist_directory,
+        collection_name=CHROMA_COLLECTION_NAME,
         collection_metadata={
-            # hnsw = Hierarchical Navigable Small World，ChromaDB 默认的近似最近邻（ANN）索引算法
-            # 类比：SQLite 的 FTS5 全文索引，或 Core Data 的 SQLite 索引
-            "hnsw:space": "cosine",                   # 向量距离计算方式；"cosine" = 余弦相似度，适合归一化后的向量
-                                                       # 可选值：l2（欧氏距离）、ip（内积）；本项目用 cosine 因为 model 已归一化
+            "hnsw:space": CHROMA_SPACE,
         },
     )
     return vectorstore  # 返回 Chroma 实例；≈ 返回 NSPersistentContainer，后续可用 .similarity_search() 做检索
