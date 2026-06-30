@@ -14,7 +14,14 @@ from src.agents.nodes import (
     verify,
 )
 from src.agents.state import AssistantState
-from src.schemas.constants import RR_SCORE, STATE_COMPLIANCE, STATE_RETRIEVAL_RESULTS, STATE_VERIFICATION
+from src.schemas.constants import (
+    DEFAULT_MAX_HOPS,
+    RR_SCORE,
+    STATE_COMPLIANCE,
+    STATE_RETRIEVAL_ATTEMPTS,
+    STATE_RETRIEVAL_RESULTS,
+    STATE_VERIFICATION,
+)
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -23,7 +30,11 @@ from src.schemas.constants import RR_SCORE, STATE_COMPLIANCE, STATE_RETRIEVAL_RE
 
 
 def should_retry_retrieval(state: AssistantState) -> str:
-    """判断是否需要补充检索"""
+    """判断是否需要补充检索（最多 DEFAULT_MAX_HOPS 次，计数器由 retrieve 节点维护）"""
+    attempts = state.get(STATE_RETRIEVAL_ATTEMPTS, 0)
+    if attempts >= DEFAULT_MAX_HOPS:
+        return "continue"
+
     results = state.get(STATE_RETRIEVAL_RESULTS, [])
     if not results:
         return "retrieve"
@@ -80,13 +91,13 @@ def build_agent_graph() -> StateGraph:
     graph.add_edge("planner", "retrieve")
     graph.add_edge("retrieve", "grade_and_filter")
 
-    # 条件路由：检索不足则补充检索
+    # 条件路由：检索不足则重新规划并补充检索（最多 DEFAULT_MAX_HOPS 次）
     graph.add_conditional_edges(
         "grade_and_filter",
         should_retry_retrieval,
         {
             "continue": "reason",
-            "retrieve": "retrieve",
+            "retrieve": "planner",
         },
     )
 

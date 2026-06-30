@@ -51,46 +51,35 @@ def create_financial_splitter(
 
 
 def chunk_documents(
-    documents: List[
-        Document
-    ],  # 待分块的文档列表；≈ NSArray<Document *> — 每个 Document 是一段未切分的原始文本
-    doc_type: str,  # 文档类型字符串；≈ NSString — 决定用哪种分块策略，如 "research_report"、"announcement"
-) -> List[Document]:  # 返回分块后的文档列表；≈ NSArray<Document *> — chunk 数量通常 ≥ 输入数量
-    """根据文档类型选择分块策略"""
-    # splitters 字典：每种文档类型对应一个预配置的 TextSplitter
-    # ObjC 类比：≈ NSDictionary<NSString *, NSScanner *> — 用 doc_type 作为 key 查找对应的切分器配置
+    documents: List[Document],
+    doc_type: str,
+) -> List[Document]:
+    """根据文档类型选择分块策略
+
+    ObjC 类比：≈ NSDictionary<NSString *, NSScanner *> dispatch
+    """
+    _default = create_financial_splitter
+
     splitters = {
-        # 研究报告：中等 chunk，保留较多上下文
-        DOC_TYPE_RESEARCH_REPORT: RecursiveCharacterTextSplitter(
-            chunk_size=500,
-            chunk_overlap=100,
-            separators=["\n\n", "\n", "。", "；", " ", ""],
-        ),
+        # 研究报告 / 法规：复用默认金融分块器（chunk_size=500, overlap=100）
+        DOC_TYPE_RESEARCH_REPORT: _default(),
+        DOC_TYPE_REGULATION: _default(),
         # 公告：小块快速切分，适合短公告
         DOC_TYPE_ANNOUNCEMENT: RecursiveCharacterTextSplitter(
-            chunk_size=300,
-            chunk_overlap=50,
+            chunk_size=300, chunk_overlap=50,
             separators=["\n\n", "\n", "。", "；", " ", ""],
         ),
         # 财务数据：大块保留完整财务数据段
         DOC_TYPE_FINANCIAL_DATA: RecursiveCharacterTextSplitter(
-            chunk_size=800,
-            chunk_overlap=200,
+            chunk_size=800, chunk_overlap=200,
             separators=["\n\n", "\n", "。", "；", " ", ""],
         ),
-        # 法规：中等 chunk，平衡精度和召回
-        DOC_TYPE_REGULATION: RecursiveCharacterTextSplitter(
-            chunk_size=500,
-            chunk_overlap=100,
-            separators=["\n\n", "\n", "。", "；", " ", ""],
-        ),
-        # 会议纪要：偏小 chunk，因为纪要结构松散
+        # 会议纪要：偏小 chunk，纪要结构松散
         DOC_TYPE_MEETING_MINUTES: RecursiveCharacterTextSplitter(
-            chunk_size=400,
-            chunk_overlap=80,
+            chunk_size=400, chunk_overlap=80,
             separators=["\n\n", "\n", "。", "；", " ", ""],
         ),
     }
 
-    splitter = splitters.get(doc_type, create_financial_splitter())
+    splitter = splitters.get(doc_type, _default())
     return splitter.split_documents(documents)

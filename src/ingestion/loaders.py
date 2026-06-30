@@ -1,4 +1,5 @@
 import hashlib
+import logging
 from pathlib import (
     Path,
 )
@@ -21,24 +22,18 @@ from src.schemas.constants import (
     PERMISSION_INTERNAL,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def load_pdf(file_path: Path) -> List[Document]:
     """加载 PDF 文档，优先使用 UnstructuredLoader，失败时回退到 pypdf"""
     try:
-        # UnstructuredLoader 是 LangChain 的文档加载器（Document Loader）
-        # ObjC 类比：≈ [[NSXMLParser alloc] initWithContentsOfURL:url] + delegate 解析
-        # 它接收文件路径，内部调用 unstructured 库做版面分析（layout analysis），提取纯文本
         loader = UnstructuredLoader(
             file_path=str(file_path)
-        )  # 初始化加载器；file_path 是 Path 对象，str() 转成字符串路径
-        # print(f'loader: {loader}')  # ← 遗留调试代码，已移除
-        # loader.load() 同步执行解析，返回 List[Document]
-        # ObjC 类比：[parser parse] — 阻塞直到解析完成，每个 Document ≈ 解析出的一个文本段落
+        )
         return loader.load()
     except Exception as e:
-        # 如果 unstructured 缺少依赖（如 pikepdf、pdf2image），或文件损坏，不会崩溃而是返回空列表
-        # ObjC 类比：@try { ... } @catch (NSException *e) { return @[]; }
-        print(f"error: {e}")
+        logger.warning("PDF 解析失败，将跳过此文件: %s — %s", file_path, e)
         return []
 
 

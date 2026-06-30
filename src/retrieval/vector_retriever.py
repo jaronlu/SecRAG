@@ -1,6 +1,6 @@
 """ChromaDB 向量检索器"""
 
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import chromadb
 
@@ -51,7 +51,7 @@ class ChromaVectorRetriever(BaseRetriever):
             self._model = get_embedding_model(config.embedding.model)
         return self._model.embed_query(text)
 
-    def _format(self, results: Any) -> List[Dict]:
+    def _format(self, results: Dict) -> List[Dict]:
         formatted = []
         for doc, meta, dist in zip(
             results["documents"][0],

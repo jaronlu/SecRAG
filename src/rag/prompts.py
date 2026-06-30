@@ -1,4 +1,4 @@
-"""RAG chain 相关模块待创建）"""
+"""RAG Chain 系统提示词模板"""
 
 from langchain_core.prompts import ChatPromptTemplate
 

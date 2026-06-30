@@ -1,3 +1,6 @@
+import platform
+import warnings
+
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -6,31 +9,47 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from src.schemas.constants import CHROMA_COLLECTION_NAME, CHROMA_SPACE, DEFAULT_EMBEDDING_MODEL
 
 
+def _detect_device() -> str:
+    """自动检测可用的 embedding 推理设备"""
+    system = platform.system()
+    if system == "Darwin":
+        return "mps"
+    if system == "Linux":
+        try:
+            import torch  # noqa: F811
+
+            if torch.cuda.is_available():
+                return "cuda"
+        except ImportError:
+            pass
+    return "cpu"
+
+
 def get_embedding_model(
     model_name: str = DEFAULT_EMBEDDING_MODEL,
 ) -> HuggingFaceEmbeddings:
     """
     返回一个 Embedding 转换器实例。
 
-    ObjC 类比：
-      相当于创建并配置一个 NSValueTransformer，
-      指定用哪个模型（model_name）做文本→向量的转换。
-
+    优先从本地 HuggingFace 缓存加载（秒级），缓存未命中时自动回退到在线下载。
     金融场景推荐：
       - BAAI/bge-m3：中文效果好，支持多语言（≈ 主力模型）
       - moka-ai/m3e-base：轻量，适合快速原型（≈ 轻量替代）
     """
-    # HuggingFaceEmbeddings(...) 初始化 embedding 模型
-    # 类似 [MyTransformer setModel:@"bge-m3"]
-    return HuggingFaceEmbeddings(
-        model_name=model_name,  # 模型名称，对应 HuggingFace Hub 上的 repo id
-        model_kwargs={
-            "device": "mps"
-        },  # 推理设备；"cuda" 用 NVIDIA GPU，"mps" 用 Apple Silicon，默认 CPU
-        encode_kwargs={
-            "normalize_embeddings": True
-        },  # 对输出向量做 L2 归一化（转成单位向量），cosine 相似度必备前提
-    )
+    device = _detect_device()
+    try:
+        return HuggingFaceEmbeddings(
+            model_name=model_name,
+            model_kwargs={"device": device, "local_files_only": True},
+            encode_kwargs={"normalize_embeddings": True},
+        )
+    except OSError:
+        warnings.warn(f"本地缓存未命中，尝试在线下载模型: {model_name}", stacklevel=1)
+        return HuggingFaceEmbeddings(
+            model_name=model_name,
+            model_kwargs={"device": device},
+            encode_kwargs={"normalize_embeddings": True},
+        )
 
 
 def embed_and_store(

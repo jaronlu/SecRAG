@@ -1,3 +1,4 @@
+import json
 from typing import Optional
 
 from langchain_core.tools import tool
@@ -25,7 +26,7 @@ def product_search(
     retriever = ProductRetriever()
     filters = {META_PRODUCT_TYPE: product_type} if product_type else None
     results = retriever.retrieve(query=query, top_k=top_k, filters=filters)
-    return str(results)
+    return json.dumps(results, ensure_ascii=False)
 
 
 @tool
@@ -42,7 +43,7 @@ def regulation_search(query: str, top_k: int = DEFAULT_TOP_K, source: Optional[s
     retriever = RegulationRetriever()
     filters = {"source": source} if source else None
     results = retriever.retrieve(query=query, top_k=top_k, filters=filters)
-    return str(results)
+    return json.dumps(results, ensure_ascii=False)
 
 
 @tool
@@ -59,7 +60,7 @@ def report_search(query: str, top_k: int = DEFAULT_TOP_K, report_type: Optional[
     retriever = ReportRetriever()
     filters = {"report_type": report_type} if report_type else None
     results = retriever.retrieve(query=query, top_k=top_k, filters=filters)
-    return str(results)
+    return json.dumps(results, ensure_ascii=False)
 
 
 @tool
@@ -71,7 +72,7 @@ def faq_search(query: str, top_k: int = DEFAULT_TOP_K) -> str:
 
     retriever = FAQRetriever()
     results = retriever.retrieve(query=query, top_k=top_k)
-    return str(results)
+    return json.dumps(results, ensure_ascii=False)
 
 
 # ══════════════════════════════════════════════════════════════════════

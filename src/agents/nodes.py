@@ -9,6 +9,11 @@ from langchain_core.messages import HumanMessage
 
 from src.agents.state import AssistantState
 from src.config import config
+from src.retrieval.base import BaseRetriever
+from src.retrieval.faq_retriever import FAQRetriever
+from src.retrieval.product_retriever import ProductRetriever
+from src.retrieval.regulation_retriever import RegulationRetriever
+from src.retrieval.report_retriever import ReportRetriever
 from src.schemas.constants import (
     CONFIDENCE_HIGH,
     CONFIDENCE_LOW,
@@ -56,6 +61,7 @@ from src.schemas.constants import (
     STATE_MESSAGES,
     STATE_ORIGINAL_QUERY,
     STATE_QUERY_TYPE,
+    STATE_RETRIEVAL_ATTEMPTS,
     STATE_RETRIEVAL_PLAN,
     STATE_RETRIEVAL_RESULTS,
     STATE_REWRITTEN_QUERY,
@@ -75,7 +81,7 @@ def _build_llm():
         return ChatOpenAI(
             base_url=config.llm.base_url,
             model=config.llm.model,
-            temperature=0,
+            temperature=config.llm.temperature,
             api_key=config.llm.api_key,
         )
     from langchain_ollama import ChatOllama
@@ -83,11 +89,21 @@ def _build_llm():
     return ChatOllama(
         base_url=config.llm.base_url,
         model=config.llm.model,
-        temperature=0,
+        temperature=config.llm.temperature,
     )
 
 
 llm = _build_llm()
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 共享合规关键词（verify 与 compliance_check 共用，避免重复定义漂移）
+# ══════════════════════════════════════════════════════════════════════
+
+_ADVICE_KEYWORDS: tuple[str, ...] = (
+    "推荐买入", "建议卖出", "目标价", "评级", "买入", "卖出", "增持", "减持",
+)
+_SENSITIVE_KEYWORDS: tuple[str, ...] = ("内幕信息", "未公开", "业绩预测")
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -194,6 +210,26 @@ def planner(state: AssistantState) -> AssistantState:
 # 4.4 Retrieve — 按计划并行执行多源检索
 # ══════════════════════════════════════════════════════════════════════
 
+_source_retriever_classes = {
+    SOURCE_PRODUCT: ProductRetriever,
+    SOURCE_REGULATION: RegulationRetriever,
+    SOURCE_REPORT: ReportRetriever,
+    SOURCE_FAQ: FAQRetriever,
+}
+
+_retriever_cache: dict[str, BaseRetriever] = {}
+
+
+def _get_retriever(source: str | None) -> BaseRetriever | None:
+    """懒加载获取领域检索器单例（避免 import 时连接 ChromaDB）"""
+    if source is None:
+        return None
+    if source not in _retriever_cache:
+        cls = _source_retriever_classes.get(source)
+        if cls is not None:
+            _retriever_cache[source] = cls()
+    return _retriever_cache.get(source)
+
 
 def retrieve(state: AssistantState) -> AssistantState:
     """并行执行检索计划：按 source 分发到对应领域检索器"""
@@ -201,46 +237,16 @@ def retrieve(state: AssistantState) -> AssistantState:
 
     for step in state[STATE_RETRIEVAL_PLAN]:
         source = step.get(PLAN_SOURCE)
+        retriever = _get_retriever(source)
+        if retriever is None:
+            continue
         try:
-            if source == SOURCE_PRODUCT:
-                from src.retrieval.product_retriever import ProductRetriever
-
-                retriever = ProductRetriever()
-                res = retriever.retrieve(
-                    query=step.get(PLAN_QUERY, state[STATE_REWRITTEN_QUERY]),
-                    top_k=step.get(PLAN_TOP_K, DEFAULT_TOP_K),
-                    filters=step.get(PLAN_FILTERS),
-                )
-                results.extend(res)
-            elif source == SOURCE_REGULATION:
-                from src.retrieval.regulation_retriever import RegulationRetriever
-
-                retriever = RegulationRetriever()
-                res = retriever.retrieve(
-                    query=step.get(PLAN_QUERY, state[STATE_REWRITTEN_QUERY]),
-                    top_k=step.get(PLAN_TOP_K, DEFAULT_TOP_K),
-                    filters=step.get(PLAN_FILTERS),
-                )
-                results.extend(res)
-            elif source == SOURCE_REPORT:
-                from src.retrieval.report_retriever import ReportRetriever
-
-                retriever = ReportRetriever()
-                res = retriever.retrieve(
-                    query=step.get(PLAN_QUERY, state[STATE_REWRITTEN_QUERY]),
-                    top_k=step.get(PLAN_TOP_K, DEFAULT_TOP_K),
-                    filters=step.get(PLAN_FILTERS),
-                )
-                results.extend(res)
-            elif source == SOURCE_FAQ:
-                from src.retrieval.faq_retriever import FAQRetriever
-
-                retriever = FAQRetriever()
-                res = retriever.retrieve(
-                    query=step.get(PLAN_QUERY, state[STATE_REWRITTEN_QUERY]),
-                    top_k=step.get(PLAN_TOP_K, DEFAULT_TOP_K),
-                )
-                results.extend(res)
+            res = retriever.retrieve(
+                query=step.get(PLAN_QUERY, state[STATE_REWRITTEN_QUERY]),
+                top_k=step.get(PLAN_TOP_K, DEFAULT_TOP_K),
+                filters=step.get(PLAN_FILTERS),
+            )
+            results.extend(res)
         except Exception as e:
             results.append({
                 RR_CONTENT: f"检索失败: {e}",
@@ -251,6 +257,7 @@ def retrieve(state: AssistantState) -> AssistantState:
     return {
         **state,
         STATE_RETRIEVAL_RESULTS: state[STATE_RETRIEVAL_RESULTS] + results,
+        STATE_RETRIEVAL_ATTEMPTS: state.get(STATE_RETRIEVAL_ATTEMPTS, 0) + 1,
     }
 
 
@@ -290,6 +297,7 @@ def reason(state: AssistantState) -> AssistantState:
     全程在 StateGraph 范式内，状态与 checkpoint 完整保留。
     """
     from langchain.agents import create_agent
+
     from src.agents.tools import tools
 
     results = state.get(STATE_RETRIEVAL_RESULTS, [])
@@ -365,8 +373,7 @@ def verify(state: AssistantState) -> AssistantState:
     # 规则 3：投顾/销售场景检查是否输出投资建议
     role = state.get(STATE_USER_ROLE)
     if role in (ROLE_ADVISOR, ROLE_INSTITUTIONAL_SALES):
-        advice_patterns = ["推荐买入", "建议卖出", "目标价", "评级", "买入", "卖出", "增持", "减持"]
-        for pat in advice_patterns:
+        for pat in _ADVICE_KEYWORDS:
             if pat in answer:
                 issues.append(f"投顾/销售角色不得输出投资建议: {pat}")
 
@@ -396,14 +403,12 @@ def compliance_check(state: AssistantState) -> AssistantState:
     flags = []
 
     # 敏感词检测
-    sensitive_keywords = ["内幕信息", "未公开", "业绩预测", "目标价"]
-    for kw in sensitive_keywords:
+    for kw in _SENSITIVE_KEYWORDS:
         if kw in answer:
             flags.append(f"sensitive:{kw}")
 
     # 投资建议检测
-    advice_patterns = ["推荐买入", "建议卖出", "目标价", "评级"]
-    for pat in advice_patterns:
+    for pat in _ADVICE_KEYWORDS:
         if pat in answer:
             flags.append(f"advice:{pat}")
 
