@@ -10,12 +10,20 @@ from langchain_core.messages import HumanMessage
 from src.agents.state import AssistantState
 from src.config import config
 from src.schemas.constants import (
+    CONFIDENCE_HIGH,
+    CONFIDENCE_LOW,
+    CONFIDENCE_MEDIUM,
     DEFAULT_TOP_K,
     GRADE_TOP_K,
     LLM_PROVIDER_OPENAI,
+    META_CHUNK_ID,
+    META_DOC_TYPE,
     META_ERROR,
+    META_PAGE_NUMBER,
+    META_PERMISSION_LEVEL,
     META_SOURCE,
     META_TITLE,
+    PERMISSION_PUBLIC,
     PLAN_FILTERS,
     PLAN_QUERY,
     PLAN_SOURCE,
@@ -34,17 +42,28 @@ from src.schemas.constants import (
     SOURCE_REGULATION,
     SOURCE_REPORT,
     STATE_AMBIGUITY,
+    STATE_AUDIT_TRAIL,
+    STATE_CITATIONS,
+    STATE_CLIENT_ID,
+    STATE_COMPLIANCE,
+    STATE_CONFIDENCE,
+    STATE_DATA_PERMISSIONS,
     STATE_DEPARTMENT,
     STATE_ENTITIES,
     STATE_FINAL_ANSWER,
     STATE_INTENT,
+    STATE_INTERMEDIATE_STEPS,
     STATE_MESSAGES,
     STATE_ORIGINAL_QUERY,
     STATE_QUERY_TYPE,
     STATE_RETRIEVAL_PLAN,
     STATE_RETRIEVAL_RESULTS,
     STATE_REWRITTEN_QUERY,
+    STATE_RISK_DISCLOSURE,
+    STATE_TOOL_CALLS,
+    STATE_USER_ID,
     STATE_USER_ROLE,
+    STATE_VERIFICATION,
 )
 
 
@@ -277,7 +296,7 @@ def reason(state: AssistantState) -> AssistantState:
 
     # 构建 context
     context = "\n\n".join([
-        f"[来源{i+1}] {r[RR_METADATA].get(META_TITLE, '未知')}\n{r[RR_CONTENT]}"
+        f"[来源{i + 1}] {r[RR_METADATA].get(META_TITLE, '未知')}\n{r[RR_CONTENT]}"
         for i, r in enumerate(results[:5])
     ])
 
@@ -316,4 +335,209 @@ def reason(state: AssistantState) -> AssistantState:
         **state,
         STATE_MESSAGES: state.get(STATE_MESSAGES, []) + response[STATE_MESSAGES],
         STATE_FINAL_ANSWER: final_msg.content,
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 4.7 Verify — 数字验证、权限校验、投资建议检测、合规引用精度
+# ══════════════════════════════════════════════════════════════════════
+
+
+def verify(state: AssistantState) -> AssistantState:
+    """验证：数字是否有来源支撑、权限是否合规、是否存在投资建议"""
+    import re
+
+    answer = state.get(STATE_FINAL_ANSWER, "")
+    results = state.get(STATE_RETRIEVAL_RESULTS, [])
+    issues = []
+
+    # 规则 1：检查是否有数字但无来源
+    numbers = re.findall(r"\d+\.?\d*%?", answer)
+    if numbers and not results:
+        issues.append("答案包含数字但无检索结果支撑")
+
+    # 规则 2：检查来源是否在权限范围内
+    for r in results:
+        perm = r.get(RR_METADATA, {}).get(META_PERMISSION_LEVEL, PERMISSION_PUBLIC)
+        if perm not in state.get(STATE_DATA_PERMISSIONS, [PERMISSION_PUBLIC]):
+            issues.append(f"来源权限不足: {r.get(RR_METADATA, {}).get(META_SOURCE)}")
+
+    # 规则 3：投顾/销售场景检查是否输出投资建议
+    role = state.get(STATE_USER_ROLE)
+    if role in (ROLE_ADVISOR, ROLE_INSTITUTIONAL_SALES):
+        advice_patterns = ["推荐买入", "建议卖出", "目标价", "评级", "买入", "卖出", "增持", "减持"]
+        for pat in advice_patterns:
+            if pat in answer:
+                issues.append(f"投顾/销售角色不得输出投资建议: {pat}")
+
+    # 规则 4：合规场景检查引用精度
+    if role == ROLE_COMPLIANCE:
+        if not re.search(r"第[一二三四五六七八九十百千]+条|第\d+条|Article\s+\d+", answer):
+            issues.append("合规引用必须精确到条款/条文号")
+
+    return {
+        **state,
+        STATE_VERIFICATION: {
+            "passed": len(issues) == 0,
+            "issues": issues,
+            "confidence": CONFIDENCE_LOW if issues else CONFIDENCE_HIGH,
+        },
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 4.8 Compliance Check — 敏感词检测、投资建议拦截、风险提示
+# ══════════════════════════════════════════════════════════════════════
+
+
+def compliance_check(state: AssistantState) -> AssistantState:
+    """合规检查：敏感词、投资建议、风险提示、适当性"""
+    answer = state.get(STATE_FINAL_ANSWER, "")
+    flags = []
+
+    # 敏感词检测
+    sensitive_keywords = ["内幕信息", "未公开", "业绩预测", "目标价"]
+    for kw in sensitive_keywords:
+        if kw in answer:
+            flags.append(f"sensitive:{kw}")
+
+    # 投资建议检测
+    advice_patterns = ["推荐买入", "建议卖出", "目标价", "评级"]
+    for pat in advice_patterns:
+        if pat in answer:
+            flags.append(f"advice:{pat}")
+
+    # 客户适当性检查（投顾场景）
+    suitability_warning = ""
+    role = state.get(STATE_USER_ROLE)
+    if role == ROLE_ADVISOR and state.get(STATE_CLIENT_ID):
+        high_risk_products = ["股票型基金", "混合型基金", "私募基金"]
+        for prod in high_risk_products:
+            if prod in answer:
+                suitability_warning = (
+                    "\n\n【适当性提示】该产品风险等级较高，请确认客户风险承受能力是否匹配。"
+                )
+                flags.append(f"suitability:{prod}")
+                break
+
+    # 风险提示（强制追加）
+    risk_disclosure = "\n\n【风险提示】本回答仅供参考，不构成投资建议。市场有风险，投资需谨慎。"
+
+    passed = len([f for f in flags if f.startswith("sensitive:")]) == 0
+
+    return {
+        **state,
+        STATE_COMPLIANCE: {
+            "passed": passed,
+            "flags": flags,
+            "risk_disclosure": risk_disclosure,
+            "suitability_warning": suitability_warning,
+        },
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 4.9 Compose — 引用标注、置信度、风险提示
+# ══════════════════════════════════════════════════════════════════════
+
+
+def compose(state: AssistantState) -> AssistantState:
+    """生成最终回答：带引用、置信度、风险提示"""
+    answer = state.get(STATE_FINAL_ANSWER, "")
+
+    # 引用标注
+    citations = []
+    for i, r in enumerate(state.get(STATE_RETRIEVAL_RESULTS, [])[:5], 1):
+        meta = r.get(RR_METADATA, {})
+        citations.append({
+            "citation_id": f"cite_{i:03d}",
+            "doc_title": meta.get(META_TITLE, "未知"),
+            "source": meta.get(META_SOURCE, ""),
+            "doc_type": meta.get(META_DOC_TYPE, ""),
+            "chunk_id": meta.get(META_CHUNK_ID, ""),
+            "quote": r.get(RR_CONTENT, "")[:200],
+            "relevance_score": round(r.get(RR_SCORE, 0), 4),
+            "page_number": meta.get(META_PAGE_NUMBER),
+            "permission_level": meta.get(META_PERMISSION_LEVEL, PERMISSION_PUBLIC),
+        })
+
+    # 风险提示 + 适当性警告
+    compliance = state.get(STATE_COMPLIANCE, {})
+    risk = compliance.get("risk_disclosure", "")
+    suitability = compliance.get("suitability_warning", "")
+    final_answer = answer + suitability + risk
+
+    # 综合置信度
+    verification_conf = state.get(STATE_VERIFICATION, {}).get("confidence", CONFIDENCE_MEDIUM)
+    compliance_passed = compliance.get("passed", False)
+    result_count = len(state.get(STATE_RETRIEVAL_RESULTS, []))
+
+    if not compliance_passed:
+        confidence = CONFIDENCE_LOW
+    elif verification_conf == CONFIDENCE_HIGH and result_count >= 3:
+        confidence = CONFIDENCE_HIGH
+    else:
+        confidence = CONFIDENCE_MEDIUM
+
+    return {
+        **state,
+        STATE_FINAL_ANSWER: final_answer,
+        STATE_CITATIONS: citations,
+        STATE_CONFIDENCE: confidence,
+        STATE_RISK_DISCLOSURE: risk + suitability,
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 4.10 Audit Log — 全链路审计记录
+# ══════════════════════════════════════════════════════════════════════
+
+
+def audit_log(state: AssistantState) -> AssistantState:
+    """记录审计日志——覆盖 Query → Retrieve → Reason → Verify → Compose 全链路"""
+    import uuid
+    from datetime import datetime, timezone
+
+    audit_entry = {
+        "request_id": str(uuid.uuid4()),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "user_id": state.get(STATE_USER_ID, ""),
+        "user_role": state.get(STATE_USER_ROLE, ""),
+        "department": state.get(STATE_DEPARTMENT, ""),
+        "query": {
+            "original": state.get(STATE_ORIGINAL_QUERY, ""),
+            "rewritten": state.get(STATE_REWRITTEN_QUERY, ""),
+            "intent": state.get(STATE_INTENT, ""),
+            "query_type": state.get(STATE_QUERY_TYPE, ""),
+            "entities": state.get(STATE_ENTITIES, {}),
+        },
+        "retrieval": {
+            "plan": state.get(STATE_RETRIEVAL_PLAN, []),
+            "sources": [
+                r.get(RR_METADATA, {}).get(META_SOURCE)
+                for r in state.get(STATE_RETRIEVAL_RESULTS, [])
+            ],
+            "total_chunks": len(state.get(STATE_RETRIEVAL_RESULTS, [])),
+            "filtered_chunks": len(state.get(STATE_RETRIEVAL_RESULTS, [])),
+        },
+        "reasoning": {
+            "tool_calls": state.get(STATE_TOOL_CALLS, []),
+            "iterations": len(state.get(STATE_INTERMEDIATE_STEPS, [])),
+            "duration_ms": 0,
+        },
+        "verification": state.get(STATE_VERIFICATION, {}),
+        "compliance": state.get(STATE_COMPLIANCE, {}),
+        "response": {
+            "citations": state.get(STATE_CITATIONS, []),
+            "confidence": state.get(STATE_CONFIDENCE, CONFIDENCE_LOW),
+            "risk_disclosure": state.get(STATE_RISK_DISCLOSURE, ""),
+        },
+    }
+
+    # TODO: 写入审计数据库
+    # audit_db.insert(audit_entry)
+
+    return {
+        **state,
+        STATE_AUDIT_TRAIL: audit_entry,
     }
