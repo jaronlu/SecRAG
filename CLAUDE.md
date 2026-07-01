@@ -2,20 +2,20 @@
 
 ## 项目概述
 
-券商内部投研知识平台 — Agentic RAG 系统。完整设计文档见 `~/llm-wiki/projects/agentic-rag-securities/`。
+券商内部投研知识平台 — Agentic RAG 系统。完整设计文档见 `docs/design/`。
 
 ## 设计文档索引
 
 | 文档 | 路径 |
 |------|------|
-| PRD | `~/llm-wiki/projects/agentic-rag-securities/PRD.md` |
-| 架构设计 | `~/llm-wiki/projects/agentic-rag-securities/architecture.md` |
-| 01-数据管道 | `~/llm-wiki/projects/agentic-rag-securities/implementation-01-data-pipeline.md` |
-| 02-基础 RAG | `~/llm-wiki/projects/agentic-rag-securities/implementation-02-basic-rag.md` |
-| 03-Agent 工作流 | `~/llm-wiki/projects/agentic-rag-securities/implementation-03-agent-graph.md` |
-| 04-多跳检索 | `~/llm-wiki/projects/agentic-rag-securities/implementation-04-multi-hop-retrieval.md` |
-| 05-金融工具 | `~/llm-wiki/projects/agentic-rag-securities/implementation-05-financial-tools.md` |
-| 06-引用与验证 | `~/llm-wiki/projects/agentic-rag-securities/implementation-06-citation-verification.md` |
+| PRD | `docs/design/PRD.md` |
+| 架构设计 | `docs/design/architecture.md` |
+| 01-数据管道 | `docs/design/implementation-01-data-pipeline.md` |
+| 02-基础 RAG | `docs/design/implementation-02-basic-rag.md` |
+| 03-Agent 工作流 | `docs/design/implementation-03-agent-graph.md` |
+| 04-多跳检索 | `docs/design/implementation-04-multi-hop-retrieval.md` |
+| 05-金融工具 | `docs/design/implementation-05-financial-tools.md` |
+| 06-引用与验证 | `docs/design/implementation-06-citation-verification.md` |
 
 ## 核心规则
 
