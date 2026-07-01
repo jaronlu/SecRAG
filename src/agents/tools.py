@@ -3,7 +3,8 @@ from typing import Optional
 
 from langchain_core.tools import tool
 
-from src.schemas.constants import DEFAULT_TOP_K, META_PRODUCT_TYPE
+from src.schemas.constants import DEFAULT_TOP_K, META_PRODUCT_TYPE, META_SOURCE
+from src.tools import calculator, suitability_check
 
 # ══════════════════════════════════════════════════════════════════════
 # 4 个知识检索工具（封装领域检索器，doc_type 过滤由检索器内部处理）
@@ -41,7 +42,7 @@ def regulation_search(query: str, top_k: int = DEFAULT_TOP_K, source: Optional[s
     from src.retrieval.regulation_retriever import RegulationRetriever
 
     retriever = RegulationRetriever()
-    filters = {"source": source} if source else None
+    filters = {META_SOURCE: source} if source else None
     results = retriever.retrieve(query=query, top_k=top_k, filters=filters)
     return json.dumps(results, ensure_ascii=False)
 
@@ -73,30 +74,6 @@ def faq_search(query: str, top_k: int = DEFAULT_TOP_K) -> str:
     retriever = FAQRetriever()
     results = retriever.retrieve(query=query, top_k=top_k)
     return json.dumps(results, ensure_ascii=False)
-
-
-# ══════════════════════════════════════════════════════════════════════
-# 占位工具（Week 2 占位，Week 3 由 impl-05 升级版替换）
-# ══════════════════════════════════════════════════════════════════════
-
-
-@tool
-def calculator(expression: str) -> str:
-    """精确计算：用于费用计算、收益率计算等。
-    Week 2 占位；Week 3 由 src/tools/calculator.py（Decimal + AST）替换。
-    示例: "申购费 100万 * 1.5%"
-    """
-    # TODO: Phase 2 — 接入 Decimal + AST 安全计算器
-    return f"calculator stub: {expression}"
-
-
-@tool
-def suitability_check(client_id: str, product_id: str) -> str:
-    """适当性匹配检查：检查客户是否适合购买指定产品。
-    仅合规/投顾场景可用。
-    """
-    # TODO: Phase 2 — 接入 src/utils/suitability.py
-    return f"suitability_check stub: client={client_id}, product={product_id}"
 
 
 # ══════════════════════════════════════════════════════════════════════

@@ -29,6 +29,10 @@ from src.schemas.constants import (
     META_SOURCE,
     META_TITLE,
     PERMISSION_PUBLIC,
+    PLAN_FILTERS,
+    PLAN_QUERY,
+    PLAN_SOURCE,
+    PLAN_TOP_K,
     ROLE_ADVISOR,
     ROLE_COMPLIANCE,
     ROLE_INSTITUTIONAL_SALES,
@@ -48,6 +52,8 @@ from src.schemas.constants import (
     STATE_REWRITTEN_QUERY,
     STATE_USER_ROLE,
     STATE_VERIFICATION,
+    SOURCE_FAQ,
+    SOURCE_PRODUCT,
 )
 
 
@@ -272,16 +278,25 @@ class TestRetrieve:
 
         state = _state(**{
             STATE_USER_ROLE: ROLE_ADVISOR,
-            STATE_RETRIEVAL_PLAN: [{"source": "product_search", "query": "产品风险", "top_k": 3}],
+            STATE_RETRIEVAL_PLAN: [{
+                PLAN_SOURCE: SOURCE_PRODUCT,
+                PLAN_QUERY: "产品风险",
+                PLAN_TOP_K: 3,
+            }],
             STATE_RETRIEVAL_RESULTS: [_result("旧结果")],
             STATE_RETRIEVAL_ATTEMPTS: 1,
-            "rewritten_query": "重写查询",
+            STATE_REWRITTEN_QUERY: "重写查询",
         })
 
         result = retrieve(state)
 
         assert captured["user_role"] == ROLE_ADVISOR
-        assert captured["plan"] == [{"source": "product_search", "query": "产品风险", "top_k": 3, "filters": None}]
+        assert captured["plan"] == [{
+            PLAN_SOURCE: SOURCE_PRODUCT,
+            PLAN_QUERY: "产品风险",
+            PLAN_TOP_K: 3,
+            PLAN_FILTERS: None,
+        }]
         assert [r[RR_CONTENT] for r in result[STATE_RETRIEVAL_RESULTS]] == ["旧结果", "新结果"]
         assert result[STATE_RETRIEVAL_ATTEMPTS] == 2
 
@@ -300,13 +315,18 @@ class TestRetrieve:
 
         state = _state(**{
             STATE_USER_ROLE: ROLE_OPERATIONS,
-            STATE_RETRIEVAL_PLAN: [{"source": "faq_search"}],
+            STATE_RETRIEVAL_PLAN: [{PLAN_SOURCE: SOURCE_FAQ}],
             STATE_REWRITTEN_QUERY: "开户流程",
         })
 
         result = retrieve(state)
 
-        assert captured["plan"] == [{"source": "faq_search", "query": "开户流程", "top_k": 5, "filters": None}]
+        assert captured["plan"] == [{
+            PLAN_SOURCE: SOURCE_FAQ,
+            PLAN_QUERY: "开户流程",
+            PLAN_TOP_K: 5,
+            PLAN_FILTERS: None,
+        }]
         assert result[STATE_RETRIEVAL_ATTEMPTS] == 1
         assert result[STATE_RETRIEVAL_RESULTS] == []
 
