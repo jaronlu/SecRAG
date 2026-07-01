@@ -4,7 +4,14 @@ from typing import Optional
 from langchain_core.tools import tool
 
 from src.schemas.constants import DEFAULT_TOP_K, META_PRODUCT_TYPE, META_SOURCE
-from src.tools import calculator, suitability_check
+from src.tools import (
+    calculator,
+    financial_ratios_tool,
+    market_data_tool,
+    rerank_tool,
+    sql_query_tool,
+    suitability_check,
+)
 
 # ══════════════════════════════════════════════════════════════════════
 # 4 个知识检索工具（封装领域检索器，doc_type 过滤由检索器内部处理）
@@ -87,4 +94,8 @@ tools = [
     faq_search,
     calculator,
     suitability_check,
+    market_data_tool,
+    sql_query_tool,
+    financial_ratios_tool,
+    rerank_tool,
 ]
