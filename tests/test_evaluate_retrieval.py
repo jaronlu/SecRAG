@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts import evaluate_retrieval as eval_script
 from src.schemas.constants import (
@@ -140,3 +141,15 @@ def test_evaluate_retrieval_requires_plan_or_source_hint(tmp_path):
         assert "plan" in str(exc)
     else:
         raise AssertionError("expected ValueError")
+
+
+def test_main_uses_default_sample_dataset(monkeypatch, capsys):
+    monkeypatch.setattr(eval_script, "evaluate_retrieval", lambda path: {"samples": 1.0, "mrr": 0.5})
+
+    with patch("sys.argv", ["evaluate_retrieval.py"]):
+        eval_script.main()
+
+    output = capsys.readouterr().out
+    assert eval_script.DEFAULT_DATASET_PATH.name in output
+    assert "samples: 1" in output
+    assert "占位 relevant_doc_ids" in output

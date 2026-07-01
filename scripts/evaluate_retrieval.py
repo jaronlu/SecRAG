@@ -36,6 +36,8 @@ _QUERY_TYPE_TO_SOURCE = {
     QT_FAQ_INQUIRY: SOURCE_FAQ,
     QT_TECHNICAL_INQUIRY: SOURCE_FAQ,
 }
+DEFAULT_DATASET_PATH = Path(__file__).with_name("evaluate_retrieval.sample.json")
+_PLACEHOLDER_CHUNK_ID_PREFIXES = ("replace_me_", "example_", "sample_")
 
 
 def _load_dataset(dataset_path: str | Path) -> list[dict[str, Any]]:
@@ -43,6 +45,14 @@ def _load_dataset(dataset_path: str | Path) -> list[dict[str, Any]]:
     if not isinstance(dataset, list):
         raise ValueError("评估集必须是 JSON 数组")
     return dataset
+
+
+def _contains_placeholder_chunk_ids(dataset: list[dict[str, Any]]) -> bool:
+    for item in dataset:
+        for doc_id in item.get("relevant_doc_ids", []):
+            if isinstance(doc_id, str) and doc_id.startswith(_PLACEHOLDER_CHUNK_ID_PREFIXES):
+                return True
+    return False
 
 
 def _normalize_plan(item: dict[str, Any]) -> list[dict[str, Any]]:
@@ -157,10 +167,20 @@ def evaluate_retrieval(dataset_path: str | Path) -> dict[str, float]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="评估 HybridRetriever 检索效果")
-    parser.add_argument("dataset_path", help="评估集 JSON 文件路径")
+    parser.add_argument(
+        "dataset_path",
+        nargs="?",
+        default=str(DEFAULT_DATASET_PATH),
+        help=f"评估集 JSON 文件路径，默认使用 {DEFAULT_DATASET_PATH.name}",
+    )
     args = parser.parse_args()
 
-    summary = evaluate_retrieval(args.dataset_path)
+    dataset_path = Path(args.dataset_path)
+    dataset = _load_dataset(dataset_path)
+    summary = evaluate_retrieval(dataset_path)
+    print(f"评估集: {dataset_path}")
+    if _contains_placeholder_chunk_ids(dataset):
+        print("提示: 当前评估集包含占位 relevant_doc_ids，请替换为真实 chunk_id 后再解读召回/MRR 指标。")
     print("检索评估结果：")
     for metric, value in summary.items():
         if metric == "samples":

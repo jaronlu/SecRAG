@@ -9,11 +9,7 @@ from langchain_core.messages import HumanMessage
 
 from src.agents.state import AssistantState
 from src.config import config
-from src.retrieval.base import BaseRetriever
-from src.retrieval.faq_retriever import FAQRetriever
-from src.retrieval.product_retriever import ProductRetriever
-from src.retrieval.regulation_retriever import RegulationRetriever
-from src.retrieval.report_retriever import ReportRetriever
+from src.retrieval.hybrid_retriever import HybridRetriever
 from src.schemas.constants import (
     CONFIDENCE_HIGH,
     CONFIDENCE_LOW,
@@ -23,7 +19,6 @@ from src.schemas.constants import (
     LLM_PROVIDER_OPENAI,
     META_CHUNK_ID,
     META_DOC_TYPE,
-    META_ERROR,
     META_PAGE_NUMBER,
     META_PERMISSION_LEVEL,
     META_SOURCE,
@@ -43,9 +38,6 @@ from src.schemas.constants import (
     RR_METADATA,
     RR_SCORE,
     SOURCE_FAQ,
-    SOURCE_PRODUCT,
-    SOURCE_REGULATION,
-    SOURCE_REPORT,
     STATE_AMBIGUITY,
     STATE_AUDIT_TRAIL,
     STATE_CITATIONS,
@@ -210,53 +202,23 @@ def planner(state: AssistantState) -> AssistantState:
 # 4.4 Retrieve — 按计划并行执行多源检索
 # ══════════════════════════════════════════════════════════════════════
 
-_source_retriever_classes = {
-    SOURCE_PRODUCT: ProductRetriever,
-    SOURCE_REGULATION: RegulationRetriever,
-    SOURCE_REPORT: ReportRetriever,
-    SOURCE_FAQ: FAQRetriever,
-}
-
-_retriever_cache: dict[str, BaseRetriever] = {}
-
-
-def _get_retriever(source: str | None) -> BaseRetriever | None:
-    """懒加载获取领域检索器单例（避免 import 时连接 ChromaDB）"""
-    if source is None:
-        return None
-    if source not in _retriever_cache:
-        cls = _source_retriever_classes.get(source)
-        if cls is not None:
-            _retriever_cache[source] = cls()
-    return _retriever_cache.get(source)
-
-
 def retrieve(state: AssistantState) -> AssistantState:
-    """并行执行检索计划：按 source 分发到对应领域检索器"""
-    results = []
+    """使用 HybridRetriever 按角色权限执行一轮检索计划。"""
+    normalized_plan = []
+    for step in state.get(STATE_RETRIEVAL_PLAN, []):
+        normalized_plan.append({
+            PLAN_SOURCE: step.get(PLAN_SOURCE),
+            PLAN_QUERY: step.get(PLAN_QUERY, state[STATE_REWRITTEN_QUERY]),
+            PLAN_TOP_K: step.get(PLAN_TOP_K, DEFAULT_TOP_K),
+            PLAN_FILTERS: step.get(PLAN_FILTERS),
+        })
 
-    for step in state[STATE_RETRIEVAL_PLAN]:
-        source = step.get(PLAN_SOURCE)
-        retriever = _get_retriever(source)
-        if retriever is None:
-            continue
-        try:
-            res = retriever.retrieve(
-                query=step.get(PLAN_QUERY, state[STATE_REWRITTEN_QUERY]),
-                top_k=step.get(PLAN_TOP_K, DEFAULT_TOP_K),
-                filters=step.get(PLAN_FILTERS),
-            )
-            results.extend(res)
-        except Exception as e:
-            results.append({
-                RR_CONTENT: f"检索失败: {e}",
-                RR_METADATA: {META_SOURCE: source, META_ERROR: str(e)},
-                RR_SCORE: 0.0,
-            })
+    retriever = HybridRetriever(user_role=state[STATE_USER_ROLE])
+    results = retriever.retrieve(plan=normalized_plan)
 
     return {
         **state,
-        STATE_RETRIEVAL_RESULTS: state[STATE_RETRIEVAL_RESULTS] + results,
+        STATE_RETRIEVAL_RESULTS: state.get(STATE_RETRIEVAL_RESULTS, []) + results,
         STATE_RETRIEVAL_ATTEMPTS: state.get(STATE_RETRIEVAL_ATTEMPTS, 0) + 1,
     }
 

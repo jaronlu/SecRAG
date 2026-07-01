@@ -1,0 +1,34 @@
+[
+  {
+    "query": "这款理财产品风险等级是多少",
+    "user_role": "advisor",
+    "source": "product_search",
+    "relevant_doc_ids": [
+      "replace_me_product_chunk_id_1"
+    ]
+  },
+  {
+    "query": "客户适当性管理相关法规",
+    "user_role": "compliance",
+    "source": "regulation_search",
+    "relevant_doc_ids": [
+      "replace_me_regulation_chunk_id_1",
+      "replace_me_regulation_chunk_id_2"
+    ]
+  },
+  {
+    "query": "内部系统操作流程",
+    "user_role": "technical",
+    "expected_query_type": "technical_inquiry",
+    "relevant_doc_ids": [
+      "replace_me_faq_chunk_id_1"
+    ]
+  },
+  {
+    "query": "内部研报摘要",
+    "user_role": "technical",
+    "source": "report_search",
+    "relevant_doc_ids": [],
+    "expected_permission_denied": true
+  }
+]

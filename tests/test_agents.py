@@ -17,6 +17,7 @@ from src.agents.nodes import (
     compliance_check,
     compose,
     grade_and_filter,
+    retrieve,
     verify,
 )
 from src.schemas.constants import (
@@ -41,7 +42,10 @@ from src.schemas.constants import (
     STATE_CONFIDENCE,
     STATE_DATA_PERMISSIONS,
     STATE_FINAL_ANSWER,
+    STATE_RETRIEVAL_ATTEMPTS,
+    STATE_RETRIEVAL_PLAN,
     STATE_RETRIEVAL_RESULTS,
+    STATE_REWRITTEN_QUERY,
     STATE_USER_ROLE,
     STATE_VERIFICATION,
 )
@@ -245,6 +249,66 @@ class TestComplianceCheck:
         })
         result = compliance_check(state)
         assert result[STATE_COMPLIANCE]["suitability_warning"] == ""
+
+
+# ══════════════════════════════════════════════════════════════════════
+# retrieve
+# ══════════════════════════════════════════════════════════════════════
+
+
+class TestRetrieve:
+    def test_uses_hybrid_retriever_and_appends_results(self, monkeypatch):
+        captured = {}
+
+        class FakeHybridRetriever:
+            def __init__(self, user_role: str):
+                captured["user_role"] = user_role
+
+            def retrieve(self, plan):
+                captured["plan"] = plan
+                return [_result("新结果", meta={META_SOURCE: "product_search"})]
+
+        monkeypatch.setattr("src.agents.nodes.HybridRetriever", FakeHybridRetriever)
+
+        state = _state(**{
+            STATE_USER_ROLE: ROLE_ADVISOR,
+            STATE_RETRIEVAL_PLAN: [{"source": "product_search", "query": "产品风险", "top_k": 3}],
+            STATE_RETRIEVAL_RESULTS: [_result("旧结果")],
+            STATE_RETRIEVAL_ATTEMPTS: 1,
+            "rewritten_query": "重写查询",
+        })
+
+        result = retrieve(state)
+
+        assert captured["user_role"] == ROLE_ADVISOR
+        assert captured["plan"] == [{"source": "product_search", "query": "产品风险", "top_k": 3, "filters": None}]
+        assert [r[RR_CONTENT] for r in result[STATE_RETRIEVAL_RESULTS]] == ["旧结果", "新结果"]
+        assert result[STATE_RETRIEVAL_ATTEMPTS] == 2
+
+    def test_falls_back_to_rewritten_query_and_default_top_k(self, monkeypatch):
+        captured = {}
+
+        class FakeHybridRetriever:
+            def __init__(self, user_role: str):
+                captured["user_role"] = user_role
+
+            def retrieve(self, plan):
+                captured["plan"] = plan
+                return []
+
+        monkeypatch.setattr("src.agents.nodes.HybridRetriever", FakeHybridRetriever)
+
+        state = _state(**{
+            STATE_USER_ROLE: ROLE_OPERATIONS,
+            STATE_RETRIEVAL_PLAN: [{"source": "faq_search"}],
+            STATE_REWRITTEN_QUERY: "开户流程",
+        })
+
+        result = retrieve(state)
+
+        assert captured["plan"] == [{"source": "faq_search", "query": "开户流程", "top_k": 5, "filters": None}]
+        assert result[STATE_RETRIEVAL_ATTEMPTS] == 1
+        assert result[STATE_RETRIEVAL_RESULTS] == []
 
 
 # ══════════════════════════════════════════════════════════════════════
