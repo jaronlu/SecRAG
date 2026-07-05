@@ -7,7 +7,7 @@ from pathlib import Path
 from src.tools.calculator import calculator, safe_eval
 from src.tools.financial_ratios import financial_ratios_tool
 from src.tools.market_data import market_data_tool
-from src.tools.rerank import rerank_documents, rerank_tool
+from src.tools.rerank import RerankService, rerank_tool
 from src.tools.sql_query import normalize_select_sql, sql_query_tool
 from src.tools.suitability import suitability_check
 from src.utils.tracing import Tracer
@@ -148,15 +148,26 @@ def test_market_data_tool_reads_local_history(tmp_path):
     assert payload[0]["close"] == "1680.00"
 
 
-def test_rerank_documents_sorts_by_score():
-    docs = [{"score": 0.2, "content": "b"}, {"score": 0.9, "content": "a"}]
-    assert rerank_documents(docs, top_k=1)[0]["content"] == "a"
+class FakeRerankModel:
+    def compute_score(self, pairs: list[tuple[str, str]]) -> list[float]:
+        return [0.9 if content == "a" else 0.1 for _, content in pairs]
 
 
-def test_rerank_tool_returns_json():
-    docs = json.dumps([{"score": 0.2, "content": "b"}, {"score": 0.9, "content": "a"}])
+def test_rerank_tool_requires_configured_model():
+    RerankService().model = None
+    docs = json.dumps([{"score": 0.9, "content": "b"}, {"score": 0.1, "content": "a"}])
+    result = rerank_tool.invoke({"query": "q", "documents": docs, "top_k": 2})
+    assert "重排序错误" in result
+    assert "BGE reranker 模型" in result
+
+
+def test_rerank_tool_uses_model_scores():
+    RerankService().model = FakeRerankModel()
+    docs = json.dumps([{"score": 0.9, "content": "b"}, {"score": 0.1, "content": "a"}])
     payload = json.loads(rerank_tool.invoke({"query": "q", "documents": docs, "top_k": 2}))
     assert [doc["content"] for doc in payload] == ["a", "b"]
+    assert payload[0]["score"] == 0.9
+    RerankService().model = None
 
 
 def test_tracer_records_success_and_error():
