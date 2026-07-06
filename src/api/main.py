@@ -43,7 +43,7 @@ from src.schemas.request_response import (
     QAResponse,
 )
 
-app = FastAPI(title="券商内部投研知识平台", version="0.1.0")
+app = FastAPI(title="机构内部投研知识平台", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -59,7 +59,7 @@ rag_chain = build_rag_chain()
 # 检索器全局复用，避免反复创建 ChromaDB 客户端
 retriever = ChromaVectorRetriever(persist_directory=config.chroma.persist_directory)
 
-# 审计日志记录器（结构化 JSON，可对接 ELK / Loki）
+# 追踪日志记录器（结构化 JSON，可对接 ELK / Loki）
 audit_logger = logging.getLogger("secrag.audit")
 
 
@@ -85,7 +85,7 @@ async def qa(request: QARequest):
         citations = format_citations(retrieval_results)
         confidence = estimate_confidence(retrieval_results)
 
-        # 4. 审计日志
+        # 4. 追踪日志
         audit_logger.info({
             "request_id": request_id,
             "query": request.query,

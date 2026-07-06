@@ -3,7 +3,16 @@ from typing import Optional
 
 from langchain_core.tools import tool
 
-from src.schemas.constants import DEFAULT_TOP_K, META_PRODUCT_TYPE, META_SOURCE
+from src.schemas.constants import (
+    DEFAULT_TOP_K,
+    META_PRODUCT_TYPE,
+    META_SOURCE,
+    ROLE_ALLOWED_SOURCES,
+    SOURCE_FAQ,
+    SOURCE_PRODUCT,
+    SOURCE_REGULATION,
+    SOURCE_REPORT,
+)
 from src.tools import (
     calculator,
     financial_ratios_tool,
@@ -22,7 +31,7 @@ from src.tools import (
 def product_search(
     query: str, top_k: int = DEFAULT_TOP_K, product_type: Optional[str] = None
 ) -> str:
-    """产品知识库检索：搜索理财产品说明书、基金合同、风险揭示书。
+    """产品知识库检索：搜索理财产品说明书、产品合同、风险揭示书。
     参数:
       query: 检索关键词
       top_k: 返回条数，默认 5
@@ -39,7 +48,7 @@ def product_search(
 
 @tool
 def regulation_search(query: str, top_k: int = DEFAULT_TOP_K, source: Optional[str] = None) -> str:
-    """法规库检索：搜索监管法规、内部制度、处罚案例。
+    """法规库检索：搜索规则法规、内部制度、处罚案例。
     参数:
       query: 检索关键词
       top_k: 返回条数，默认 5
@@ -99,3 +108,21 @@ tools = [
     financial_ratios_tool,
     rerank_tool,
 ]
+
+_RETRIEVAL_TOOL_SOURCES = {
+    product_search.name: SOURCE_PRODUCT,
+    regulation_search.name: SOURCE_REGULATION,
+    report_search.name: SOURCE_REPORT,
+    faq_search.name: SOURCE_FAQ,
+}
+
+
+def get_tools_for_role(user_role: str):
+    """Return tools visible to the ReAct agent for the given role."""
+    allowed_sources = set(ROLE_ALLOWED_SOURCES.get(user_role, [SOURCE_FAQ]))
+    return [
+        tool_item
+        for tool_item in tools
+        if _RETRIEVAL_TOOL_SOURCES.get(tool_item.name) in allowed_sources
+        or tool_item.name not in _RETRIEVAL_TOOL_SOURCES
+    ]

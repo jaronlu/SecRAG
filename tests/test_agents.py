@@ -17,6 +17,7 @@ from src.agents.nodes import (
     compliance_check,
     compose,
     grade_and_filter,
+    reason,
     retrieve,
     verify,
 )
@@ -37,6 +38,7 @@ from src.schemas.constants import (
     ROLE_COMPLIANCE,
     ROLE_INSTITUTIONAL_SALES,
     ROLE_OPERATIONS,
+    ROLE_TECHNICAL,
     RR_CONTENT,
     RR_METADATA,
     RR_SCORE,
@@ -45,7 +47,10 @@ from src.schemas.constants import (
     STATE_COMPLIANCE,
     STATE_CONFIDENCE,
     STATE_DATA_PERMISSIONS,
+    STATE_DEPARTMENT,
     STATE_FINAL_ANSWER,
+    STATE_MESSAGES,
+    STATE_ORIGINAL_QUERY,
     STATE_RETRIEVAL_ATTEMPTS,
     STATE_RETRIEVAL_PLAN,
     STATE_RETRIEVAL_RESULTS,
@@ -54,6 +59,7 @@ from src.schemas.constants import (
     STATE_VERIFICATION,
     SOURCE_FAQ,
     SOURCE_PRODUCT,
+    SOURCE_REPORT,
 )
 
 
@@ -82,7 +88,7 @@ ADVICE_BUY = "推荐" + "买" + "入"
 ADVICE_SELL = "建议" + "卖" + "出"
 RESTRICTED_TEXT = "限制级测试内容"
 SENSITIVE_FIXTURE_TEXT = "内" + "幕" + "信息"
-HIGH_RISK_PRODUCT = "私" + "募" + "基金"
+HIGH_RISK_PRODUCT = "私" + "募" + "产品"
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -157,11 +163,11 @@ class TestVerify:
     def test_investment_advice_blocked_for_advisor(self):
         state = _state(**{
             STATE_USER_ROLE: ROLE_ADVISOR,
-            STATE_FINAL_ANSWER: f"{ADVICE_BUY}这只股票",
+            STATE_FINAL_ANSWER: f"{ADVICE_BUY}这只标的",
             STATE_RETRIEVAL_RESULTS: [_result(ADVICE_BUY)],
         })
         result = verify(state)
-        assert any("投资建议" in i for i in result[STATE_VERIFICATION]["issues"])
+        assert any("业务建议" in i for i in result[STATE_VERIFICATION]["issues"])
 
     def test_investment_advice_blocked_for_sales(self):
         state = _state(**{
@@ -170,17 +176,17 @@ class TestVerify:
             STATE_RETRIEVAL_RESULTS: [_result("卖" + "出建议")],
         })
         result = verify(state)
-        assert any("投资建议" in i for i in result[STATE_VERIFICATION]["issues"])
+        assert any("业务建议" in i for i in result[STATE_VERIFICATION]["issues"])
 
     def test_no_advice_check_for_compliance(self):
-        """合规角色不触发投资建议检查"""
+        """规则角色不触发业务建议检查"""
         state = _state(**{
             STATE_USER_ROLE: ROLE_COMPLIANCE,
             STATE_FINAL_ANSWER: ADVICE_SELL,
             STATE_RETRIEVAL_RESULTS: [_result("数据")],
         })
         result = verify(state)
-        advice_issues = [i for i in result[STATE_VERIFICATION]["issues"] if "投资建议" in i]
+        advice_issues = [i for i in result[STATE_VERIFICATION]["issues"] if "业务建议" in i]
         assert len(advice_issues) == 0
 
     def test_compliance_requires_article_number(self):
@@ -231,7 +237,7 @@ class TestComplianceCheck:
         assert any("sensitive" in f for f in result[STATE_COMPLIANCE]["flags"])
 
     def test_investment_advice_flagged(self):
-        state = _state(**{STATE_FINAL_ANSWER: f"{ADVICE_BUY}这只股票"})
+        state = _state(**{STATE_FINAL_ANSWER: f"{ADVICE_BUY}这只标的"})
         result = compliance_check(state)
         assert any("advice" in f for f in result[STATE_COMPLIANCE]["flags"])
 
@@ -241,7 +247,7 @@ class TestComplianceCheck:
         assert "风险提示" in result[STATE_COMPLIANCE]["risk_disclosure"]
 
     def test_clean_answer_passes(self):
-        state = _state(**{STATE_FINAL_ANSWER: "该产品风险等级为R3，适合稳健型及以上投资者"})
+        state = _state(**{STATE_FINAL_ANSWER: "该产品风险等级为R3，适合稳健型及以上业务者"})
         result = compliance_check(state)
         assert result[STATE_COMPLIANCE]["passed"] is True
 
@@ -336,6 +342,51 @@ class TestRetrieve:
         }]
         assert result[STATE_RETRIEVAL_ATTEMPTS] == 1
         assert result[STATE_RETRIEVAL_RESULTS] == []
+
+
+# ══════════════════════════════════════════════════════════════════════
+# role-aware tools
+# ══════════════════════════════════════════════════════════════════════
+
+
+class TestRoleAwareTools:
+    def test_technical_role_only_gets_allowed_retrieval_tools(self):
+        from src.agents.tools import get_tools_for_role
+
+        tool_names = {tool.name for tool in get_tools_for_role(ROLE_TECHNICAL)}
+
+        assert SOURCE_FAQ in tool_names
+        assert SOURCE_REPORT not in tool_names
+        assert "calculator" in tool_names
+
+    def test_reason_binds_role_filtered_tools(self, monkeypatch):
+        from langchain_core.messages import AIMessage
+
+        captured = {}
+
+        def fake_create_agent(model, tools, system_prompt):
+            captured["tool_names"] = {tool.name for tool in tools}
+
+            class FakeAgent:
+                def invoke(self, payload):
+                    return {STATE_MESSAGES: [AIMessage(content="ok")]}
+
+            return FakeAgent()
+
+        monkeypatch.setattr("langchain.agents.create_agent", fake_create_agent)
+
+        state = _state(**{
+            STATE_USER_ROLE: ROLE_TECHNICAL,
+            STATE_ORIGINAL_QUERY: "查询",
+            STATE_DEPARTMENT: "tech",
+            STATE_MESSAGES: [],
+        })
+
+        result = reason(state)
+
+        assert SOURCE_FAQ in captured["tool_names"]
+        assert SOURCE_REPORT not in captured["tool_names"]
+        assert result[STATE_FINAL_ANSWER] == "ok"
 
 
 # ══════════════════════════════════════════════════════════════════════

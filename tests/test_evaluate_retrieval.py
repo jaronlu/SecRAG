@@ -152,4 +152,4 @@ def test_main_uses_default_sample_dataset(monkeypatch, capsys):
     output = capsys.readouterr().out
     assert eval_script.DEFAULT_DATASET_PATH.name in output
     assert "samples: 1" in output
-    assert "占位 relevant_doc_ids" in output
+    assert "占位 relevant_doc_ids" not in output

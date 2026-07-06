@@ -32,7 +32,7 @@ def _local_market_data(
     db_path: str | Path,
 ) -> list[dict]:
     if not _STOCK_CODE_PATTERN.fullmatch(stock_code):
-        raise ValueError("股票代码格式不合法")
+        raise ValueError("标的代码格式不合法")
 
     selected_fields = [field.strip() for field in fields.split(",") if field.strip()]
     if not selected_fields:

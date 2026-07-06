@@ -1,4 +1,4 @@
-"""金融文档分块策略"""
+"""业务文档分块策略"""
 
 from typing import List
 
@@ -20,14 +20,14 @@ def create_financial_splitter(
     chunk_overlap: int = 100,  # 相邻 chunk 之间重叠的字符数；≈ NSAttributedString 切分时保留的上下文尾巴，确保语义不被打断
 ) -> RecursiveCharacterTextSplitter:
     """
-    金融文档专用分块器（工厂函数）
+    业务文档专用分块器（工厂函数）
 
     ObjC 类比：相当于一个配置并返回 NSScanner 实例的工厂方法
       - chunk_size: 单次扫描的最大长度
       - chunk_overlap: 两次扫描之间的重叠长度，避免关键信息在边界被切断
 
     设计原则：
-      1. 金融文档信息密度高，chunk_size 可以小一些（500字符）
+      1. 业务文档信息密度高，chunk_size 可以小一些（500字符）
       2. 保留章节标题作为上下文
       3. 中文优先：按段落/句子切分
     """
@@ -61,7 +61,7 @@ def chunk_documents(
     _default = create_financial_splitter
 
     splitters = {
-        # 研究报告 / 法规：复用默认金融分块器（chunk_size=500, overlap=100）
+        # 研究报告 / 法规：复用默认业务分块器（chunk_size=500, overlap=100）
         DOC_TYPE_RESEARCH_REPORT: _default(),
         DOC_TYPE_REGULATION: _default(),
         # 公告：小块快速切分，适合短公告

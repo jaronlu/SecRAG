@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-券商内部投研知识平台 — Agentic RAG 系统。完整设计文档见 `docs/design/`。
+机构内部投研知识平台 — Agentic RAG 系统。完整设计文档见 `docs/design/`。
 - `docs/design` 只是软连接
 - 文档真实路径: `llm-wiki/raw/10-AI/projects/agentic-rag-securities/`
 ## 设计文档索引
@@ -15,7 +15,7 @@
 | 02-基础 RAG | `docs/design/implementation-02-basic-rag.md` |
 | 03-Agent 工作流 | `docs/design/implementation-03-agent-graph.md` |
 | 04-多跳检索 | `docs/design/implementation-04-multi-hop-retrieval.md` |
-| 05-金融工具 | `docs/design/implementation-05-financial-tools.md` |
+| 05-业务工具 | `docs/design/implementation-05-financial-tools.md` |
 | 06-引用与验证 | `docs/design/implementation-06-citation-verification.md` |
 
 ## 核心规则
@@ -62,7 +62,7 @@ src/
 ├── retrieval/        # 混合检索 + Reranker
 ├── ingestion/        # 文档加载、分块、Embedding
 ├── data/             # 行情、财务、资讯接口
-└── utils/            # 审计、引用、合规
+└── utils/            # 追踪、引用、规则
 tests/
 docs/
 scripts/

@@ -39,7 +39,7 @@ class AssistantState(TypedDict):
     # 验证结果 — STATE_VERIFICATION
     verification: dict  # {passed, issues, confidence}
 
-    # 合规检查 — STATE_COMPLIANCE
+    # 规则检查 — STATE_COMPLIANCE
     compliance: dict  # {passed, flags, risk_disclosure}
 
     # 最终回答 — STATE_FINAL_ANSWER / STATE_CITATIONS / STATE_CONFIDENCE / STATE_RISK_DISCLOSURE
@@ -48,5 +48,5 @@ class AssistantState(TypedDict):
     confidence: str  # 值域见 src.schemas.constants.Confidence
     risk_disclosure: str
 
-    # 审计 — STATE_AUDIT_TRAIL
+    # 追踪 — STATE_AUDIT_TRAIL
     audit_trail: dict  # 序列化 AuditEntry（SCHEMA-REFERENCE §3.3）

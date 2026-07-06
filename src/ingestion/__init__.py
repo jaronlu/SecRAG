@@ -16,7 +16,7 @@ from src.ingestion.loaders import (
 
 from src.ingestion.chunkers import (
     chunk_documents,            # 按文档类型分块
-    create_financial_splitter, # 创建默认金融分块器
+    create_financial_splitter, # 创建默认业务分块器
 )
 
 from src.ingestion.embedder import (

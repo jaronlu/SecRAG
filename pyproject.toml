@@ -8,7 +8,7 @@ packages = ["src"]
 [project]
 name = "secrag"
 version = "0.1.0"
-description = "券商内部投研知识平台 — Agentic RAG"
+description = "机构内部投研知识平台 — Agentic RAG"
 requires-python = ">=3.11"
 dependencies = [
     "langchain>=1.3,<2",
@@ -26,6 +26,8 @@ dependencies = [
     "unstructured[docx,pdf]>=0.23.1",
     "fastapi>=0.100,<1",
     "langchain-openai>=1.3.3",
+    "uvicorn>=0.30,<1",
+    "httpx>=0.27,<1",
 ]
 
 [project.optional-dependencies]

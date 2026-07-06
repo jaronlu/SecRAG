@@ -32,7 +32,7 @@ def get_embedding_model(
     返回一个 Embedding 转换器实例。
 
     优先从本地 HuggingFace 缓存加载（秒级），缓存未命中时自动回退到在线下载。
-    金融场景推荐：
+    业务场景推荐：
       - BAAI/bge-m3：中文效果好，支持多语言（≈ 主力模型）
       - moka-ai/m3e-base：轻量，适合快速原型（≈ 轻量替代）
     """

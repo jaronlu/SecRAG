@@ -36,7 +36,7 @@ def financial_ratios_tool(
 ) -> str:
     """Query PE/PB/ROE and other financial ratios from the financial_ratios table."""
     if not _STOCK_CODE_PATTERN.fullmatch(stock_code):
-        return "财务指标查询错误: 股票代码格式不合法"
+        return "财务指标查询错误: 标的代码格式不合法"
     if report_type and not _REPORT_TYPE_PATTERN.fullmatch(report_type):
         return "财务指标查询错误: 报告类型格式不合法"
 

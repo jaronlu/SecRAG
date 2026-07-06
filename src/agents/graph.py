@@ -52,7 +52,7 @@ def should_reason_again(state: AssistantState) -> str:
 
 
 def is_compliant(state: AssistantState) -> str:
-    """判断是否通过合规检查"""
+    """判断是否通过规则检查"""
     compliance = state.get(STATE_COMPLIANCE, {})
     if compliance.get("passed", False):
         return "pass"
@@ -69,7 +69,7 @@ def build_agent_graph() -> StateGraph:
 
     流程：START → query_understand → planner → retrieve → grade_and_filter
              → reason → verify → compliance_check → compose → audit_log → END
-    条件路由：检索不足则重新检索，验证失败则重新推理，合规拦截仍走 compose。
+    条件路由：检索不足则重新检索，验证失败则重新推理，规则拦截仍走 compose。
     """
     graph = StateGraph(AssistantState)
 
@@ -113,7 +113,7 @@ def build_agent_graph() -> StateGraph:
         },
     )
 
-    # 条件路由：合规拦截（block 也走 compose，附合规提示）
+    # 条件路由：规则拦截（block 也走 compose，附规则提示）
     graph.add_conditional_edges(
         "compliance_check",
         is_compliant,
