@@ -8,7 +8,7 @@ SecRAG 请求/响应模型
 
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.schemas.constants import DEFAULT_TOP_K
 
@@ -37,10 +37,9 @@ class QAResponse(BaseModel):
 
 
 class AssistantQARequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     query: str = Field(..., min_length=1, max_length=500)
-    user_id: str
-    user_role: str  # advisor | institutional_sales | compliance | operations | technical
-    department: str
     client_id: Optional[str] = None
     thread_id: Optional[str] = None
 

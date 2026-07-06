@@ -12,6 +12,9 @@
 用法：
   uv run python scripts/demo.py [--base-url http://127.0.0.1:8000]
 
+Demo token:
+  demo-advisor / demo-sales / demo-compliance / demo-ops / demo-tech
+
 会调用 .env 中配置的真实 LLM API（消耗真实调用额度），不在 CI/测试中自动执行。
 """
 
@@ -63,32 +66,25 @@ def demo_simple_qa(client: httpx.Client) -> None:
 
 
 def demo_agent_qa_allowed(client: httpx.Client) -> None:
-    """完整 Agent：advisor 角色查询 product_search（权限范围内）。"""
-    _print_section("2. /v1/assistant/qa —— advisor 角色查询产品风险（权限范围内）")
-    resp = client.post("/v1/assistant/qa", json={
-        "query": "这款理财产品风险等级是多少？",
-        "user_id": "demo-advisor-001",
-        "user_role": "advisor",
-        "department": "零售财富管理部",
-    })
+    """完整 Agent：服务端从 demo token 派生角色。"""
+    _print_section("2. /v1/assistant/qa —— demo-advisor token 查询产品风险")
+    resp = client.post(
+        "/v1/assistant/qa",
+        headers={"Authorization": "Bearer demo-advisor"},
+        json={"query": "这款理财产品风险等级是多少？"},
+    )
     resp.raise_for_status()
     _print_assistant_response(resp.json())
 
 
 def demo_agent_qa_denied(client: httpx.Client) -> None:
-    """完整 Agent：technical 角色查询 report_search（权限范围外，展示检索层显式拒绝）。
-
-    technical 角色在 ROLE_ALLOWED_SOURCES 中只允许 faq_search，
-    若 Planner 生成 report_search 步骤，HybridRetriever 会在检索前拦截，
-    返回 denied=True 的结果，而不是生成回答后再做事后过滤。
-    """
-    _print_section("3. /v1/assistant/qa —— technical 角色查询研报（权限范围外，预期检索层拒绝）")
-    resp = client.post("/v1/assistant/qa", json={
-        "query": "内部研报摘要里对新能源板块怎么看？",
-        "user_id": "demo-tech-001",
-        "user_role": "technical",
-        "department": "技术部",
-    })
+    """完整 Agent：demo-tech token 只能走其服务端绑定范围。"""
+    _print_section("3. /v1/assistant/qa —— demo-tech token 查询受限资料")
+    resp = client.post(
+        "/v1/assistant/qa",
+        headers={"Authorization": "Bearer demo-tech"},
+        json={"query": "内部研究摘要里对新能源板块怎么看？"},
+    )
     resp.raise_for_status()
     _print_assistant_response(resp.json())
 

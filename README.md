@@ -6,7 +6,7 @@
 
 机构内部投研知识平台的 Agentic RAG 系统。目标是把知识库从"文档检索器"升级成结构上可信任的投研助手——不是靠模型自觉，而是靠工作流设计把权限、验证、追踪变成硬约束。
 
-行业行业的知识问答场景，核心难点从来不是"检索"，而是：
+行业知识问答场景，核心难点从来不是"检索"，而是：
 
 - 信息分散在研报、公告、法规、财报、内部制度里
 - 同一问题，投顾 / 机构销售 / 规则看到的材料权限不同
@@ -63,6 +63,32 @@ uv run python scripts/demo.py
 ```
 
 `scripts/demo.py` 会依次调用 `/v1/qa`（单轮 RAG）和 `/v1/assistant/qa`（完整 Agent 工作流，含权限拒绝场景），打印回答、引用、置信度和追踪信息。
+
+### Assistant API 身份绑定
+
+`/v1/assistant/qa` 不再接受请求体里的用户角色作为可信输入。调用时必须传入
+`Authorization: Bearer <demo-token>`，服务端根据 token 派生用户身份和角色。
+
+可用 demo token：
+
+```text
+demo-advisor
+demo-sales
+demo-compliance
+demo-ops
+demo-tech
+```
+
+curl 示例：
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/assistant/qa \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer demo-tech' \
+  -d '{"query":"系统操作流程怎么查？"}'
+```
+
+Swagger UI 中点击 `Authorize`，填入 `Bearer demo-tech` 后再调用接口。
 
 ### 检索效果评估
 
