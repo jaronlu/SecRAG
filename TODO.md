@@ -28,4 +28,4 @@
    `src/config.py` 里所有配置项都有默认值，代码本身不依赖 `.env.example` 就能跑，但对第一次看这个项目的人来说，缺一份"这些环境变量是什么、需要填什么"的示例文件，会增加理解成本。
 
 8. **`docs/design` 是指向仓库外部路径的软链接**
-   指向 `/Users/ryan/llm-wiki/raw/10-AI/projects/agentic-rag-securities`，只在你本机有效。如果仓库要公开，这个软链接对别人是断的——需要决定是把设计文档一并搬进仓库，还是在 README 里说明"设计文档未公开，以下是精简版架构说明"。
+   指向 `/Users/ryan/llm-wiki/raw/10-AI/projects/agentic-rag-securities`，只在你本机有效。如果仓库要公开，这个软链接对别人是断的——需要决定是把设计文档一并搬进仓库，还是在 README 里说明"设计文档未披露，以下是精简版架构说明"。
