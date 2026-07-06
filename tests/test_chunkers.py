@@ -83,9 +83,3 @@ def test_chunk_documents_unknown_type_fallback():
     doc = _sample_document("未知类型。")
     chunks = chunk_documents([doc], "nonexistent_type")
     assert len(chunks) >= 1
-
-
-if __name__ == "__main__":
-    test_create_financial_splitter_returns_splitter()
-    test_chunk_documents_financial_report_larger_chunks()
-    print("all manual checks passed")

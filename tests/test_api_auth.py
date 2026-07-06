@@ -5,6 +5,7 @@ from pydantic import ValidationError
 from src.api.auth import authenticate_user, build_assistant_initial_state
 from src.schemas.constants import (
     AUDIT_REQUEST_ID,
+    AUDIT_STARTED_PERF_COUNTER,
     AUDIT_TIMESTAMP,
     ROLE_ALLOWED_SOURCES,
     ROLE_TECHNICAL,
@@ -54,6 +55,7 @@ def test_build_initial_state_uses_authenticated_user():
     assert state[STATE_DATA_PERMISSIONS]
     assert state[STATE_AUDIT_TRAIL][AUDIT_REQUEST_ID]
     assert state[STATE_AUDIT_TRAIL][AUDIT_TIMESTAMP]
+    assert state[STATE_AUDIT_TRAIL][AUDIT_STARTED_PERF_COUNTER] > 0
     assert SOURCE_FAQ in ROLE_ALLOWED_SOURCES[state[STATE_USER_ROLE]]
     assert SOURCE_REPORT not in ROLE_ALLOWED_SOURCES[state[STATE_USER_ROLE]]
 

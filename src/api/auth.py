@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -9,6 +10,7 @@ from fastapi import Header, HTTPException, status
 
 from src.schemas.constants import (
     AUDIT_REQUEST_ID,
+    AUDIT_STARTED_PERF_COUNTER,
     AUDIT_TIMESTAMP,
     ROLE_ADVISOR,
     ROLE_COMPLIANCE,
@@ -116,5 +118,6 @@ def build_assistant_initial_state(
         STATE_AUDIT_TRAIL: {
             AUDIT_REQUEST_ID: str(uuid.uuid4()),
             AUDIT_TIMESTAMP: datetime.now(timezone.utc).isoformat(),
+            AUDIT_STARTED_PERF_COUNTER: time.perf_counter(),
         },
     }

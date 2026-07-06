@@ -61,7 +61,7 @@ class HybridRetriever:
             source = step.get(PLAN_SOURCE)
             retriever = self._get_retriever(source)
             if retriever is None:
-                results.append(self._error_result(source, f"未知检索源: {source}"))
+                results.append(self._error_result(source, "未知检索源", f"未知检索源: {source}"))
                 continue
 
             try:
@@ -72,7 +72,7 @@ class HybridRetriever:
                 )
                 results.extend(self._filter_results_by_role(retrieved))
             except Exception as exc:
-                results.append(self._error_result(source, f"检索失败: {exc}", str(exc)))
+                results.append(self._error_result(source, "检索失败", str(exc)))
 
         return results
 
@@ -132,9 +132,12 @@ class HybridRetriever:
             RR_REASON: step.get(PLAN_REASON, "权限不足"),
         }
 
-    def _error_result(self, source: Optional[str], content: str, error: Optional[str] = None) -> Dict:
+    def _error_result(
+        self, source: Optional[str], content: str, error: Optional[str] = None
+    ) -> Dict:
         return {
-            RR_CONTENT: content,
+            RR_CONTENT: "",
             RR_METADATA: {META_SOURCE: source, META_ERROR: error or content},
+            RR_REASON: content,
             RR_SCORE: 0.0,
         }

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
+from src.retrieval.base import BaseRetriever
 from src.retrieval.hybrid_retriever import HybridRetriever
 from src.schemas.constants import (
     META_ALLOWED_ROLES,
@@ -27,7 +28,7 @@ from src.schemas.constants import (
 )
 
 
-class FakeRetriever:
+class FakeRetriever(BaseRetriever):
     def __init__(self):
         self.calls: list[dict] = []
 
@@ -38,14 +39,16 @@ class FakeRetriever:
         filters: Optional[Dict] = None,
     ) -> List[Dict]:
         self.calls.append({"query": query, "top_k": top_k, "filters": filters})
-        return [{
-            RR_CONTENT: f"{query}:{top_k}",
-            RR_METADATA: {META_SOURCE: "fake"},
-            RR_SCORE: 0.9,
-        }]
+        return [
+            {
+                RR_CONTENT: f"{query}:{top_k}",
+                RR_METADATA: {META_SOURCE: "fake"},
+                RR_SCORE: 0.9,
+            }
+        ]
 
 
-class FailingRetriever:
+class FailingRetriever(BaseRetriever):
     def retrieve(
         self,
         query: str,
@@ -55,7 +58,7 @@ class FailingRetriever:
         raise RuntimeError("boom")
 
 
-class RoleTaggedRetriever:
+class RoleTaggedRetriever(BaseRetriever):
     def retrieve(
         self,
         query: str,
@@ -87,28 +90,34 @@ class TestHybridRetriever:
         retriever = HybridRetriever(user_role=ROLE_ADVISOR)
         retriever._retriever_cache[SOURCE_PRODUCT] = fake
 
-        results = retriever.retrieve([{
-            PLAN_SOURCE: SOURCE_PRODUCT,
-            PLAN_QUERY: "风险等级",
-            PLAN_TOP_K: 3,
-            PLAN_FILTERS: {"product_type": "fund"},
-        }])
+        results = retriever.retrieve([
+            {
+                PLAN_SOURCE: SOURCE_PRODUCT,
+                PLAN_QUERY: "风险等级",
+                PLAN_TOP_K: 3,
+                PLAN_FILTERS: {"product_type": "fund"},
+            }
+        ])
 
         assert results[0][RR_CONTENT] == "风险等级:3"
-        assert fake.calls == [{
-            "query": "风险等级",
-            "top_k": 3,
-            "filters": {"product_type": "fund"},
-        }]
+        assert fake.calls == [
+            {
+                "query": "风险等级",
+                "top_k": 3,
+                "filters": {"product_type": "fund"},
+            }
+        ]
 
     def test_denies_source_not_allowed_for_role(self):
         retriever = HybridRetriever(user_role=ROLE_TECHNICAL)
 
-        results = retriever.retrieve([{
-            PLAN_SOURCE: SOURCE_REPORT,
-            PLAN_QUERY: "内部研报摘要",
-            PLAN_TOP_K: 5,
-        }])
+        results = retriever.retrieve([
+            {
+                PLAN_SOURCE: SOURCE_REPORT,
+                PLAN_QUERY: "内部研报摘要",
+                PLAN_TOP_K: 5,
+            }
+        ])
 
         assert len(results) == 1
         assert results[0][RR_DENIED] is True
@@ -120,10 +129,12 @@ class TestHybridRetriever:
         retriever = HybridRetriever(user_role="unknown")
         retriever._retriever_cache[SOURCE_FAQ] = fake
 
-        results = retriever.retrieve([{
-            PLAN_SOURCE: SOURCE_FAQ,
-            PLAN_QUERY: "操作流程",
-        }])
+        results = retriever.retrieve([
+            {
+                PLAN_SOURCE: SOURCE_FAQ,
+                PLAN_QUERY: "操作流程",
+            }
+        ])
 
         assert results[0][RR_CONTENT] == "操作流程:5"
         assert fake.calls[0]["top_k"] == 5
@@ -131,26 +142,32 @@ class TestHybridRetriever:
     def test_unknown_source_returns_error_result(self):
         retriever = HybridRetriever(user_role=ROLE_ADVISOR)
 
-        results = retriever.retrieve([{
-            PLAN_SOURCE: "unknown_search",
-            PLAN_QUERY: "测试",
-        }])
+        results = retriever.retrieve([
+            {
+                PLAN_SOURCE: "unknown_search",
+                PLAN_QUERY: "测试",
+            }
+        ])
 
         assert results[0][RR_SCORE] == 0.0
-        assert "未知检索源" in results[0][RR_CONTENT]
-        assert results[0][RR_METADATA][META_ERROR]
+        assert results[0][RR_CONTENT] == ""
+        assert results[0][RR_REASON] == "未知检索源"
+        assert results[0][RR_METADATA][META_ERROR] == "未知检索源: unknown_search"
 
     def test_retriever_exception_returns_error_result(self):
         retriever = HybridRetriever(user_role=ROLE_ADVISOR)
         retriever._retriever_cache[SOURCE_PRODUCT] = FailingRetriever()
 
-        results = retriever.retrieve([{
-            PLAN_SOURCE: SOURCE_PRODUCT,
-            PLAN_QUERY: "风险等级",
-        }])
+        results = retriever.retrieve([
+            {
+                PLAN_SOURCE: SOURCE_PRODUCT,
+                PLAN_QUERY: "风险等级",
+            }
+        ])
 
         assert results[0][RR_SCORE] == 0.0
-        assert "检索失败" in results[0][RR_CONTENT]
+        assert results[0][RR_CONTENT] == ""
+        assert results[0][RR_REASON] == "检索失败"
         assert results[0][RR_METADATA][META_ERROR] == "boom"
 
     def test_merges_multiple_allowed_sources(self):

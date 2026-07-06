@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, cast
 from unittest.mock import MagicMock
@@ -23,8 +24,19 @@ from src.agents.nodes import (
 )
 from src.agents.state import AssistantState
 from src.schemas.constants import (
+    AUDIT_COMPLIANCE,
+    AUDIT_QUERY,
+    AUDIT_QUERY_ORIGINAL,
+    AUDIT_REASONING,
+    AUDIT_REASONING_DURATION_MS,
     AUDIT_REQUEST_ID,
+    AUDIT_RESPONSE,
+    AUDIT_RETRIEVAL,
+    AUDIT_RETRIEVAL_SOURCES,
+    AUDIT_RETRIEVAL_TOTAL_CHUNKS,
+    AUDIT_STARTED_PERF_COUNTER,
     AUDIT_TIMESTAMP,
+    AUDIT_VERIFICATION,
     CONFIDENCE_HIGH,
     CONFIDENCE_LOW,
     CONFIDENCE_MEDIUM,
@@ -487,23 +499,23 @@ class TestAuditLog:
             STATE_RETRIEVAL_RESULTS: [_result("内容")],
         })
         result = audit_log(state)
-        entry = result["audit_trail"]
+        entry = result[STATE_AUDIT_TRAIL]
         assert AUDIT_REQUEST_ID in entry
         assert AUDIT_TIMESTAMP in entry
-        assert entry["query"]["original"] == ""
-        assert entry["retrieval"]["total_chunks"] == 1
+        assert entry[AUDIT_QUERY][AUDIT_QUERY_ORIGINAL] == ""
+        assert entry[AUDIT_RETRIEVAL][AUDIT_RETRIEVAL_TOTAL_CHUNKS] == 1
 
     def test_audit_includes_all_sections(self):
         state = _state()
         result = audit_log(state)
-        entry = result["audit_trail"]
+        entry = result[STATE_AUDIT_TRAIL]
         for section in (
-            "query",
-            "retrieval",
-            "reasoning",
-            "verification",
-            "compliance",
-            "response",
+            AUDIT_QUERY,
+            AUDIT_RETRIEVAL,
+            AUDIT_REASONING,
+            AUDIT_VERIFICATION,
+            AUDIT_COMPLIANCE,
+            AUDIT_RESPONSE,
         ):
             assert section in entry, f"audit entry missing section: {section}"
 
@@ -517,22 +529,27 @@ class TestAuditLog:
         })
         result = audit_log(state)
 
-        assert result["audit_trail"]["retrieval"]["sources"] == ["faq.html", "product.html"]
+        assert result[STATE_AUDIT_TRAIL][AUDIT_RETRIEVAL][AUDIT_RETRIEVAL_SOURCES] == [
+            "faq.html",
+            "product.html",
+        ]
 
     def test_reuses_initialized_audit_metadata_and_calculates_duration(self):
         timestamp = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
         state = _state(**{
             STATE_AUDIT_TRAIL: {
                 AUDIT_REQUEST_ID: "request-123",
+                AUDIT_STARTED_PERF_COUNTER: time.perf_counter() - 1,
                 AUDIT_TIMESTAMP: timestamp,
             },
         })
 
         result = audit_log(state)
 
-        assert result["audit_trail"][AUDIT_REQUEST_ID] == "request-123"
-        assert result["audit_trail"][AUDIT_TIMESTAMP] == timestamp
-        assert result["audit_trail"]["reasoning"]["duration_ms"] > 0
+        assert result[STATE_AUDIT_TRAIL][AUDIT_REQUEST_ID] == "request-123"
+        assert result[STATE_AUDIT_TRAIL][AUDIT_TIMESTAMP] == timestamp
+        assert AUDIT_STARTED_PERF_COUNTER not in result[STATE_AUDIT_TRAIL]
+        assert result[STATE_AUDIT_TRAIL][AUDIT_REASONING][AUDIT_REASONING_DURATION_MS] > 0
 
 
 # ══════════════════════════════════════════════════════════════════════

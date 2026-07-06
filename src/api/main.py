@@ -2,10 +2,12 @@ import logging
 import uuid
 from html import escape
 
+import httpx
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, Response
 from langchain_core.runnables.config import RunnableConfig
+from openai import APIConnectionError, APIStatusError, APITimeoutError
 
 from src.api.auth import (
     TOKEN_USER_BINDINGS,
@@ -540,6 +542,19 @@ def _get_agent_app():
     return agent_app
 
 
+def _is_provider_unavailable(exc: Exception) -> bool:
+    if isinstance(exc, (httpx.TimeoutException, httpx.TransportError)):
+        return True
+
+    if isinstance(exc, (APIConnectionError, APITimeoutError)):
+        return True
+
+    if isinstance(exc, APIStatusError):
+        return exc.status_code in {401, 403, 408, 409, 429} or exc.status_code >= 500
+
+    return False
+
+
 @app.post("/v1/assistant/qa", response_model=AssistantQAResponse)
 async def assistant_qa(
     request: AssistantQARequest,
@@ -553,19 +568,23 @@ async def assistant_qa(
     try:
         result = app.invoke(initial_state, config=config)
     except Exception as exc:
-        audit_logger.warning(
-            "Assistant provider unavailable: thread_id=%s error=%s",
-            thread_id,
-            exc.__class__.__name__,
-        )
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "LLM provider unavailable. Check OPENAI_API_BASE, OPENAI_API_KEY, "
-                "network/proxy settings, or start a local Ollama service and set "
-                "LLM_PROVIDER=ollama."
-            ),
-        )
+        if _is_provider_unavailable(exc):
+            audit_logger.warning(
+                "Assistant provider unavailable: thread_id=%s error=%s",
+                thread_id,
+                exc.__class__.__name__,
+            )
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "LLM provider unavailable. Check OPENAI_API_BASE, OPENAI_API_KEY, "
+                    "network/proxy settings, or start a local Ollama service and set "
+                    "LLM_PROVIDER=ollama."
+                ),
+            ) from exc
+
+        audit_logger.exception("Assistant QA failed: thread_id=%s", thread_id)
+        raise HTTPException(status_code=500, detail="内部处理错误") from exc
 
     return AssistantQAResponse(
         answer=result[STATE_FINAL_ANSWER],
