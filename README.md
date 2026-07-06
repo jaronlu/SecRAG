@@ -98,6 +98,32 @@ uv run python scripts/evaluate_retrieval.py
 
 基于 `scripts/evaluate_retrieval.sample.json` 中的小样本评估集，输出 recall@5/recall@10/mrr/precision@5/coverage/permission_block_accuracy。样本量很小，仅用于验证评估流程可跑通，不代表生产环境效果。
 
+当前本地小样本结果：
+
+```text
+samples: 5
+recall@5: 0.700
+recall@10: 0.800
+mrr: 0.640
+precision@5: 0.240
+coverage: 1.000
+permission_block_accuracy: 1.000
+```
+
+### 权限验收
+
+```bash
+uv run python scripts/check_permissions.py
+```
+
+当前本地验收结果：
+
+```text
+technical_langgraph_faq: PASS
+operations_langgraph_faq_blocked: PASS
+sales_langgraph_report_blocked: PASS
+```
+
 ## 运行测试
 
 ```bash
@@ -114,6 +140,31 @@ CI 在每次 push / PR 时自动跑 lint + 测试。
 - 独立 commit 逐步推进，功能按模块落地（数据管道 → 基础 RAG → Agent 编排 → 检索优化 → 业务工具）
 - `src/agents/`：`graph.py`（图构建）、`nodes.py`（六节点实现）、`state.py`（状态定义）、`tools.py`（工具定义）
 - `tests/` 100+ 单元测试，覆盖节点逻辑、条件路由与图构建
+
+## 职场竞争力评估
+
+这个项目适合作为 AI 应用工程、RAG 工程、后端转 AI 工程方向的作品集项目。它不是简单聊天壳子，而是围绕角色权限、引用、审计、合规边界构建了一条可验证的 Agentic RAG 链路。
+
+当前加分点：
+
+- **业务约束明确**：同一问题在不同角色下有不同检索源和可见结果，不是普通“上传 PDF 问答”。
+- **工程链路完整**：包含 FastAPI、LangGraph、Chroma、ingest、retriever、agent graph、tools、tests、demo UI 和启动脚本。
+- **真实问题修复记录清晰**：已修过请求体伪造角色、工具绕过权限、chunk 级 `allowed_roles` 过滤、低相关内容误答、sources 去重等问题。
+- **测试意识较强**：包含节点单测、权限 smoke check、metadata 测试和评估脚本入口。
+
+当前短板：
+
+- **评估指标还不够强**：需要用 `scripts/evaluate_retrieval.py` 跑出一组稳定的小样本 recall/precision/permission_block_accuracy 结果。
+- **UI 仍偏调试型**：目前结果展示更像 JSON 调试页，后续应拆成 Answer、Citations、Audit Trail 和 Raw JSON。
+- **LLM 依赖外部网络**：StepFun 或兼容 API 不稳定时会影响现场演示，需要明确网络要求或提供标注清楚的离线 demo mode。
+- **样例数据规模较小**：当前能证明流程，但不能证明效果，需要扩充 20-50 条覆盖不同角色和拒答场景的小评估集。
+- **设计文档发布方式未闭环**：`docs/design` 是本机外部路径软链接，公开仓库前需要内置精简设计文档或在 README 里说明详细设计不随仓库发布。
+
+下一步最能提分的三件事：
+
+1. 把 `scripts/check_permissions.py` 的结果写进 README，形成固定权限验收说明。
+2. 跑通 `scripts/evaluate_retrieval.py`，记录本地小样本评估结果。
+3. 优化 UI 展示结构，减少 raw JSON 暴露，把答案、引用和审计信息分区展示。
 
 ## 技术栈
 

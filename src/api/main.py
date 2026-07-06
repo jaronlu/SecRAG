@@ -171,6 +171,49 @@ async def ui():
       min-height: 180px;
       overflow: auto;
     }
+    .result-sections {
+      display: grid;
+      gap: 14px;
+    }
+    .output-section {
+      background: #fff;
+      border: 1px solid #d7dce2;
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .output-section h3 {
+      margin: 0 0 10px;
+      font-size: 16px;
+    }
+    .answer-text {
+      white-space: pre-wrap;
+      line-height: 1.65;
+    }
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .pill {
+      border: 1px solid #c8d0da;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 13px;
+      color: #374151;
+      background: #f8fafc;
+    }
+    .citation-list {
+      margin: 0;
+      padding-left: 20px;
+    }
+    .citation-list li {
+      margin-bottom: 10px;
+    }
+    details summary {
+      cursor: pointer;
+      font-weight: 700;
+    }
     .toolbar {
       display: flex;
       justify-content: space-between;
@@ -256,7 +299,29 @@ async def ui():
         </button>
       </div>
     </div>
-    <pre id="result">等待查询...</pre>
+    <section id="emptyResult" class="output-section">等待查询...</section>
+    <div id="resultSections" class="result-sections" hidden>
+      <section class="output-section">
+        <h3>Answer</h3>
+        <div id="answerText" class="answer-text"></div>
+        <div class="meta-row">
+          <span id="confidenceText" class="pill"></span>
+          <span id="complianceText" class="pill"></span>
+        </div>
+      </section>
+      <section class="output-section">
+        <h3>Citations</h3>
+        <ol id="citationList" class="citation-list"></ol>
+      </section>
+      <details class="output-section">
+        <summary>Audit Trail</summary>
+        <pre id="auditText"></pre>
+      </details>
+      <details class="output-section">
+        <summary>Raw JSON</summary>
+        <pre id="rawJson"></pre>
+      </details>
+    </div>
   </main>
   <script>
     const submit = document.getElementById("submit");
@@ -265,7 +330,15 @@ async def ui():
     const roleBinding = document.getElementById("roleBinding");
     const statusEl = document.getElementById("status");
     const copyStatusEl = document.getElementById("copyStatus");
-    const resultEl = document.getElementById("result");
+    const emptyResult = document.getElementById("emptyResult");
+    const resultSections = document.getElementById("resultSections");
+    const answerText = document.getElementById("answerText");
+    const confidenceText = document.getElementById("confidenceText");
+    const complianceText = document.getElementById("complianceText");
+    const citationList = document.getElementById("citationList");
+    const auditText = document.getElementById("auditText");
+    const rawJson = document.getElementById("rawJson");
+    let lastResultText = "";
 
     function updateRoleBinding() {
       const selected = tokenSelect.options[tokenSelect.selectedIndex];
@@ -274,6 +347,44 @@ async def ui():
 
     tokenSelect.addEventListener("change", updateRoleBinding);
     updateRoleBinding();
+
+    function renderResult(data) {
+      emptyResult.hidden = true;
+      resultSections.hidden = false;
+
+      const answer = data.answer || data.detail || data.raw || "";
+      const citations = Array.isArray(data.citations) ? data.citations : [];
+      const audit = data.audit_trail || {};
+      const compliance = data.compliance || {};
+
+      answerText.textContent = answer || "无回答内容";
+      confidenceText.textContent = `confidence: ${data.confidence || "n/a"}`;
+      complianceText.textContent = `compliance: ${compliance.passed === false ? "blocked" : "passed/unknown"}`;
+
+      citationList.replaceChildren();
+      if (citations.length === 0) {
+        const item = document.createElement("li");
+        item.textContent = "无引用";
+        citationList.appendChild(item);
+      } else {
+        for (const citation of citations) {
+          const item = document.createElement("li");
+          const title = citation.doc_title || "未知文档";
+          const source = citation.source || "";
+          const quote = citation.quote || "";
+          item.textContent = `${title} — ${source}\n${quote}`;
+          citationList.appendChild(item);
+        }
+      }
+
+      auditText.textContent = JSON.stringify(audit, null, 2);
+      rawJson.textContent = JSON.stringify(data, null, 2);
+      lastResultText = [
+        `Answer:\n${answer}`,
+        `Citations:\n${citations.map((c, i) => `${i + 1}. ${c.doc_title || "未知文档"} — ${c.source || ""}`).join("\n") || "无引用"}`,
+        `Audit Trail:\n${JSON.stringify(audit, null, 2)}`
+      ].join("\n\n");
+    }
 
     submit.addEventListener("click", async () => {
       const query = document.getElementById("query").value.trim();
@@ -292,7 +403,10 @@ async def ui():
 
       submit.disabled = true;
       statusEl.textContent = "查询中...";
-      resultEl.textContent = "";
+      emptyResult.hidden = false;
+      emptyResult.textContent = "查询中...";
+      resultSections.hidden = true;
+      lastResultText = "";
 
       try {
         const response = await fetch("/v1/assistant/qa", {
@@ -310,10 +424,10 @@ async def ui():
         } catch {
           data = { raw: text };
         }
-        resultEl.textContent = JSON.stringify(data, null, 2);
+        renderResult(data);
         statusEl.textContent = response.ok ? "完成" : `请求失败：${response.status}`;
       } catch (error) {
-        resultEl.textContent = String(error);
+        renderResult({ raw: String(error) });
         statusEl.textContent = "请求失败";
       } finally {
         submit.disabled = false;
@@ -321,8 +435,8 @@ async def ui():
     });
 
     copyResult.addEventListener("click", async () => {
-      const text = resultEl.textContent.trim();
-      if (!text || text === "等待查询...") {
+      const text = lastResultText.trim();
+      if (!text) {
         copyStatusEl.textContent = "暂无可复制内容";
         return;
       }
@@ -331,12 +445,16 @@ async def ui():
         await navigator.clipboard.writeText(text);
         copyStatusEl.textContent = "已复制";
       } catch {
-        const range = document.createRange();
-        range.selectNodeContents(resultEl);
-        const selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(range);
-        copyStatusEl.textContent = "已选中，请手动复制";
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const copied = document.execCommand("copy");
+        textarea.remove();
+        copyStatusEl.textContent = copied ? "已复制" : "复制失败";
       }
     });
   </script>
