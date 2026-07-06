@@ -4,7 +4,8 @@
 输出 dict 的字段名对应 SCHEMA-REFERENCE §3.1 Citation 模型。
 """
 
-from typing import Dict, List
+from dataclasses import asdict, dataclass
+from typing import Dict, List, Optional
 
 from src.schemas.constants import (
     # 枚举 (§2.3, §2.4)
@@ -30,6 +31,21 @@ from src.schemas.constants import (
 )
 
 
+@dataclass
+class Citation:
+    """引用标注 — 权威定义，字段对应 SCHEMA-REFERENCE §3.1"""
+
+    citation_id: str
+    doc_title: str
+    source: str
+    doc_type: str
+    chunk_id: str
+    quote: str
+    relevance_score: float
+    permission_level: str
+    page_number: Optional[int] = None
+
+
 def format_citations(retrieval_results: List[Dict]) -> List[Dict]:
     """生成引用列表
 
@@ -39,17 +55,18 @@ def format_citations(retrieval_results: List[Dict]) -> List[Dict]:
     for i, doc in enumerate(retrieval_results, 1):
         meta = doc.get(RR_METADATA, {})
         content = doc.get(RR_CONTENT, "")
-        citations.append({
-            "citation_id": f"cite_{i:03d}",
-            "doc_title": meta.get(META_TITLE, "未知"),
-            "source": meta.get(META_SOURCE, ""),
-            "doc_type": meta.get(META_DOC_TYPE, ""),
-            "chunk_id": meta.get(META_CHUNK_ID, ""),
-            "quote": content[:200] + "..." if len(content) > 200 else content,
-            "relevance_score": round(doc.get(RR_SCORE, 0), 4),
-            "page_number": meta.get(META_PAGE_NUMBER),
-            "permission_level": meta.get(META_PERMISSION_LEVEL, PERMISSION_PUBLIC),
-        })
+        citation = Citation(
+            citation_id=f"cite_{i:03d}",
+            doc_title=meta.get(META_TITLE, "未知"),
+            source=meta.get(META_SOURCE, ""),
+            doc_type=meta.get(META_DOC_TYPE, ""),
+            chunk_id=meta.get(META_CHUNK_ID, ""),
+            quote=content[:200] + "..." if len(content) > 200 else content,
+            relevance_score=round(doc.get(RR_SCORE, 0), 4),
+            page_number=meta.get(META_PAGE_NUMBER),
+            permission_level=meta.get(META_PERMISSION_LEVEL, PERMISSION_PUBLIC),
+        )
+        citations.append(asdict(citation))
     return citations
 
 

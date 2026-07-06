@@ -9,6 +9,7 @@ from langchain_core.messages import HumanMessage
 
 from src.agents.state import AssistantState
 from src.config import config
+from src.rag.formatter import format_citations
 from src.retrieval.hybrid_retriever import HybridRetriever
 from src.schemas.constants import (
     CONFIDENCE_HIGH,
@@ -17,9 +18,6 @@ from src.schemas.constants import (
     DEFAULT_TOP_K,
     GRADE_TOP_K,
     LLM_PROVIDER_OPENAI,
-    META_CHUNK_ID,
-    META_DOC_TYPE,
-    META_PAGE_NUMBER,
     META_PERMISSION_LEVEL,
     META_SOURCE,
     META_TITLE,
@@ -429,21 +427,8 @@ def compose(state: AssistantState) -> AssistantState:
     """生成最终回答：带引用、置信度、风险提示"""
     answer = state.get(STATE_FINAL_ANSWER, "")
 
-    # 引用标注
-    citations = []
-    for i, r in enumerate(state.get(STATE_RETRIEVAL_RESULTS, [])[:5], 1):
-        meta = r.get(RR_METADATA, {})
-        citations.append({
-            "citation_id": f"cite_{i:03d}",
-            "doc_title": meta.get(META_TITLE, "未知"),
-            "source": meta.get(META_SOURCE, ""),
-            "doc_type": meta.get(META_DOC_TYPE, ""),
-            "chunk_id": meta.get(META_CHUNK_ID, ""),
-            "quote": r.get(RR_CONTENT, "")[:200],
-            "relevance_score": round(r.get(RR_SCORE, 0), 4),
-            "page_number": meta.get(META_PAGE_NUMBER),
-            "permission_level": meta.get(META_PERMISSION_LEVEL, PERMISSION_PUBLIC),
-        })
+    # 引用标注（复用 src/rag/formatter.py 的权威实现，避免重复维护 Citation 字段）
+    citations = format_citations(state.get(STATE_RETRIEVAL_RESULTS, [])[:5])
 
     # 风险提示 + 适当性警告
     compliance = state.get(STATE_COMPLIANCE, {})
