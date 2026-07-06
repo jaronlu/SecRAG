@@ -1,0 +1,20 @@
+{
+  "local-source-repos.pdf": {
+    "doc_type": "faq",
+    "retrieval_source": "faq_search",
+    "permission_level": "internal",
+    "allowed_roles": ["technical"]
+  },
+  "local-word.docx": {
+    "doc_type": "faq",
+    "retrieval_source": "faq_search",
+    "permission_level": "internal",
+    "allowed_roles": ["technical"]
+  },
+  "sample-financial.csv": {
+    "doc_type": "financial_data",
+    "retrieval_source": "sql_query",
+    "permission_level": "internal",
+    "allowed_roles": ["advisor", "institutional_sales", "compliance"]
+  }
+}

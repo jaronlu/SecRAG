@@ -5,25 +5,25 @@ import json
 import sys
 from pathlib import Path
 
+from src.config import config
 from src.ingestion.chunkers import chunk_documents
 from src.ingestion.embedder import embed_and_store, get_embedding_model
-from src.config import config
 from src.schemas.constants import (
-    META_CHUNK_ID,
-    META_ALLOWED_ROLES,
-    META_DOC_ID,
-    META_DOC_TYPE,
-    META_SOURCE,
-    META_TITLE,
-    META_DATE,
-    META_PERMISSION_LEVEL,
-    META_RETRIEVAL_SOURCE,
-    PERMISSION_INTERNAL,
     ALL_VALID_DOC_TYPES,
     CHROMA_DEFAULT_PERSIST_DIR,
+    META_ALLOWED_ROLES,
+    META_CHUNK_ID,
+    META_DATE,
+    META_DOC_ID,
+    META_DOC_TYPE,
+    META_PERMISSION_LEVEL,
+    META_RETRIEVAL_SOURCE,
+    META_SOURCE,
+    META_TITLE,
+    PERMISSION_INTERNAL,
 )
 
-SUPPORTED_SUFFIXES = {".pdf", ".docx", ".doc", ".html", ".htm"}
+SUPPORTED_SUFFIXES = {".pdf", ".docx", ".doc", ".html", ".htm", ".csv"}
 
 
 def build_chunk_id(source: str, index: int, content: str) -> str:
@@ -96,6 +96,8 @@ def normalize_chunks(chunks, file_path: Path, doc_type: str, sample_metadata: di
 def ingest_document(file_path: Path, doc_type: str):
     """单文档入库流程"""
     print(f"处理: {file_path}")
+    sample_metadata = _load_sample_metadata(file_path)
+    effective_doc_type = sample_metadata.get(META_DOC_TYPE, doc_type)
 
     documents = []
     # 1. 加载
@@ -112,13 +114,17 @@ def ingest_document(file_path: Path, doc_type: str):
         from src.ingestion.loaders import load_html
 
         documents = load_html(file_path)
+    elif suffix == ".csv":
+        from src.ingestion.loaders import load_financial_csv
+
+        documents = load_financial_csv(file_path)
     else:
         print(f"不支持的文件格式: {suffix}")
         return
 
     # 2. 分块
-    chunks = chunk_documents(documents=documents, doc_type=doc_type)
-    chunks = normalize_chunks(chunks, file_path, doc_type, _load_sample_metadata(file_path))
+    chunks = chunk_documents(documents=documents, doc_type=effective_doc_type)
+    chunks = normalize_chunks(chunks, file_path, effective_doc_type, sample_metadata)
     print(f"  分块数: {len(chunks)}")
 
     # 3. 向量化并存储（从 config 读取 embedding 模型名称）
@@ -145,7 +151,9 @@ def ingest_directory(directory: Path, doc_type: str):
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("用法: python scripts/ingest.py <目录路径> <文档类型>")
-        print("文档类型: research_report / announcement / regulation / financial_data / meeting_minutes / product / faq")
+        print(
+            "文档类型: research_report / announcement / regulation / financial_data / meeting_minutes / product / faq"
+        )
         sys.exit(1)
 
     directory = Path(sys.argv[1])

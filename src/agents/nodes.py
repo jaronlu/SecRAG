@@ -291,7 +291,7 @@ def reason(state: AssistantState) -> AssistantState:
     role_instructions = {
         ROLE_ADVISOR: "你是机构投顾助手。基于内部知识库为客户提供准确的产品/规则/市场信息。",
         ROLE_INSTITUTIONAL_SALES: "你是机构销售助手。为机构客户提供研究支持和市场洞察。",
-        ROLE_COMPLIANCE: "你是规则助手。基于法规和制度提供准确的规则判断和引用。",
+        ROLE_COMPLIANCE: "你是合规助手。基于法规和制度提供准确的合规判断和引用。",
         ROLE_OPERATIONS: "你是运营支持助手。回答客户常见问题，提供操作指引。",
         ROLE_TECHNICAL: "你是技术支持助手。回答系统/数据相关问题。",
     }
@@ -312,7 +312,7 @@ def reason(state: AssistantState) -> AssistantState:
 回答必须附引用标注 [来源1][来源2]。
 数字必须来自检索结果，禁止编造。
 {"投顾/销售角色：不得输出" + "买" + "入/" + "卖" + "出/" + "目标" + "价等业务建议，仅提供事实信息。" if role in (ROLE_ADVISOR, ROLE_INSTITUTIONAL_SALES) else ""}
-{"规则角色：引用必须精确到条款/条文号。" if role == ROLE_COMPLIANCE else ""}"""
+{"合规角色：引用必须精确到条款/条文号。" if role == ROLE_COMPLIANCE else ""}"""
 
     agent = create_agent(model=llm, tools=get_tools_for_role(role), system_prompt=system_prompt)
     response = agent.invoke({"messages": [HumanMessage(content=state[STATE_ORIGINAL_QUERY])]})
@@ -326,12 +326,12 @@ def reason(state: AssistantState) -> AssistantState:
 
 
 # ══════════════════════════════════════════════════════════════════════
-# 4.7 Verify — 数字验证、权限校验、业务建议检测、规则引用精度
+# 4.7 Verify — 数字验证、权限校验、业务建议检测、合规引用精度
 # ══════════════════════════════════════════════════════════════════════
 
 
 def verify(state: AssistantState) -> AssistantState:
-    """验证：数字是否有来源支撑、权限是否规则、是否存在业务建议"""
+    """验证：数字是否有来源支撑、权限是否合规、是否存在业务建议"""
     import re
 
     answer = state.get(STATE_FINAL_ANSWER, "")
@@ -356,10 +356,10 @@ def verify(state: AssistantState) -> AssistantState:
             if pat in answer:
                 issues.append(f"投顾/销售角色不得输出业务建议: {pat}")
 
-    # 规则 4：规则场景检查引用精度
+    # 规则 4：合规场景检查引用精度
     if role == ROLE_COMPLIANCE:
         if not re.search(r"第[一二三四五六七八九十百千]+条|第\d+条|Article\s+\d+", answer):
-            issues.append("规则引用必须精确到条款/条文号")
+            issues.append("合规引用必须精确到条款/条文号")
 
     return {
         **state,
@@ -377,7 +377,7 @@ def verify(state: AssistantState) -> AssistantState:
 
 
 def compliance_check(state: AssistantState) -> AssistantState:
-    """规则检查：敏感词、业务建议、风险提示、适当性"""
+    """合规检查：敏感词、业务建议、风险提示、适当性"""
     answer = state.get(STATE_FINAL_ANSWER, "")
     flags = []
 

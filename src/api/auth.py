@@ -46,7 +46,7 @@ class AuthenticatedUser:
     department: str
 
 
-DEMO_TOKEN_USERS: dict[str, AuthenticatedUser] = {
+TOKEN_USER_BINDINGS: dict[str, AuthenticatedUser] = {
     "demo-advisor": AuthenticatedUser("user_advisor", ROLE_ADVISOR, "wealth"),
     "demo-sales": AuthenticatedUser("user_sales", ROLE_INSTITUTIONAL_SALES, "sales"),
     "demo-compliance": AuthenticatedUser("user_compliance", ROLE_COMPLIANCE, "control"),
@@ -71,7 +71,7 @@ def authenticate_user(
             detail="invalid authorization header",
         )
 
-    user = DEMO_TOKEN_USERS.get(token)
+    user = TOKEN_USER_BINDINGS.get(token)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

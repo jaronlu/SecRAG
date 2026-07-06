@@ -187,7 +187,7 @@ class TestVerify:
         assert any("业务建议" in i for i in result[STATE_VERIFICATION]["issues"])
 
     def test_no_advice_check_for_compliance(self):
-        """规则角色不触发业务建议检查"""
+        """合规角色不触发业务建议检查"""
         state = _state(**{
             STATE_USER_ROLE: ROLE_COMPLIANCE,
             STATE_FINAL_ANSWER: ADVICE_SELL,

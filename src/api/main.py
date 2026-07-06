@@ -1,17 +1,29 @@
 import logging
 import uuid
+from html import escape
+
 from fastapi import Depends, FastAPI, HTTPException
-from langchain_core.runnables.config import RunnableConfig
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, Response
+from langchain_core.runnables.config import RunnableConfig
 
-from src.api.auth import AuthenticatedUser, authenticate_user, build_assistant_initial_state
+from src.api.auth import (
+    TOKEN_USER_BINDINGS,
+    AuthenticatedUser,
+    authenticate_user,
+    build_assistant_initial_state,
+)
 from src.config import config
 from src.rag.chain import build_rag_chain, format_docs
 from src.rag.formatter import estimate_confidence, format_citations
 from src.retrieval.vector_retriever import ChromaVectorRetriever
 from src.schemas.constants import (
     META_SOURCE,
+    ROLE_ADVISOR,
+    ROLE_COMPLIANCE,
+    ROLE_INSTITUTIONAL_SALES,
+    ROLE_OPERATIONS,
+    ROLE_TECHNICAL,
     RR_METADATA,
     STATE_AUDIT_TRAIL,
     STATE_CITATIONS,
@@ -35,6 +47,44 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+ROLE_UI_OPTIONS = {
+    ROLE_TECHNICAL: "技术支持",
+    ROLE_ADVISOR: "投顾",
+    ROLE_INSTITUTIONAL_SALES: "机构销售",
+    ROLE_COMPLIANCE: "合规",
+    ROLE_OPERATIONS: "运营",
+}
+
+
+def _render_identity_options() -> str:
+    options = []
+    token_by_role = {}
+    duplicate_roles = set()
+    for token, user in TOKEN_USER_BINDINGS.items():
+        if user.role in token_by_role:
+            duplicate_roles.add(user.role)
+        token_by_role[user.role] = token
+
+    missing_roles = [role for role in ROLE_UI_OPTIONS if role not in token_by_role]
+    extra_roles = [role for role in token_by_role if role not in ROLE_UI_OPTIONS]
+    if duplicate_roles or missing_roles or extra_roles:
+        raise RuntimeError(
+            "UI role options and demo token roles are inconsistent: "
+            f"duplicates={sorted(duplicate_roles)}, missing={missing_roles}, extra={extra_roles}"
+        )
+
+    for role, label in ROLE_UI_OPTIONS.items():
+        token = token_by_role[role]
+        options.append(
+            '<option value="{token}" data-role="{role}">{label} ({role})</option>'.format(
+                token=escape(token),
+                role=escape(role),
+                label=escape(label),
+            )
+        )
+    return "\n".join(options)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -176,12 +226,9 @@ async def ui():
         <div>
           <label for="token">身份</label>
           <select id="token">
-            <option value="demo-tech">技术支持</option>
-            <option value="demo-advisor">投顾</option>
-            <option value="demo-sales">机构销售</option>
-            <option value="demo-compliance">规则</option>
-            <option value="demo-ops">运营</option>
+            __IDENTITY_OPTIONS__
           </select>
+          <div id="roleBinding" class="status"></div>
         </div>
         <div>
           <label for="clientId">客户 ID（可选）</label>
@@ -214,13 +261,23 @@ async def ui():
   <script>
     const submit = document.getElementById("submit");
     const copyResult = document.getElementById("copyResult");
+    const tokenSelect = document.getElementById("token");
+    const roleBinding = document.getElementById("roleBinding");
     const statusEl = document.getElementById("status");
     const copyStatusEl = document.getElementById("copyStatus");
     const resultEl = document.getElementById("result");
 
+    function updateRoleBinding() {
+      const selected = tokenSelect.options[tokenSelect.selectedIndex];
+      roleBinding.textContent = `绑定 user_role: ${selected.dataset.role}`;
+    }
+
+    tokenSelect.addEventListener("change", updateRoleBinding);
+    updateRoleBinding();
+
     submit.addEventListener("click", async () => {
       const query = document.getElementById("query").value.trim();
-      const token = document.getElementById("token").value;
+      const token = tokenSelect.value;
       const clientId = document.getElementById("clientId").value.trim();
       const threadId = document.getElementById("threadId").value.trim();
 
@@ -284,7 +341,7 @@ async def ui():
     });
   </script>
 </body>
-</html>"""
+</html>""".replace("__IDENTITY_OPTIONS__", _render_identity_options())
 
 
 @app.get("/favicon.ico", include_in_schema=False)
@@ -295,6 +352,7 @@ async def favicon():
 @app.get("/.well-known/appspecific/com.chrome.devtools.json", include_in_schema=False)
 async def chrome_devtools_probe():
     return {}
+
 
 # 构建 RAG 链（langchain LCEL），全局复用，避免每次请求重新编译
 rag_chain = build_rag_chain()
