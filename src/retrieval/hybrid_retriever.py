@@ -9,6 +9,7 @@ from src.retrieval.regulation_retriever import RegulationRetriever
 from src.retrieval.report_retriever import ReportRetriever
 from src.schemas.constants import (
     DEFAULT_TOP_K,
+    META_ALLOWED_ROLES,
     META_ERROR,
     META_SOURCE,
     PLAN_DENIED,
@@ -64,11 +65,12 @@ class HybridRetriever:
                 continue
 
             try:
-                results.extend(retriever.retrieve(
+                retrieved = retriever.retrieve(
                     query=step.get(PLAN_QUERY, ""),
                     top_k=step.get(PLAN_TOP_K, DEFAULT_TOP_K),
                     filters=step.get(PLAN_FILTERS),
-                ))
+                )
+                results.extend(self._filter_results_by_role(retrieved))
             except Exception as exc:
                 results.append(self._error_result(source, f"检索失败: {exc}", str(exc)))
 
@@ -101,6 +103,24 @@ class HybridRetriever:
             if cls is not None:
                 self._retriever_cache[source] = cls()
         return self._retriever_cache.get(source)
+
+    def _filter_results_by_role(self, results: List[Dict]) -> List[Dict]:
+        filtered = []
+        for result in results:
+            metadata = result.get(RR_METADATA, {})
+            allowed_roles = metadata.get(META_ALLOWED_ROLES)
+            if not allowed_roles:
+                filtered.append(result)
+                continue
+
+            if isinstance(allowed_roles, str):
+                allowed = {role.strip() for role in allowed_roles.split(",") if role.strip()}
+            else:
+                allowed = set(allowed_roles)
+
+            if self.user_role in allowed:
+                filtered.append(result)
+        return filtered
 
     def _denied_result(self, step: Dict) -> Dict:
         source = step.get(PLAN_SOURCE)

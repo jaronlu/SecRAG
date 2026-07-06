@@ -224,6 +224,7 @@ CONFIDENCE_HIGH_THRESHOLD = 0.75
 CONFIDENCE_MEDIUM_THRESHOLD = 0.5
 CONFIDENCE_HIGH_MIN_RESULTS = 3
 HALLUCINATION_THRESHOLD = 0.3
+RETRIEVAL_MIN_SCORE = 0.6
 
 # ══════════════════════════════════════════════════════════════════════
 # Embedding 默认值  (SCHEMA-REFERENCE §4)

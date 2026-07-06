@@ -128,6 +128,34 @@ async def ui():
       gap: 12px;
       margin-top: 16px;
     }
+    .result-heading {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    .result-heading h2 {
+      margin: 0;
+    }
+    .copy-tools {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .icon-button {
+      width: 36px;
+      height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .icon-button svg {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+    }
     .status {
       font-size: 14px;
       color: #4b5563;
@@ -169,12 +197,25 @@ async def ui():
         <span id="status" class="status">Ready</span>
       </div>
     </section>
-    <h2>结果</h2>
+    <div class="result-heading">
+      <h2>结果</h2>
+      <div class="copy-tools">
+        <span id="copyStatus" class="status"></span>
+        <button id="copyResult" class="icon-button" type="button" aria-label="复制结果" title="复制结果">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+            <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
     <pre id="result">等待查询...</pre>
   </main>
   <script>
     const submit = document.getElementById("submit");
+    const copyResult = document.getElementById("copyResult");
     const statusEl = document.getElementById("status");
+    const copyStatusEl = document.getElementById("copyStatus");
     const resultEl = document.getElementById("result");
 
     submit.addEventListener("click", async () => {
@@ -219,6 +260,26 @@ async def ui():
         statusEl.textContent = "请求失败";
       } finally {
         submit.disabled = false;
+      }
+    });
+
+    copyResult.addEventListener("click", async () => {
+      const text = resultEl.textContent.trim();
+      if (!text || text === "等待查询...") {
+        copyStatusEl.textContent = "暂无可复制内容";
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(text);
+        copyStatusEl.textContent = "已复制";
+      } catch {
+        const range = document.createRange();
+        range.selectNodeContents(resultEl);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        copyStatusEl.textContent = "已选中，请手动复制";
       }
     });
   </script>

@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 
 from src.retrieval.hybrid_retriever import HybridRetriever
 from src.schemas.constants import (
+    META_ALLOWED_ROLES,
     META_ERROR,
     META_SOURCE,
     PLAN_FILTERS,
@@ -52,6 +53,32 @@ class FailingRetriever:
         filters: Optional[Dict] = None,
     ) -> List[Dict]:
         raise RuntimeError("boom")
+
+
+class RoleTaggedRetriever:
+    def retrieve(
+        self,
+        query: str,
+        top_k: int = 5,
+        filters: Optional[Dict] = None,
+    ) -> List[Dict]:
+        return [
+            {
+                RR_CONTENT: "tech-only",
+                RR_METADATA: {META_SOURCE: "fake", META_ALLOWED_ROLES: ROLE_TECHNICAL},
+                RR_SCORE: 0.9,
+            },
+            {
+                RR_CONTENT: "advisor-only",
+                RR_METADATA: {META_SOURCE: "fake", META_ALLOWED_ROLES: ROLE_ADVISOR},
+                RR_SCORE: 0.8,
+            },
+            {
+                RR_CONTENT: "untagged",
+                RR_METADATA: {META_SOURCE: "fake"},
+                RR_SCORE: 0.7,
+            },
+        ]
 
 
 class TestHybridRetriever:
@@ -152,3 +179,11 @@ class TestHybridRetriever:
 
         assert results[0][RR_CONTENT] == "FAQ:5"
         assert results[1][RR_DENIED] is True
+
+    def test_filters_allowed_roles_metadata_within_allowed_source(self):
+        retriever = HybridRetriever(user_role=ROLE_TECHNICAL)
+        retriever._retriever_cache[SOURCE_FAQ] = RoleTaggedRetriever()
+
+        results = retriever.retrieve([{PLAN_SOURCE: SOURCE_FAQ, PLAN_QUERY: "LangGraph"}])
+
+        assert [r[RR_CONTENT] for r in results] == ["tech-only", "untagged"]

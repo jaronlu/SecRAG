@@ -103,13 +103,21 @@ class TestGradeAndFilter:
         assert result[STATE_RETRIEVAL_RESULTS] == []
 
     def test_sorts_by_score_desc(self):
-        r1 = _result("a", score=0.5)
+        r1 = _result("a", score=0.7)
         r2 = _result("b", score=0.9)
-        r3 = _result("c", score=0.3)
+        r3 = _result("c", score=0.65)
         state = _state(**{STATE_RETRIEVAL_RESULTS: [r1, r2, r3]})
         result = grade_and_filter(state)
         scores = [r[RR_SCORE] for r in result[STATE_RETRIEVAL_RESULTS]]
-        assert scores == [0.9, 0.5, 0.3]
+        assert scores == [0.9, 0.7, 0.65]
+
+    def test_filters_low_relevance_results(self):
+        state = _state(**{
+            STATE_RETRIEVAL_RESULTS: [_result("weak", score=0.52), _result("strong", score=0.8)]
+        })
+        result = grade_and_filter(state)
+
+        assert [r[RR_CONTENT] for r in result[STATE_RETRIEVAL_RESULTS]] == ["strong"]
 
     def test_truncates_to_grade_top_k(self):
         results = [_result(f"doc{i}", score=0.9 - i * 0.01) for i in range(20)]
@@ -380,6 +388,7 @@ class TestRoleAwareTools:
             STATE_ORIGINAL_QUERY: "查询",
             STATE_DEPARTMENT: "tech",
             STATE_MESSAGES: [],
+            STATE_RETRIEVAL_RESULTS: [_result("context", score=0.8)],
         })
 
         result = reason(state)
@@ -484,6 +493,18 @@ class TestAuditLog:
             "response",
         ):
             assert section in entry, f"audit entry missing section: {section}"
+
+    def test_audit_sources_are_unique_in_first_seen_order(self):
+        state = _state(**{
+            STATE_RETRIEVAL_RESULTS: [
+                _result("a", meta={META_SOURCE: "faq.html"}),
+                _result("b", meta={META_SOURCE: "faq.html"}),
+                _result("c", meta={META_SOURCE: "product.html"}),
+            ],
+        })
+        result = audit_log(state)
+
+        assert result["audit_trail"]["retrieval"]["sources"] == ["faq.html", "product.html"]
 
 
 # ══════════════════════════════════════════════════════════════════════

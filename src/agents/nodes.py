@@ -34,6 +34,7 @@ from src.schemas.constants import (
     ROLE_INSTITUTIONAL_SALES,
     ROLE_OPERATIONS,
     ROLE_TECHNICAL,
+    RETRIEVAL_MIN_SCORE,
     RR_CONTENT,
     RR_METADATA,
     RR_SCORE,
@@ -241,7 +242,11 @@ def grade_and_filter(state: AssistantState) -> AssistantState:
     if not results:
         return state
 
-    filtered = sorted(results, key=lambda x: x.get(RR_SCORE, 0), reverse=True)[:GRADE_TOP_K]
+    filtered = [
+        result
+        for result in sorted(results, key=lambda x: x.get(RR_SCORE, 0), reverse=True)
+        if result.get(RR_SCORE, 0) >= RETRIEVAL_MIN_SCORE
+    ][:GRADE_TOP_K]
 
     return {
         **state,
@@ -270,6 +275,11 @@ def reason(state: AssistantState) -> AssistantState:
     from src.agents.tools import get_tools_for_role
 
     results = state.get(STATE_RETRIEVAL_RESULTS, [])
+    if not results:
+        return {
+            **state,
+            STATE_FINAL_ANSWER: "未检索到足够相关的资料，无法基于当前知识库回答该问题。",
+        }
 
     # 构建 context
     context = "\n\n".join([
@@ -467,6 +477,18 @@ def compose(state: AssistantState) -> AssistantState:
 # ══════════════════════════════════════════════════════════════════════
 
 
+def _unique_sources(results: list[dict]) -> list[str]:
+    sources = []
+    seen = set()
+    for result in results:
+        source = result.get(RR_METADATA, {}).get(META_SOURCE)
+        if not source or source in seen:
+            continue
+        seen.add(source)
+        sources.append(source)
+    return sources
+
+
 def audit_log(state: AssistantState) -> AssistantState:
     """记录追踪日志——覆盖 Query → Retrieve → Reason → Verify → Compose 全链路"""
     import uuid
@@ -487,10 +509,7 @@ def audit_log(state: AssistantState) -> AssistantState:
         },
         "retrieval": {
             "plan": state.get(STATE_RETRIEVAL_PLAN, []),
-            "sources": [
-                r.get(RR_METADATA, {}).get(META_SOURCE)
-                for r in state.get(STATE_RETRIEVAL_RESULTS, [])
-            ],
+            "sources": _unique_sources(state.get(STATE_RETRIEVAL_RESULTS, [])),
             "total_chunks": len(state.get(STATE_RETRIEVAL_RESULTS, [])),
             "filtered_chunks": len(state.get(STATE_RETRIEVAL_RESULTS, [])),
         },
