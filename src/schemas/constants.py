@@ -80,6 +80,10 @@ STATE_CONFIDENCE = "confidence"
 STATE_RISK_DISCLOSURE = "risk_disclosure"
 STATE_AUDIT_TRAIL = "audit_trail"
 
+# audit_trail 字段键名（SCHEMA-REFERENCE §3.3）
+AUDIT_REQUEST_ID = "request_id"
+AUDIT_TIMESTAMP = "timestamp"
+
 # ══════════════════════════════════════════════════════════════════════
 # doc_type 枚举  (SCHEMA-REFERENCE §2.1)
 # ══════════════════════════════════════════════════════════════════════

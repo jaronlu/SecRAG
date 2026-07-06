@@ -4,15 +4,18 @@ from pydantic import ValidationError
 
 from src.api.auth import authenticate_user, build_assistant_initial_state
 from src.schemas.constants import (
+    AUDIT_REQUEST_ID,
+    AUDIT_TIMESTAMP,
+    ROLE_ALLOWED_SOURCES,
     ROLE_TECHNICAL,
     SOURCE_FAQ,
     SOURCE_REPORT,
+    STATE_AUDIT_TRAIL,
     STATE_DATA_PERMISSIONS,
     STATE_DEPARTMENT,
     STATE_USER_ID,
     STATE_USER_ROLE,
 )
-from src.schemas.constants import ROLE_ALLOWED_SOURCES
 from src.schemas.request_response import AssistantQARequest
 
 
@@ -49,6 +52,8 @@ def test_build_initial_state_uses_authenticated_user():
     assert state[STATE_USER_ROLE] == ROLE_TECHNICAL
     assert state[STATE_DEPARTMENT] == "tech"
     assert state[STATE_DATA_PERMISSIONS]
+    assert state[STATE_AUDIT_TRAIL][AUDIT_REQUEST_ID]
+    assert state[STATE_AUDIT_TRAIL][AUDIT_TIMESTAMP]
     assert SOURCE_FAQ in ROLE_ALLOWED_SOURCES[state[STATE_USER_ROLE]]
     assert SOURCE_REPORT not in ROLE_ALLOWED_SOURCES[state[STATE_USER_ROLE]]
 

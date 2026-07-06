@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import Any, cast
 from unittest.mock import MagicMock
 
-from src.agents.state import AssistantState
 from src.agents.graph import (
     build_agent_graph,
     is_compliant,
@@ -21,7 +21,10 @@ from src.agents.nodes import (
     retrieve,
     verify,
 )
+from src.agents.state import AssistantState
 from src.schemas.constants import (
+    AUDIT_REQUEST_ID,
+    AUDIT_TIMESTAMP,
     CONFIDENCE_HIGH,
     CONFIDENCE_LOW,
     CONFIDENCE_MEDIUM,
@@ -42,6 +45,10 @@ from src.schemas.constants import (
     RR_CONTENT,
     RR_METADATA,
     RR_SCORE,
+    SOURCE_FAQ,
+    SOURCE_PRODUCT,
+    SOURCE_REPORT,
+    STATE_AUDIT_TRAIL,
     STATE_CITATIONS,
     STATE_CLIENT_ID,
     STATE_COMPLIANCE,
@@ -57,9 +64,6 @@ from src.schemas.constants import (
     STATE_REWRITTEN_QUERY,
     STATE_USER_ROLE,
     STATE_VERIFICATION,
-    SOURCE_FAQ,
-    SOURCE_PRODUCT,
-    SOURCE_REPORT,
 )
 
 
@@ -74,14 +78,17 @@ def _result(content: str, score: float = 0.9, meta: dict[str, Any] | None = None
 
 def _state(**overrides: Any) -> AssistantState:
     """快捷构造最小 AssistantState"""
-    return cast(AssistantState, {
-        STATE_RETRIEVAL_RESULTS: [],
-        STATE_FINAL_ANSWER: "",
-        STATE_USER_ROLE: ROLE_OPERATIONS,
-        STATE_VERIFICATION: {},
-        STATE_COMPLIANCE: {},
-        **overrides,
-    })
+    return cast(
+        AssistantState,
+        {
+            STATE_RETRIEVAL_RESULTS: [],
+            STATE_FINAL_ANSWER: "",
+            STATE_USER_ROLE: ROLE_OPERATIONS,
+            STATE_VERIFICATION: {},
+            STATE_COMPLIANCE: {},
+            **overrides,
+        },
+    )
 
 
 ADVICE_BUY = "推荐" + "买" + "入"
@@ -299,11 +306,13 @@ class TestRetrieve:
 
         state = _state(**{
             STATE_USER_ROLE: ROLE_ADVISOR,
-            STATE_RETRIEVAL_PLAN: [{
-                PLAN_SOURCE: SOURCE_PRODUCT,
-                PLAN_QUERY: "产品风险",
-                PLAN_TOP_K: 3,
-            }],
+            STATE_RETRIEVAL_PLAN: [
+                {
+                    PLAN_SOURCE: SOURCE_PRODUCT,
+                    PLAN_QUERY: "产品风险",
+                    PLAN_TOP_K: 3,
+                }
+            ],
             STATE_RETRIEVAL_RESULTS: [_result("旧结果")],
             STATE_RETRIEVAL_ATTEMPTS: 1,
             STATE_REWRITTEN_QUERY: "重写查询",
@@ -312,12 +321,14 @@ class TestRetrieve:
         result = retrieve(state)
 
         assert captured["user_role"] == ROLE_ADVISOR
-        assert captured["plan"] == [{
-            PLAN_SOURCE: SOURCE_PRODUCT,
-            PLAN_QUERY: "产品风险",
-            PLAN_TOP_K: 3,
-            PLAN_FILTERS: None,
-        }]
+        assert captured["plan"] == [
+            {
+                PLAN_SOURCE: SOURCE_PRODUCT,
+                PLAN_QUERY: "产品风险",
+                PLAN_TOP_K: 3,
+                PLAN_FILTERS: None,
+            }
+        ]
         assert [r[RR_CONTENT] for r in result[STATE_RETRIEVAL_RESULTS]] == ["旧结果", "新结果"]
         assert result[STATE_RETRIEVAL_ATTEMPTS] == 2
 
@@ -342,12 +353,14 @@ class TestRetrieve:
 
         result = retrieve(state)
 
-        assert captured["plan"] == [{
-            PLAN_SOURCE: SOURCE_FAQ,
-            PLAN_QUERY: "开户流程",
-            PLAN_TOP_K: 5,
-            PLAN_FILTERS: None,
-        }]
+        assert captured["plan"] == [
+            {
+                PLAN_SOURCE: SOURCE_FAQ,
+                PLAN_QUERY: "开户流程",
+                PLAN_TOP_K: 5,
+                PLAN_FILTERS: None,
+            }
+        ]
         assert result[STATE_RETRIEVAL_ATTEMPTS] == 1
         assert result[STATE_RETRIEVAL_RESULTS] == []
 
@@ -475,8 +488,8 @@ class TestAuditLog:
         })
         result = audit_log(state)
         entry = result["audit_trail"]
-        assert "request_id" in entry
-        assert "timestamp" in entry
+        assert AUDIT_REQUEST_ID in entry
+        assert AUDIT_TIMESTAMP in entry
         assert entry["query"]["original"] == ""
         assert entry["retrieval"]["total_chunks"] == 1
 
@@ -505,6 +518,21 @@ class TestAuditLog:
         result = audit_log(state)
 
         assert result["audit_trail"]["retrieval"]["sources"] == ["faq.html", "product.html"]
+
+    def test_reuses_initialized_audit_metadata_and_calculates_duration(self):
+        timestamp = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+        state = _state(**{
+            STATE_AUDIT_TRAIL: {
+                AUDIT_REQUEST_ID: "request-123",
+                AUDIT_TIMESTAMP: timestamp,
+            },
+        })
+
+        result = audit_log(state)
+
+        assert result["audit_trail"][AUDIT_REQUEST_ID] == "request-123"
+        assert result["audit_trail"][AUDIT_TIMESTAMP] == timestamp
+        assert result["audit_trail"]["reasoning"]["duration_ms"] > 0
 
 
 # ══════════════════════════════════════════════════════════════════════

@@ -26,13 +26,13 @@ from src.schemas.constants import (
     PLAN_QUERY,
     PLAN_SOURCE,
     PLAN_TOP_K,
+    RETRIEVAL_MIN_SCORE,
     ROLE_ADVISOR,
     ROLE_ALLOWED_SOURCES,
     ROLE_COMPLIANCE,
     ROLE_INSTITUTIONAL_SALES,
     ROLE_OPERATIONS,
     ROLE_TECHNICAL,
-    RETRIEVAL_MIN_SCORE,
     RR_CONTENT,
     RR_METADATA,
     RR_SCORE,
@@ -48,7 +48,6 @@ from src.schemas.constants import (
     STATE_ENTITIES,
     STATE_FINAL_ANSWER,
     STATE_INTENT,
-    STATE_INTERMEDIATE_STEPS,
     STATE_MESSAGES,
     STATE_ORIGINAL_QUERY,
     STATE_QUERY_TYPE,
@@ -57,8 +56,6 @@ from src.schemas.constants import (
     STATE_RETRIEVAL_RESULTS,
     STATE_REWRITTEN_QUERY,
     STATE_RISK_DISCLOSURE,
-    STATE_TOOL_CALLS,
-    STATE_USER_ID,
     STATE_USER_ROLE,
     STATE_VERIFICATION,
 )
@@ -207,6 +204,7 @@ def planner(state: AssistantState) -> AssistantState:
 # ══════════════════════════════════════════════════════════════════════
 # 4.4 Retrieve — 按计划并行执行多源检索
 # ══════════════════════════════════════════════════════════════════════
+
 
 def retrieve(state: AssistantState) -> AssistantState:
     """使用 HybridRetriever 按角色权限执行一轮检索计划。"""
@@ -462,60 +460,22 @@ def compose(state: AssistantState) -> AssistantState:
 # ══════════════════════════════════════════════════════════════════════
 
 
-def _unique_sources(results: list[dict]) -> list[str]:
-    sources = []
-    seen = set()
-    for result in results:
-        source = result.get(RR_METADATA, {}).get(META_SOURCE)
-        if not source or source in seen:
-            continue
-        seen.add(source)
-        sources.append(source)
-    return sources
-
-
 def audit_log(state: AssistantState) -> AssistantState:
-    """记录追踪日志——覆盖 Query → Retrieve → Reason → Verify → Compose 全链路"""
-    import uuid
-    from datetime import datetime, timezone
+    """记录追踪日志——覆盖 Query → Retrieve → Reason → Verify → Compose 全链路
 
-    audit_entry = {
-        "request_id": str(uuid.uuid4()),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "user_id": state.get(STATE_USER_ID, ""),
-        "user_role": state.get(STATE_USER_ROLE, ""),
-        "department": state.get(STATE_DEPARTMENT, ""),
-        "query": {
-            "original": state.get(STATE_ORIGINAL_QUERY, ""),
-            "rewritten": state.get(STATE_REWRITTEN_QUERY, ""),
-            "intent": state.get(STATE_INTENT, ""),
-            "query_type": state.get(STATE_QUERY_TYPE, ""),
-            "entities": state.get(STATE_ENTITIES, {}),
-        },
-        "retrieval": {
-            "plan": state.get(STATE_RETRIEVAL_PLAN, []),
-            "sources": _unique_sources(state.get(STATE_RETRIEVAL_RESULTS, [])),
-            "total_chunks": len(state.get(STATE_RETRIEVAL_RESULTS, [])),
-            "filtered_chunks": len(state.get(STATE_RETRIEVAL_RESULTS, [])),
-        },
-        "reasoning": {
-            "tool_calls": state.get(STATE_TOOL_CALLS, []),
-            "iterations": len(state.get(STATE_INTERMEDIATE_STEPS, [])),
-            "duration_ms": 0,
-        },
-        "verification": state.get(STATE_VERIFICATION, {}),
-        "compliance": state.get(STATE_COMPLIANCE, {}),
-        "response": {
-            "citations": state.get(STATE_CITATIONS, []),
-            "confidence": state.get(STATE_CONFIDENCE, CONFIDENCE_LOW),
-            "risk_disclosure": state.get(STATE_RISK_DISCLOSURE, ""),
-        },
-    }
+    实现委托给 src/utils/audit.py 的 AuditLogger（AuditEntry 模型的权威构建者），
+    避免与该模块重复维护同一份字段拼装逻辑。
+    """
+    from dataclasses import asdict
+
+    from src.utils.audit import AuditLogger
+
+    audit_entry = AuditLogger().log(state)
 
     # TODO: 写入追踪数据库
-    # audit_db.insert(audit_entry)
+    # audit_db.insert(asdict(audit_entry))
 
     return {
         **state,
-        STATE_AUDIT_TRAIL: audit_entry,
+        STATE_AUDIT_TRAIL: asdict(audit_entry),
     }
