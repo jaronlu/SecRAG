@@ -23,14 +23,14 @@ class TestFormatDocs:
         from src.rag.chain import format_docs
 
         docs = [
-            {RR_CONTENT: "茅台净利润747亿", RR_METADATA: {META_TITLE: "年报", META_DATE: "2024"}},
-            {RR_CONTENT: "五粮液净利润302亿", RR_METADATA: {META_TITLE: "年报", META_DATE: "2024"}},
+            {RR_CONTENT: "示例公司净利润747亿", RR_METADATA: {META_TITLE: "年报", META_DATE: "2024"}},
+            {RR_CONTENT: "对照公司净利润302亿", RR_METADATA: {META_TITLE: "年报", META_DATE: "2024"}},
         ]
         result = format_docs(docs)
         assert "[来源1]" in result
         assert "[来源2]" in result
-        assert "茅台净利润747亿" in result
-        assert "五粮液净利润302亿" in result
+        assert "示例公司净利润747亿" in result
+        assert "对照公司净利润302亿" in result
         assert "2024" in result
         assert "年报" in result
 
@@ -146,7 +146,7 @@ class TestBuildRagChain:
         from src.rag.chain import build_rag_chain
 
         chain = build_rag_chain()
-        result = chain.invoke({"question": "茅台2024净利润是多少？"})
+        result = chain.invoke({"question": "示例公司2024净利润是多少？"})
         assert isinstance(result, str)
         assert len(result) > 0
         assert result == "模拟回答"

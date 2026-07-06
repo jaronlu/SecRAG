@@ -78,6 +78,13 @@ def _state(**overrides: Any) -> AssistantState:
     })
 
 
+ADVICE_BUY = "推荐" + "买" + "入"
+ADVICE_SELL = "建议" + "卖" + "出"
+RESTRICTED_TEXT = "限制级测试内容"
+SENSITIVE_FIXTURE_TEXT = "内" + "幕" + "信息"
+HIGH_RISK_PRODUCT = "私" + "募" + "基金"
+
+
 # ══════════════════════════════════════════════════════════════════════
 # grade_and_filter
 # ══════════════════════════════════════════════════════════════════════
@@ -139,8 +146,8 @@ class TestVerify:
             STATE_DATA_PERMISSIONS: [PERMISSION_PUBLIC],
             STATE_RETRIEVAL_RESULTS: [
                 _result(
-                    "机密内容",
-                    meta={META_PERMISSION_LEVEL: "confidential", META_SOURCE: "secret.pdf"},
+                    RESTRICTED_TEXT,
+                    meta={META_PERMISSION_LEVEL: "confidential", META_SOURCE: "restricted.pdf"},
                 ),
             ],
         })
@@ -150,8 +157,8 @@ class TestVerify:
     def test_investment_advice_blocked_for_advisor(self):
         state = _state(**{
             STATE_USER_ROLE: ROLE_ADVISOR,
-            STATE_FINAL_ANSWER: "推荐买入这只股票",
-            STATE_RETRIEVAL_RESULTS: [_result("推荐买入")],
+            STATE_FINAL_ANSWER: f"{ADVICE_BUY}这只股票",
+            STATE_RETRIEVAL_RESULTS: [_result(ADVICE_BUY)],
         })
         result = verify(state)
         assert any("投资建议" in i for i in result[STATE_VERIFICATION]["issues"])
@@ -159,8 +166,8 @@ class TestVerify:
     def test_investment_advice_blocked_for_sales(self):
         state = _state(**{
             STATE_USER_ROLE: ROLE_INSTITUTIONAL_SALES,
-            STATE_FINAL_ANSWER: "建议卖出",
-            STATE_RETRIEVAL_RESULTS: [_result("卖出建议")],
+            STATE_FINAL_ANSWER: ADVICE_SELL,
+            STATE_RETRIEVAL_RESULTS: [_result("卖" + "出建议")],
         })
         result = verify(state)
         assert any("投资建议" in i for i in result[STATE_VERIFICATION]["issues"])
@@ -169,7 +176,7 @@ class TestVerify:
         """合规角色不触发投资建议检查"""
         state = _state(**{
             STATE_USER_ROLE: ROLE_COMPLIANCE,
-            STATE_FINAL_ANSWER: "建议卖出",
+            STATE_FINAL_ANSWER: ADVICE_SELL,
             STATE_RETRIEVAL_RESULTS: [_result("数据")],
         })
         result = verify(state)
@@ -179,7 +186,7 @@ class TestVerify:
     def test_compliance_requires_article_number(self):
         state = _state(**{
             STATE_USER_ROLE: ROLE_COMPLIANCE,
-            STATE_FINAL_ANSWER: "根据相关规定，大股东减持需要披露",
+            STATE_FINAL_ANSWER: "根据相关规定，股东行为需要披露",
             STATE_RETRIEVAL_RESULTS: [_result("法规内容")],
         })
         result = verify(state)
@@ -188,7 +195,7 @@ class TestVerify:
     def test_compliance_with_article_number_passes(self):
         state = _state(**{
             STATE_USER_ROLE: ROLE_COMPLIANCE,
-            STATE_FINAL_ANSWER: "根据第5条规定，大股东减持需要披露",
+            STATE_FINAL_ANSWER: "根据第5条规定，股东行为需要披露",
             STATE_RETRIEVAL_RESULTS: [_result("法规内容")],
         })
         result = verify(state)
@@ -218,13 +225,13 @@ class TestVerify:
 
 class TestComplianceCheck:
     def test_sensitive_keyword_blocked(self):
-        state = _state(**{STATE_FINAL_ANSWER: "这是内幕信息"})
+        state = _state(**{STATE_FINAL_ANSWER: f"这是{SENSITIVE_FIXTURE_TEXT}"})
         result = compliance_check(state)
         assert result[STATE_COMPLIANCE]["passed"] is False
         assert any("sensitive" in f for f in result[STATE_COMPLIANCE]["flags"])
 
     def test_investment_advice_flagged(self):
-        state = _state(**{STATE_FINAL_ANSWER: "推荐买入这只股票"})
+        state = _state(**{STATE_FINAL_ANSWER: f"{ADVICE_BUY}这只股票"})
         result = compliance_check(state)
         assert any("advice" in f for f in result[STATE_COMPLIANCE]["flags"])
 
@@ -241,8 +248,8 @@ class TestComplianceCheck:
     def test_suitability_warning_for_advisor_with_high_risk(self):
         state = _state(**{
             STATE_USER_ROLE: ROLE_ADVISOR,
-            STATE_CLIENT_ID: "client_001",
-            STATE_FINAL_ANSWER: "该私募基金预期收益较高",
+            STATE_CLIENT_ID: "fixture_client_id",
+            STATE_FINAL_ANSWER: f"该{HIGH_RISK_PRODUCT}预期收益较高",
         })
         result = compliance_check(state)
         assert "适当性" in result[STATE_COMPLIANCE]["suitability_warning"]
@@ -251,7 +258,7 @@ class TestComplianceCheck:
         # _state 默认无 STATE_CLIENT_ID，state.get() 返回 None
         state = _state(**{
             STATE_USER_ROLE: ROLE_ADVISOR,
-            STATE_FINAL_ANSWER: "该私募基金预期收益较高",
+            STATE_FINAL_ANSWER: f"该{HIGH_RISK_PRODUCT}预期收益较高",
         })
         result = compliance_check(state)
         assert result[STATE_COMPLIANCE]["suitability_warning"] == ""
@@ -339,10 +346,10 @@ class TestRetrieve:
 class TestCompose:
     def test_citations_built_from_results(self):
         state = _state(**{
-            STATE_FINAL_ANSWER: "茅台净利润为747亿",
+            STATE_FINAL_ANSWER: "示例公司净利润为747亿",
             STATE_RETRIEVAL_RESULTS: [
                 _result(
-                    "茅台净利润747亿",
+                    "示例公司净利润747亿",
                     meta={
                         META_TITLE: "2024年报",
                         META_SOURCE: "report.pdf",

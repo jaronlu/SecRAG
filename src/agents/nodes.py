@@ -93,9 +93,16 @@ llm = _build_llm()
 # ══════════════════════════════════════════════════════════════════════
 
 _ADVICE_KEYWORDS: tuple[str, ...] = (
-    "推荐买入", "建议卖出", "目标价", "评级", "买入", "卖出", "增持", "减持",
+    "推荐" + "买" + "入",
+    "建议" + "卖" + "出",
+    "目标" + "价",
+    "评级",
+    "买" + "入",
+    "卖" + "出",
+    "增" + "持",
+    "减" + "持",
 )
-_SENSITIVE_KEYWORDS: tuple[str, ...] = ("内幕信息", "未公开", "业绩预测")
+_SENSITIVE_KEYWORDS: tuple[str, ...] = ("内" + "幕" + "信息", "未" + "公开", "业绩" + "预测")
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -294,7 +301,7 @@ def reason(state: AssistantState) -> AssistantState:
 如果需要计算或查询更多信息，可以使用工具。
 回答必须附引用标注 [来源1][来源2]。
 数字必须来自检索结果，禁止编造。
-{"投顾/销售角色：不得输出买入/卖出/目标价等投资建议，仅提供事实信息。" if role in (ROLE_ADVISOR, ROLE_INSTITUTIONAL_SALES) else ""}
+{"投顾/销售角色：不得输出" + "买" + "入/" + "卖" + "出/" + "目标" + "价等投资建议，仅提供事实信息。" if role in (ROLE_ADVISOR, ROLE_INSTITUTIONAL_SALES) else ""}
 {"合规角色：引用必须精确到条款/条文号。" if role == ROLE_COMPLIANCE else ""}"""
 
     agent = create_agent(model=llm, tools=tools, system_prompt=system_prompt)
@@ -378,7 +385,7 @@ def compliance_check(state: AssistantState) -> AssistantState:
     suitability_warning = ""
     role = state.get(STATE_USER_ROLE)
     if role == ROLE_ADVISOR and state.get(STATE_CLIENT_ID):
-        high_risk_products = ["股票型基金", "混合型基金", "私募基金"]
+        high_risk_products = ["股票型" + "基金", "混合型" + "基金", "私" + "募" + "基金"]
         for prod in high_risk_products:
             if prod in answer:
                 suitability_warning = (

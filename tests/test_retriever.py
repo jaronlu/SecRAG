@@ -53,13 +53,13 @@ class TestFormat:
 
     def test_single_result(self, retriever):
         results = {
-            "documents": [["茅台净利润747亿"]],
+            "documents": [["示例公司净利润747亿"]],
             "metadatas": [[{"title": "年报", "date": "2024"}]],
             "distances": [[0.15]],
         }
         formatted = retriever._format(results)
         assert len(formatted) == 1
-        assert formatted[0][RR_CONTENT] == "茅台净利润747亿"
+        assert formatted[0][RR_CONTENT] == "示例公司净利润747亿"
         assert formatted[0][RR_METADATA] == {"title": "年报", "date": "2024"}
         assert formatted[0][RR_SCORE] == pytest.approx(0.85)
 
@@ -140,15 +140,15 @@ class TestRetrieve:
         """retrieve 调用 _embed 和 ChromaDB query，返回格式化结果"""
         # 配置 mock collection.query 的返回值
         mock_chromadb.query.return_value = {
-            "documents": [["茅台净利润747亿", "五粮液净利润302亿"]],
+            "documents": [["示例公司净利润747亿", "对照公司净利润302亿"]],
             "metadatas": [[{"title": "年报"}, {"title": "年报"}]],
             "distances": [[0.12, 0.25]],
         }
 
-        results = retriever.retrieve("茅台2024净利润")
+        results = retriever.retrieve("示例公司2024净利润")
 
         assert len(results) == 2
-        assert results[0][RR_CONTENT] == "茅台净利润747亿"
+        assert results[0][RR_CONTENT] == "示例公司净利润747亿"
         assert results[0][RR_SCORE] == pytest.approx(0.88)
 
         # 验证 ChromaDB query 被正确调用
