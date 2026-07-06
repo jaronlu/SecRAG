@@ -27,6 +27,8 @@ META_PAGE_NUMBER = "page_number"
 META_RETRIEVAL_PATH = "retrieval_path"
 META_PRODUCT_TYPE = "product_type"
 META_ERROR = "error"
+META_ALLOWED_ROLES = "allowed_roles"
+META_RETRIEVAL_SOURCE = "retrieval_source"
 
 # ══════════════════════════════════════════════════════════════════════
 # retrieval_results dict 键名  (SCHEMA-REFERENCE §1.2)

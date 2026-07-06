@@ -1,7 +1,8 @@
 __pycache__/
 *.pyc
+.DS_Store
 .venv/
-data/
+/data/
 
 # 环境变量（含 API Key）
 .env

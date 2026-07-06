@@ -1,0 +1,32 @@
+{
+  "faq/sample_internal_system_operation_faq.html": {
+    "doc_type": "faq",
+    "retrieval_source": "faq_search",
+    "permission_level": "internal",
+    "allowed_roles": ["operations", "technical"]
+  },
+  "faq/sample_project_technical_faq.html": {
+    "doc_type": "faq",
+    "retrieval_source": "faq_search",
+    "permission_level": "internal",
+    "allowed_roles": ["technical"]
+  },
+  "product/sample_wealth_product_risk_disclosure.html": {
+    "doc_type": "product",
+    "retrieval_source": "product_search",
+    "permission_level": "internal",
+    "allowed_roles": ["advisor", "institutional_sales", "compliance", "operations"]
+  },
+  "regulation/sample_client_suitability_regulation.html": {
+    "doc_type": "regulation",
+    "retrieval_source": "regulation_search",
+    "permission_level": "internal",
+    "allowed_roles": ["institutional_sales", "compliance", "operations"]
+  },
+  "report/sample_research_report_summary.html": {
+    "doc_type": "research_report",
+    "retrieval_source": "report_search",
+    "permission_level": "internal",
+    "allowed_roles": ["advisor", "institutional_sales", "compliance"]
+  }
+}

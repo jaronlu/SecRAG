@@ -26,6 +26,15 @@
     ]
   },
   {
+    "query": "LangGraph",
+    "user_role": "technical",
+    "source": "faq_search",
+    "relevant_doc_ids": [
+      "2ffa8bf679221432ce6c61ab",
+      "b1ac82f745ab3df083ee9ed5"
+    ]
+  },
+  {
     "query": "内部研报摘要",
     "user_role": "technical",
     "source": "report_search",

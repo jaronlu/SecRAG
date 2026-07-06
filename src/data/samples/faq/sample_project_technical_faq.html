@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>示例项目技术 FAQ</title>
+</head>
+<body>
+  <h1>示例项目技术 FAQ</h1>
+  <p>本文档为演示用虚构内容，用于验证技术支持角色的检索能力。</p>
+
+  <h2>Q: LangGraph 在本项目中起什么作用？</h2>
+  <p>
+    A: LangGraph 用于编排 Agent 工作流。系统把一次问答拆成 Planner、Retriever、
+    Reasoner、Verifier、Composer、Auditor 等节点，通过 StateGraph 管理状态传递和
+    条件路由。这样可以把检索、推理、校验和追踪拆成可观察的步骤。
+  </p>
+
+  <h2>Q: 为什么不用单一 Chain？</h2>
+  <p>
+    A: 单一 Chain 适合线性问答，但不适合需要多步检索、角色过滤、工具调用和结果校验
+    的场景。Graph 编排能在检索不足时回退，在校验失败时重试，并保留每一步的状态。
+  </p>
+
+  <h2>Q: 技术支持角色能查哪些内容？</h2>
+  <p>
+    A: 技术支持角色默认只查 FAQ 类资料，用于回答系统操作、错误处理、数据流程和项目
+    技术架构相关问题。
+  </p>
+</body>
+</html>

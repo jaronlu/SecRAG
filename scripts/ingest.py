@@ -1,6 +1,7 @@
 """完整入库流程"""
 
 import hashlib
+import json
 import sys
 from pathlib import Path
 
@@ -9,12 +10,14 @@ from src.ingestion.embedder import embed_and_store, get_embedding_model
 from src.config import config
 from src.schemas.constants import (
     META_CHUNK_ID,
+    META_ALLOWED_ROLES,
     META_DOC_ID,
     META_DOC_TYPE,
     META_SOURCE,
     META_TITLE,
     META_DATE,
     META_PERMISSION_LEVEL,
+    META_RETRIEVAL_SOURCE,
     PERMISSION_INTERNAL,
     ALL_VALID_DOC_TYPES,
     CHROMA_DEFAULT_PERSIST_DIR,
@@ -35,7 +38,29 @@ def _sanitize_metadata(meta: dict) -> dict:
     return {k: v for k, v in meta.items() if isinstance(v, SIMPLE_TYPES)}
 
 
-def normalize_chunks(chunks, file_path: Path, doc_type: str):
+def _load_sample_metadata(file_path: Path) -> dict:
+    for parent in (file_path.parent, *file_path.parents):
+        manifest = parent / "metadata.json"
+        if not manifest.exists():
+            continue
+        metadata = json.loads(manifest.read_text(encoding="utf-8"))
+        try:
+            key = str(file_path.relative_to(parent))
+        except ValueError:
+            continue
+        return metadata.get(key, {})
+    return {}
+
+
+def _normalize_manifest_metadata(metadata: dict) -> dict:
+    normalized = dict(metadata)
+    allowed_roles = normalized.get(META_ALLOWED_ROLES)
+    if isinstance(allowed_roles, list):
+        normalized[META_ALLOWED_ROLES] = ",".join(allowed_roles)
+    return _sanitize_metadata(normalized)
+
+
+def normalize_chunks(chunks, file_path: Path, doc_type: str, sample_metadata: dict | None = None):
     """补齐 Chroma 过滤和去重所需的基础元数据。"""
     source = str(file_path)
     doc_id = hashlib.sha1(source.encode("utf-8")).hexdigest()[:16]
@@ -50,10 +75,13 @@ def normalize_chunks(chunks, file_path: Path, doc_type: str):
         "",
     )
 
+    sample_metadata = _normalize_manifest_metadata(sample_metadata or {})
+
     for index, chunk in enumerate(chunks):
         chunk.metadata = _sanitize_metadata(chunk.metadata)
         chunk_id = build_chunk_id(source, index, chunk.page_content)
         chunk.id = chunk_id
+        chunk.metadata.update(sample_metadata)
         chunk.metadata.setdefault(META_CHUNK_ID, chunk_id)
         chunk.metadata.setdefault(META_DOC_ID, doc_id)
         chunk.metadata.setdefault(META_DOC_TYPE, doc_type)
@@ -61,6 +89,7 @@ def normalize_chunks(chunks, file_path: Path, doc_type: str):
         chunk.metadata.setdefault(META_TITLE, title)
         chunk.metadata.setdefault(META_DATE, date)
         chunk.metadata.setdefault(META_PERMISSION_LEVEL, PERMISSION_INTERNAL)
+        chunk.metadata.setdefault(META_RETRIEVAL_SOURCE, "")
     return chunks
 
 
@@ -89,7 +118,7 @@ def ingest_document(file_path: Path, doc_type: str):
 
     # 2. 分块
     chunks = chunk_documents(documents=documents, doc_type=doc_type)
-    chunks = normalize_chunks(chunks, file_path, doc_type)
+    chunks = normalize_chunks(chunks, file_path, doc_type, _load_sample_metadata(file_path))
     print(f"  分块数: {len(chunks)}")
 
     # 3. 向量化并存储（从 config 读取 embedding 模型名称）
