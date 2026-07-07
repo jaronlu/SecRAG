@@ -1,12 +1,13 @@
 """角色感知混合检索器：按权限过滤并执行检索计划。"""
 
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from src.retrieval.base import BaseRetriever
 from src.retrieval.faq_retriever import FAQRetriever
 from src.retrieval.product_retriever import ProductRetriever
 from src.retrieval.regulation_retriever import RegulationRetriever
 from src.retrieval.report_retriever import ReportRetriever
+from src.retrieval.vector_retriever import ChromaVectorRetriever
 from src.schemas.constants import (
     DEFAULT_TOP_K,
     META_ALLOWED_ROLES,
@@ -30,7 +31,7 @@ from src.schemas.constants import (
     SOURCE_REPORT,
 )
 
-_SOURCE_RETRIEVER_CLASSES: dict[str, type[BaseRetriever]] = {
+_SOURCE_RETRIEVER_FACTORIES: dict[str, Callable[[BaseRetriever], BaseRetriever]] = {
     SOURCE_PRODUCT: ProductRetriever,
     SOURCE_REGULATION: RegulationRetriever,
     SOURCE_REPORT: ReportRetriever,
@@ -45,6 +46,7 @@ class HybridRetriever:
         self.user_role = user_role
         self.allowed_sources = ROLE_ALLOWED_SOURCES.get(user_role, [SOURCE_FAQ])
         self._retriever_cache: dict[str, BaseRetriever] = {}
+        self._vector_engine: Optional[ChromaVectorRetriever] = None
 
     def retrieve(self, plan: List[Dict]) -> List[Dict]:
         """按角色过滤并执行一轮检索计划。
@@ -81,7 +83,7 @@ class HybridRetriever:
         filtered = []
         for step in plan:
             source = step.get(PLAN_SOURCE)
-            if source not in _SOURCE_RETRIEVER_CLASSES:
+            if source not in _SOURCE_RETRIEVER_FACTORIES:
                 filtered.append(step)
             elif source in self.allowed_sources:
                 filtered.append(step)
@@ -99,10 +101,15 @@ class HybridRetriever:
         if source is None:
             return None
         if source not in self._retriever_cache:
-            cls = _SOURCE_RETRIEVER_CLASSES.get(source)
-            if cls is not None:
-                self._retriever_cache[source] = cls()
+            factory = _SOURCE_RETRIEVER_FACTORIES.get(source)
+            if factory is not None:
+                self._retriever_cache[source] = factory(self._get_vector_engine())
         return self._retriever_cache.get(source)
+
+    def _get_vector_engine(self) -> ChromaVectorRetriever:
+        if self._vector_engine is None:
+            self._vector_engine = ChromaVectorRetriever()
+        return self._vector_engine
 
     def _filter_results_by_role(self, results: List[Dict]) -> List[Dict]:
         filtered = []

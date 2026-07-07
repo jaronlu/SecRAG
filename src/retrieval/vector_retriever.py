@@ -14,7 +14,6 @@ from src.config import config
 from src.retrieval.base import BaseRetriever
 from src.schemas.constants import (
     CHROMA_COLLECTION_NAME,
-    CHROMA_DEFAULT_PERSIST_DIR,
     CHROMA_SPACE,
     DEFAULT_TOP_K,
     RR_CONTENT,
@@ -24,7 +23,8 @@ from src.schemas.constants import (
 
 
 class ChromaVectorRetriever(BaseRetriever):
-    def __init__(self, persist_directory: str = CHROMA_DEFAULT_PERSIST_DIR):
+    def __init__(self, persist_directory: Optional[str] = None):
+        persist_directory = persist_directory or config.chroma.persist_directory
         self.client = chromadb.PersistentClient(
             path=persist_directory,
         )

@@ -5,8 +5,17 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from src.retrieval.base import BaseRetriever
+from src.retrieval.faq_retriever import FAQRetriever
+from src.retrieval.product_retriever import ProductRetriever
+from src.retrieval.regulation_retriever import RegulationRetriever
+from src.retrieval.report_retriever import ReportRetriever
 from src.schemas.constants import (
+    DOC_TYPE_FAQ,
     DOC_TYPE_FINANCIAL_DATA,
+    DOC_TYPE_PRODUCT,
+    DOC_TYPE_REGULATION,
+    DOC_TYPE_RESEARCH_REPORT,
     META_DOC_TYPE,
     RR_CONTENT,
     RR_METADATA,
@@ -40,6 +49,15 @@ def retriever(mock_chromadb, mock_embedding):
     from src.retrieval.vector_retriever import ChromaVectorRetriever
 
     return ChromaVectorRetriever()
+
+
+class RecordingEngine(BaseRetriever):
+    def __init__(self):
+        self.calls: list[dict] = []
+
+    def retrieve(self, query: str, top_k: int = 5, filters: dict | None = None) -> list[dict]:
+        self.calls.append({"query": query, "top_k": top_k, "filters": filters})
+        return [{RR_CONTENT: query, RR_METADATA: {}, RR_SCORE: 1.0}]
 
 
 # ── _format ──────────────────────────────────────────────────────────────
@@ -204,3 +222,64 @@ class TestRetrieve:
 
         results = retriever.retrieve("不存在的内容")
         assert results == []
+
+    def test_default_persist_directory_uses_config(self, monkeypatch):
+        """未显式传 persist_directory 时，使用配置中的 Chroma 路径"""
+        mock_collection = MagicMock()
+        mock_client = MagicMock()
+        mock_client.get_or_create_collection.return_value = mock_collection
+        persistent_client = MagicMock(return_value=mock_client)
+        monkeypatch.setattr("chromadb.PersistentClient", persistent_client)
+        monkeypatch.setattr(
+            "src.retrieval.vector_retriever.config.chroma_persist_directory",
+            "/tmp/secrag-configured-chroma",
+        )
+
+        from src.retrieval.vector_retriever import ChromaVectorRetriever
+
+        ChromaVectorRetriever()
+
+        persistent_client.assert_called_once_with(path="/tmp/secrag-configured-chroma")
+
+
+class TestDomainRetrievers:
+    @pytest.mark.parametrize(
+        ("retriever_cls", "doc_type"),
+        [
+            (ProductRetriever, DOC_TYPE_PRODUCT),
+            (RegulationRetriever, DOC_TYPE_REGULATION),
+            (ReportRetriever, DOC_TYPE_RESEARCH_REPORT),
+            (FAQRetriever, DOC_TYPE_FAQ),
+        ],
+    )
+    def test_adds_required_doc_type_filter(self, retriever_cls, doc_type):
+        engine = RecordingEngine()
+        retriever = retriever_cls(engine=engine)
+
+        results = retriever.retrieve("适当性", top_k=2)
+
+        assert results[0][RR_CONTENT] == "适当性"
+        assert engine.calls == [
+            {
+                "query": "适当性",
+                "top_k": 2,
+                "filters": {META_DOC_TYPE: doc_type},
+            }
+        ]
+
+    def test_extra_filters_cannot_override_required_doc_type(self):
+        engine = RecordingEngine()
+        retriever = ProductRetriever(engine=engine)
+
+        retriever.retrieve(
+            "风险等级",
+            filters={META_DOC_TYPE: DOC_TYPE_REGULATION, "product_type": "fund"},
+        )
+
+        assert engine.calls[0]["filters"] == {
+            "$and": [
+                {META_DOC_TYPE: DOC_TYPE_PRODUCT},
+                {META_DOC_TYPE: DOC_TYPE_REGULATION},
+                {"product_type": "fund"},
+            ]
+        }

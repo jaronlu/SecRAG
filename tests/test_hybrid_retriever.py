@@ -204,3 +204,24 @@ class TestHybridRetriever:
         results = retriever.retrieve([{PLAN_SOURCE: SOURCE_FAQ, PLAN_QUERY: "LangGraph"}])
 
         assert [r[RR_CONTENT] for r in results] == ["tech-only", "untagged"]
+
+    def test_domain_retrievers_share_one_vector_engine(self, monkeypatch):
+        created_engines = []
+
+        def fake_vector_engine():
+            engine = FakeRetriever()
+            created_engines.append(engine)
+            return engine
+
+        monkeypatch.setattr(
+            "src.retrieval.hybrid_retriever.ChromaVectorRetriever",
+            fake_vector_engine,
+        )
+        retriever = HybridRetriever(user_role=ROLE_ADVISOR)
+
+        product = retriever._get_retriever(SOURCE_PRODUCT)
+        faq = retriever._get_retriever(SOURCE_FAQ)
+
+        assert len(created_engines) == 1
+        assert product._engine is created_engines[0]
+        assert faq._engine is created_engines[0]

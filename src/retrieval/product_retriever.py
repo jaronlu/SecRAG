@@ -11,8 +11,8 @@ from src.schemas.constants import DEFAULT_TOP_K, DOC_TYPE_PRODUCT
 class ProductRetriever(BaseRetriever):
     """产品知识库检索：封装 ChromaVectorRetriever，按 doc_type=product 过滤"""
 
-    def __init__(self):
-        self._engine = ChromaVectorRetriever()
+    def __init__(self, engine: Optional[BaseRetriever] = None):
+        self._engine = engine or ChromaVectorRetriever()
 
     def retrieve(
         self,
