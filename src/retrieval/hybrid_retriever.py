@@ -1,6 +1,6 @@
 """角色感知混合检索器：按权限过滤并执行检索计划。"""
 
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Optional
 
 from src.retrieval.base import BaseRetriever
 from src.retrieval.faq_retriever import FAQRetriever
@@ -20,16 +20,13 @@ from src.schemas.constants import (
     PLAN_SOURCE,
     PLAN_TOP_K,
     ROLE_ALLOWED_SOURCES,
-    RR_CONTENT,
-    RR_DENIED,
     RR_METADATA,
-    RR_REASON,
-    RR_SCORE,
     SOURCE_FAQ,
     SOURCE_PRODUCT,
     SOURCE_REGULATION,
     SOURCE_REPORT,
 )
+from src.schemas.typed_dicts import RetrievalPlanStep, RetrievalResult
 
 _SOURCE_RETRIEVER_FACTORIES: dict[str, Callable[[BaseRetriever], BaseRetriever]] = {
     SOURCE_PRODUCT: ProductRetriever,
@@ -48,12 +45,12 @@ class HybridRetriever:
         self._retriever_cache: dict[str, BaseRetriever] = {}
         self._vector_engine: Optional[ChromaVectorRetriever] = None
 
-    def retrieve(self, plan: List[Dict]) -> List[Dict]:
+    def retrieve(self, plan: list[RetrievalPlanStep]) -> list[RetrievalResult]:
         """按角色过滤并执行一轮检索计划。
 
         多跳次数由 Agent Graph 条件路由控制；本类不生成计划、不循环调用 Planner。
         """
-        results = []
+        results: list[RetrievalResult] = []
 
         for step in self._filter_plan_by_role(plan):
             if step.get(PLAN_DENIED):
@@ -78,9 +75,9 @@ class HybridRetriever:
 
         return results
 
-    def _filter_plan_by_role(self, plan: List[Dict]) -> List[Dict]:
+    def _filter_plan_by_role(self, plan: list[RetrievalPlanStep]) -> list[RetrievalPlanStep]:
         """保留允许 source；越权 source 转为显式拒绝结果。"""
-        filtered = []
+        filtered: list[RetrievalPlanStep] = []
         for step in plan:
             source = step.get(PLAN_SOURCE)
             if source not in _SOURCE_RETRIEVER_FACTORIES:
@@ -88,13 +85,15 @@ class HybridRetriever:
             elif source in self.allowed_sources:
                 filtered.append(step)
             else:
-                filtered.append({
-                    PLAN_SOURCE: source,
-                    PLAN_QUERY: step.get(PLAN_QUERY, ""),
-                    PLAN_TOP_K: step.get(PLAN_TOP_K, 0),
-                    PLAN_DENIED: True,
-                    PLAN_REASON: f"角色 {self.user_role} 无权限访问 {source}",
-                })
+                filtered.append(
+                    RetrievalPlanStep(
+                        source=source or "",
+                        query=step.get(PLAN_QUERY, ""),
+                        top_k=step.get(PLAN_TOP_K, 0),
+                        denied=True,
+                        reason=f"角色 {self.user_role} 无权限访问 {source}",
+                    )
+                )
         return filtered
 
     def _get_retriever(self, source: Optional[str]) -> Optional[BaseRetriever]:
@@ -111,8 +110,8 @@ class HybridRetriever:
             self._vector_engine = ChromaVectorRetriever()
         return self._vector_engine
 
-    def _filter_results_by_role(self, results: List[Dict]) -> List[Dict]:
-        filtered = []
+    def _filter_results_by_role(self, results: list[RetrievalResult]) -> list[RetrievalResult]:
+        filtered: list[RetrievalResult] = []
         for result in results:
             metadata = result.get(RR_METADATA, {})
             allowed_roles = metadata.get(META_ALLOWED_ROLES)
@@ -129,22 +128,22 @@ class HybridRetriever:
                 filtered.append(result)
         return filtered
 
-    def _denied_result(self, step: Dict) -> Dict:
+    def _denied_result(self, step: RetrievalPlanStep) -> RetrievalResult:
         source = step.get(PLAN_SOURCE)
-        return {
-            RR_CONTENT: "",
-            RR_METADATA: {META_SOURCE: source, "permission_denied": True},
-            RR_SCORE: 0.0,
-            RR_DENIED: True,
-            RR_REASON: step.get(PLAN_REASON, "权限不足"),
-        }
+        return RetrievalResult(
+            content="",
+            metadata={META_SOURCE: source, "permission_denied": True},
+            score=0.0,
+            denied=True,
+            reason=step.get(PLAN_REASON, "权限不足"),
+        )
 
     def _error_result(
         self, source: Optional[str], content: str, error: Optional[str] = None
-    ) -> Dict:
-        return {
-            RR_CONTENT: "",
-            RR_METADATA: {META_SOURCE: source, META_ERROR: error or content},
-            RR_REASON: content,
-            RR_SCORE: 0.0,
-        }
+    ) -> RetrievalResult:
+        return RetrievalResult(
+            content="",
+            metadata={META_SOURCE: source, META_ERROR: error or content},
+            reason=content,
+            score=0.0,
+        )

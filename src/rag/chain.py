@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableLambda
@@ -14,11 +14,12 @@ from src.schemas.constants import (
     RR_CONTENT,
     RR_METADATA,
 )
+from src.schemas.typed_dicts import RetrievalResult
 
 retriever = ChromaVectorRetriever()
 
 
-def format_docs(docs: List[Dict]) -> str:
+def format_docs(docs: list[RetrievalResult]) -> str:
     """把检索结果拼接成 context"""
     lines = []
     for i, doc in enumerate(docs, 1):
@@ -31,7 +32,7 @@ def format_docs(docs: List[Dict]) -> str:
     return "\n".join(lines)
 
 
-def _retrieve_by_question(x: Dict[str, Any]) -> List[Dict]:
+def _retrieve_by_question(x: Dict[str, Any]) -> list[RetrievalResult]:
     """RunnableLambda 包装函数，类型标注让 Pylance 能推断"""
     return retriever.retrieve(x["question"], top_k=DEFAULT_TOP_K)
 

@@ -4,6 +4,7 @@
 """
 
 import json
+from typing import Any, cast
 
 from langchain_core.messages import HumanMessage
 
@@ -59,6 +60,7 @@ from src.schemas.constants import (
     STATE_USER_ROLE,
     STATE_VERIFICATION,
 )
+from src.schemas.typed_dicts import RetrievalPlanStep
 from src.utils.compliance import ComplianceChecker, INVESTMENT_ADVICE_PATTERNS
 
 
@@ -97,6 +99,30 @@ def _get_audit_store():
 
 _ADVICE_KEYWORDS = INVESTMENT_ADVICE_PATTERNS
 _COMPLIANCE_CHECKER = ComplianceChecker()
+
+
+def _with_state_updates(state: AssistantState, updates: dict[str, Any]) -> AssistantState:
+    return cast(AssistantState, {**state, **updates})
+
+
+def _normalize_plan_step(step: object, default_query: str = "") -> RetrievalPlanStep | None:
+    if not isinstance(step, dict):
+        return None
+
+    source = step.get(PLAN_SOURCE)
+    if not isinstance(source, str):
+        return None
+
+    query = step.get(PLAN_QUERY, default_query)
+    top_k = step.get(PLAN_TOP_K, DEFAULT_TOP_K)
+    filters = step.get(PLAN_FILTERS)
+
+    return RetrievalPlanStep(
+        source=source,
+        query=query if isinstance(query, str) else default_query,
+        top_k=top_k if isinstance(top_k, int) else DEFAULT_TOP_K,
+        filters=filters if isinstance(filters, dict) else None,
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -138,14 +164,13 @@ def query_understand(state: AssistantState) -> AssistantState:
             "ambiguity": [],
         }
 
-    return {
-        **state,
+    return _with_state_updates(state, {
         STATE_INTENT: result.get("intent", "unknown"),
         STATE_QUERY_TYPE: result.get("query_type", "unknown"),
         STATE_ENTITIES: result.get("entities", {}),
         STATE_REWRITTEN_QUERY: result.get("rewritten_query", state[STATE_ORIGINAL_QUERY]),
         STATE_AMBIGUITY: result.get("ambiguity", []),
-    }
+    })
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -186,17 +211,23 @@ def planner(state: AssistantState) -> AssistantState:
         raw = response.content
         if not isinstance(raw, str):
             raw = str(raw)
-        plan = json.loads(raw)
+        parsed_plan = json.loads(raw)
     except json.JSONDecodeError:
-        plan = [{PLAN_SOURCE: SOURCE_FAQ, PLAN_QUERY: state[STATE_REWRITTEN_QUERY], PLAN_TOP_K: 3}]
+        parsed_plan = [
+            {PLAN_SOURCE: SOURCE_FAQ, PLAN_QUERY: state[STATE_REWRITTEN_QUERY], PLAN_TOP_K: 3}
+        ]
 
     # 按角色权限过滤：去掉 LLM 可能越权生成的 source
-    filtered_plan = [step for step in plan if step.get(PLAN_SOURCE) in allowed_sources]
+    raw_steps = parsed_plan if isinstance(parsed_plan, list) else []
+    filtered_plan: list[RetrievalPlanStep] = []
+    for raw_step in raw_steps:
+        step = _normalize_plan_step(raw_step, state[STATE_REWRITTEN_QUERY])
+        if step is not None and step.get(PLAN_SOURCE) in allowed_sources:
+            filtered_plan.append(step)
 
-    return {
-        **state,
+    return _with_state_updates(state, {
         STATE_RETRIEVAL_PLAN: filtered_plan,
-    }
+    })
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -206,23 +237,24 @@ def planner(state: AssistantState) -> AssistantState:
 
 def retrieve(state: AssistantState) -> AssistantState:
     """使用 HybridRetriever 按角色权限执行一轮检索计划。"""
-    normalized_plan = []
+    normalized_plan: list[RetrievalPlanStep] = []
     for step in state.get(STATE_RETRIEVAL_PLAN, []):
-        normalized_plan.append({
-            PLAN_SOURCE: step.get(PLAN_SOURCE),
-            PLAN_QUERY: step.get(PLAN_QUERY, state[STATE_REWRITTEN_QUERY]),
-            PLAN_TOP_K: step.get(PLAN_TOP_K, DEFAULT_TOP_K),
-            PLAN_FILTERS: step.get(PLAN_FILTERS),
-        })
+        normalized_plan.append(
+            RetrievalPlanStep(
+                source=step.get(PLAN_SOURCE, ""),
+                query=step.get(PLAN_QUERY, state[STATE_REWRITTEN_QUERY]),
+                top_k=step.get(PLAN_TOP_K, DEFAULT_TOP_K),
+                filters=step.get(PLAN_FILTERS),
+            )
+        )
 
     retriever = HybridRetriever(user_role=state[STATE_USER_ROLE])
     results = retriever.retrieve(plan=normalized_plan)
 
-    return {
-        **state,
+    return _with_state_updates(state, {
         STATE_RETRIEVAL_RESULTS: state.get(STATE_RETRIEVAL_RESULTS, []) + results,
         STATE_RETRIEVAL_ATTEMPTS: state.get(STATE_RETRIEVAL_ATTEMPTS, 0) + 1,
-    }
+    })
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -242,10 +274,9 @@ def grade_and_filter(state: AssistantState) -> AssistantState:
         if result.get(RR_SCORE, 0) >= RETRIEVAL_MIN_SCORE
     ][:GRADE_TOP_K]
 
-    return {
-        **state,
+    return _with_state_updates(state, {
         STATE_RETRIEVAL_RESULTS: filtered,
-    }
+    })
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -270,10 +301,9 @@ def reason(state: AssistantState) -> AssistantState:
 
     results = state.get(STATE_RETRIEVAL_RESULTS, [])
     if not results:
-        return {
-            **state,
+        return _with_state_updates(state, {
             STATE_FINAL_ANSWER: "未检索到足够相关的资料，无法基于当前知识库回答该问题。",
-        }
+        })
 
     # 构建 context
     context = "\n\n".join([
@@ -312,11 +342,11 @@ def reason(state: AssistantState) -> AssistantState:
     response = agent.invoke({"messages": [HumanMessage(content=state[STATE_ORIGINAL_QUERY])]})
 
     final_msg = response[STATE_MESSAGES][-1]
-    return {
-        **state,
+    final_content = final_msg.content if isinstance(final_msg.content, str) else str(final_msg.content)
+    return _with_state_updates(state, {
         STATE_MESSAGES: state.get(STATE_MESSAGES, []) + response[STATE_MESSAGES],
-        STATE_FINAL_ANSWER: final_msg.content,
-    }
+        STATE_FINAL_ANSWER: final_content,
+    })
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -350,14 +380,13 @@ def verify(state: AssistantState) -> AssistantState:
             if pat in answer:
                 issues.append(f"投顾/销售角色不得输出业务建议: {pat}")
 
-    return {
-        **state,
+    return _with_state_updates(state, {
         STATE_VERIFICATION: {
             "passed": len(issues) == 0,
             "issues": issues,
             "confidence": CONFIDENCE_LOW if issues else CONFIDENCE_HIGH,
         },
-    }
+    })
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -374,10 +403,9 @@ def compliance_check(state: AssistantState) -> AssistantState:
         client_id=state.get(STATE_CLIENT_ID),
     )
 
-    return {
-        **state,
-        STATE_COMPLIANCE: dict(compliance),
-    }
+    return _with_state_updates(state, {
+        STATE_COMPLIANCE: compliance,
+    })
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -410,13 +438,12 @@ def compose(state: AssistantState) -> AssistantState:
     else:
         confidence = CONFIDENCE_MEDIUM
 
-    return {
-        **state,
+    return _with_state_updates(state, {
         STATE_FINAL_ANSWER: final_answer,
         STATE_CITATIONS: citations,
         STATE_CONFIDENCE: confidence,
         STATE_RISK_DISCLOSURE: risk + suitability,
-    }
+    })
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -430,14 +457,11 @@ def audit_log(state: AssistantState) -> AssistantState:
     实现委托给 src/utils/audit.py 的 AuditLogger（AuditEntry 模型的权威构建者），
     避免与该模块重复维护同一份字段拼装逻辑。
     """
-    from dataclasses import asdict
-
-    from src.utils.audit import AuditLogger
+    from src.utils.audit import AuditLogger, audit_entry_to_trail
 
     audit_entry = AuditLogger().log(state)
     _get_audit_store().insert(audit_entry)
 
-    return {
-        **state,
-        STATE_AUDIT_TRAIL: asdict(audit_entry),
-    }
+    return _with_state_updates(state, {
+        STATE_AUDIT_TRAIL: audit_entry_to_trail(audit_entry),
+    })

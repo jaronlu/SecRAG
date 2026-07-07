@@ -52,6 +52,7 @@
 - Python 3.11+，使用 uv 管理依赖
 - 代码风格：ruff，行宽 100
 - 测试：pytest + pytest-asyncio
+- 结构固定的 `dict` 优先抽成 `TypedDict`，尤其是 Agent state、检索计划/结果、审计日志、API 序列化 payload、跨模块传递的数据结构；临时局部字典、第三方原始 payload、动态 metadata 可保持普通 `dict`
 
 ## 项目结构
 

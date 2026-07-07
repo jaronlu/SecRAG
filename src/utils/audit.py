@@ -8,37 +8,19 @@ import json
 import sqlite3
 import time
 import uuid
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import cast
 
 from src.agents.state import AssistantState
 from src.schemas.constants import (
-    AUDIT_COMPLIANCE,
     AUDIT_DB_PATH,
-    AUDIT_QUERY,
-    AUDIT_QUERY_ENTITIES,
-    AUDIT_QUERY_INTENT,
     AUDIT_QUERY_ORIGINAL,
-    AUDIT_QUERY_REWRITTEN,
-    AUDIT_QUERY_TYPE,
-    AUDIT_REASONING,
-    AUDIT_REASONING_DURATION_MS,
-    AUDIT_REASONING_ITERATIONS,
-    AUDIT_REASONING_TOOL_CALLS,
     AUDIT_REQUEST_ID,
-    AUDIT_RESPONSE,
-    AUDIT_RESPONSE_CITATIONS,
     AUDIT_RESPONSE_CONFIDENCE,
-    AUDIT_RESPONSE_RISK_DISCLOSURE,
-    AUDIT_RETRIEVAL,
-    AUDIT_RETRIEVAL_FILTERED_CHUNKS,
-    AUDIT_RETRIEVAL_PLAN,
-    AUDIT_RETRIEVAL_SOURCES,
-    AUDIT_RETRIEVAL_TOTAL_CHUNKS,
     AUDIT_STARTED_PERF_COUNTER,
     AUDIT_TIMESTAMP,
-    AUDIT_VERIFICATION,
     CONFIDENCE_LOW,
     META_SOURCE,
     RR_METADATA,
@@ -61,6 +43,16 @@ from src.schemas.constants import (
     STATE_USER_ROLE,
     STATE_VERIFICATION,
 )
+from src.schemas.typed_dicts import (
+    AuditQuery,
+    AuditReasoning,
+    AuditResponse,
+    AuditRetrieval,
+    AuditTrail,
+    ComplianceResult,
+    RetrievalResult,
+    VerificationResult,
+)
 
 
 @dataclass
@@ -72,15 +64,32 @@ class AuditEntry:
     user_id: str
     user_role: str
     department: str
-    query: dict
-    retrieval: dict
-    reasoning: dict
-    verification: dict
-    compliance: dict
-    response: dict
+    query: AuditQuery
+    retrieval: AuditRetrieval
+    reasoning: AuditReasoning
+    verification: VerificationResult
+    compliance: ComplianceResult
+    response: AuditResponse
 
 
-def _unique_sources(results: list[dict]) -> list[str]:
+def audit_entry_to_trail(entry: AuditEntry) -> AuditTrail:
+    """Serialize an AuditEntry into the AssistantState audit_trail shape."""
+    return AuditTrail(
+        request_id=entry.request_id,
+        timestamp=entry.timestamp,
+        user_id=entry.user_id,
+        user_role=entry.user_role,
+        department=entry.department,
+        query=entry.query,
+        retrieval=entry.retrieval,
+        reasoning=entry.reasoning,
+        verification=entry.verification,
+        compliance=entry.compliance,
+        response=entry.response,
+    )
+
+
+def _unique_sources(results: list[RetrievalResult]) -> list[str]:
     sources = []
     seen = set()
     for result in results:
@@ -108,34 +117,34 @@ class AuditLogger:
             user_id=state.get(STATE_USER_ID, ""),
             user_role=state.get(STATE_USER_ROLE, ""),
             department=state.get(STATE_DEPARTMENT, ""),
-            query={
-                AUDIT_QUERY_ORIGINAL: state.get(STATE_ORIGINAL_QUERY, ""),
-                AUDIT_QUERY_REWRITTEN: state.get(STATE_REWRITTEN_QUERY, ""),
-                AUDIT_QUERY_INTENT: state.get(STATE_INTENT, ""),
-                AUDIT_QUERY_TYPE: state.get(STATE_QUERY_TYPE, ""),
-                AUDIT_QUERY_ENTITIES: state.get(STATE_ENTITIES, {}),
-            },
-            retrieval={
-                AUDIT_RETRIEVAL_PLAN: state.get(STATE_RETRIEVAL_PLAN, []),
-                AUDIT_RETRIEVAL_SOURCES: _unique_sources(state.get(STATE_RETRIEVAL_RESULTS, [])),
-                AUDIT_RETRIEVAL_TOTAL_CHUNKS: len(state.get(STATE_RETRIEVAL_RESULTS, [])),
-                AUDIT_RETRIEVAL_FILTERED_CHUNKS: len(state.get(STATE_RETRIEVAL_RESULTS, [])),
-            },
-            reasoning={
-                AUDIT_REASONING_TOOL_CALLS: state.get(STATE_TOOL_CALLS, []),
-                AUDIT_REASONING_ITERATIONS: len(state.get(STATE_INTERMEDIATE_STEPS, [])),
-                AUDIT_REASONING_DURATION_MS: self._calculate_duration_ms(
+            query=AuditQuery(
+                original=state.get(STATE_ORIGINAL_QUERY, ""),
+                rewritten=state.get(STATE_REWRITTEN_QUERY, ""),
+                intent=state.get(STATE_INTENT, ""),
+                query_type=state.get(STATE_QUERY_TYPE, ""),
+                entities=state.get(STATE_ENTITIES, {}),
+            ),
+            retrieval=AuditRetrieval(
+                plan=state.get(STATE_RETRIEVAL_PLAN, []),
+                sources=_unique_sources(state.get(STATE_RETRIEVAL_RESULTS, [])),
+                total_chunks=len(state.get(STATE_RETRIEVAL_RESULTS, [])),
+                filtered_chunks=len(state.get(STATE_RETRIEVAL_RESULTS, [])),
+            ),
+            reasoning=AuditReasoning(
+                tool_calls=state.get(STATE_TOOL_CALLS, []),
+                iterations=len(state.get(STATE_INTERMEDIATE_STEPS, [])),
+                duration_ms=self._calculate_duration_ms(
                     timestamp,
                     started_perf_counter,
                 ),
-            },
+            ),
             verification=state.get(STATE_VERIFICATION, {}),
             compliance=state.get(STATE_COMPLIANCE, {}),
-            response={
-                AUDIT_RESPONSE_CITATIONS: state.get(STATE_CITATIONS, []),
-                AUDIT_RESPONSE_CONFIDENCE: state.get(STATE_CONFIDENCE, CONFIDENCE_LOW),
-                AUDIT_RESPONSE_RISK_DISCLOSURE: state.get(STATE_RISK_DISCLOSURE, ""),
-            },
+            response=AuditResponse(
+                citations=state.get(STATE_CITATIONS, []),
+                confidence=state.get(STATE_CONFIDENCE, CONFIDENCE_LOW),
+                risk_disclosure=state.get(STATE_RISK_DISCLOSURE, ""),
+            ),
         )
 
     def _calculate_duration_ms(
@@ -186,19 +195,19 @@ class SQLiteAuditStore:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    payload[AUDIT_REQUEST_ID],
-                    payload[AUDIT_TIMESTAMP],
-                    payload[STATE_USER_ID],
-                    payload[STATE_USER_ROLE],
-                    payload[STATE_DEPARTMENT],
-                    payload[AUDIT_QUERY].get(AUDIT_QUERY_ORIGINAL, ""),
-                    self._bool_to_int(payload[AUDIT_COMPLIANCE].get("passed")),
-                    payload[AUDIT_RESPONSE].get(AUDIT_RESPONSE_CONFIDENCE, CONFIDENCE_LOW),
+                    entry.request_id,
+                    entry.timestamp,
+                    entry.user_id,
+                    entry.user_role,
+                    entry.department,
+                    entry.query.get(AUDIT_QUERY_ORIGINAL, ""),
+                    self._bool_to_int(entry.compliance.get("passed")),
+                    entry.response.get(AUDIT_RESPONSE_CONFIDENCE, CONFIDENCE_LOW),
                     json.dumps(payload, ensure_ascii=False, sort_keys=True),
                 ),
             )
 
-    def get_by_request_id(self, request_id: str) -> dict | None:
+    def get_by_request_id(self, request_id: str) -> AuditTrail | None:
         with sqlite3.connect(str(self.db_path), timeout=5) as conn:
             self._ensure_schema(conn)
             row = conn.execute(
@@ -207,7 +216,7 @@ class SQLiteAuditStore:
             ).fetchone()
         if row is None:
             return None
-        return json.loads(row[0])
+        return cast(AuditTrail, json.loads(row[0]))
 
     def _ensure_schema(self, conn: sqlite3.Connection) -> None:
         conn.execute(
@@ -235,21 +244,8 @@ class SQLiteAuditStore:
             "CREATE INDEX IF NOT EXISTS idx_audit_entries_compliance ON audit_entries(compliance_passed)"
         )
 
-    def _to_payload(self, entry: AuditEntry) -> dict:
-        payload = asdict(entry)
-        return {
-            AUDIT_REQUEST_ID: payload[AUDIT_REQUEST_ID],
-            AUDIT_TIMESTAMP: payload[AUDIT_TIMESTAMP],
-            STATE_USER_ID: payload[STATE_USER_ID],
-            STATE_USER_ROLE: payload[STATE_USER_ROLE],
-            STATE_DEPARTMENT: payload[STATE_DEPARTMENT],
-            AUDIT_QUERY: payload[AUDIT_QUERY],
-            AUDIT_RETRIEVAL: payload[AUDIT_RETRIEVAL],
-            AUDIT_REASONING: payload[AUDIT_REASONING],
-            AUDIT_VERIFICATION: payload[AUDIT_VERIFICATION],
-            AUDIT_COMPLIANCE: payload[AUDIT_COMPLIANCE],
-            AUDIT_RESPONSE: payload[AUDIT_RESPONSE],
-        }
+    def _to_payload(self, entry: AuditEntry) -> AuditTrail:
+        return audit_entry_to_trail(entry)
 
     def _bool_to_int(self, value: object) -> int | None:
         if value is None:

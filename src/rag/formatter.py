@@ -4,8 +4,8 @@
 输出 dict 的字段名对应 SCHEMA-REFERENCE §3.1 Citation 模型。
 """
 
-from dataclasses import asdict, dataclass
-from typing import Dict, List, Optional
+from dataclasses import dataclass
+from typing import Optional
 
 from src.schemas.constants import (
     # 枚举 (§2.3, §2.4)
@@ -29,6 +29,7 @@ from src.schemas.constants import (
     RR_METADATA,
     RR_SCORE,
 )
+from src.schemas.typed_dicts import CitationDict, RetrievalResult
 
 
 @dataclass
@@ -46,12 +47,12 @@ class Citation:
     page_number: Optional[int] = None
 
 
-def format_citations(retrieval_results: List[Dict]) -> List[Dict]:
+def format_citations(retrieval_results: list[RetrievalResult]) -> list[CitationDict]:
     """生成引用列表
 
     输出 dict 字段对应 SCHEMA-REFERENCE §3.1 Citation 模型。
     """
-    citations = []
+    citations: list[CitationDict] = []
     for i, doc in enumerate(retrieval_results, 1):
         meta = doc.get(RR_METADATA, {})
         content = doc.get(RR_CONTENT, "")
@@ -66,11 +67,21 @@ def format_citations(retrieval_results: List[Dict]) -> List[Dict]:
             page_number=meta.get(META_PAGE_NUMBER),
             permission_level=meta.get(META_PERMISSION_LEVEL, PERMISSION_PUBLIC),
         )
-        citations.append(asdict(citation))
+        citations.append({
+            "citation_id": citation.citation_id,
+            "doc_title": citation.doc_title,
+            "source": citation.source,
+            "doc_type": citation.doc_type,
+            "chunk_id": citation.chunk_id,
+            "quote": citation.quote,
+            "relevance_score": citation.relevance_score,
+            "permission_level": citation.permission_level,
+            "page_number": citation.page_number,
+        })
     return citations
 
 
-def estimate_confidence(retrieval_results: List[Dict]) -> str:
+def estimate_confidence(retrieval_results: list[RetrievalResult]) -> str:
     """
     简单置信度估计（规则版）
     后续可替换为 LLM judge

@@ -6,127 +6,113 @@ SecRAG — 字段名常量、枚举值、配置常量
 定义见 SCHEMA-REFERENCE.md 中的对应章节。
 """
 
-from typing import Literal
+from typing import Final, Literal
 
 # ══════════════════════════════════════════════════════════════════════
 # metadata 字段键名  (SCHEMA-REFERENCE §1.1)
 # ══════════════════════════════════════════════════════════════════════
 
-META_CHUNK_ID = "chunk_id"
-META_DOC_ID = "doc_id"
-META_DOC_TYPE = "doc_type"
-META_SOURCE = "source"
-META_TITLE = "title"
-META_DATE = "date"
-META_STOCK_CODE = "stock_code"
-META_COMPANY_NAME = "company_name"
-META_ANALYST = "analyst"
-META_INSTITUTION = "institution"
-META_PERMISSION_LEVEL = "permission_level"
-META_PAGE_NUMBER = "page_number"
-META_RETRIEVAL_PATH = "retrieval_path"
-META_PRODUCT_TYPE = "product_type"
-META_ERROR = "error"
-META_ALLOWED_ROLES = "allowed_roles"
-META_RETRIEVAL_SOURCE = "retrieval_source"
+META_CHUNK_ID: Final = "chunk_id"
+META_DOC_ID: Final = "doc_id"
+META_DOC_TYPE: Final = "doc_type"
+META_SOURCE: Final = "source"
+META_TITLE: Final = "title"
+META_DATE: Final = "date"
+META_STOCK_CODE: Final = "stock_code"
+META_PERMISSION_LEVEL: Final = "permission_level"
+META_PAGE_NUMBER: Final = "page_number"
+META_PRODUCT_TYPE: Final = "product_type"
+META_ERROR: Final = "error"
+META_ALLOWED_ROLES: Final = "allowed_roles"
+META_RETRIEVAL_SOURCE: Final = "retrieval_source"
 
 # ══════════════════════════════════════════════════════════════════════
 # retrieval_results dict 键名  (SCHEMA-REFERENCE §1.2)
 # ══════════════════════════════════════════════════════════════════════
 
-RR_CONTENT = "content"
-RR_METADATA = "metadata"
-RR_SCORE = "score"
-RR_DENIED = "denied"
-RR_REASON = "reason"
+RR_CONTENT: Final = "content"
+RR_METADATA: Final = "metadata"
+RR_SCORE: Final = "score"
+RR_DENIED: Final = "denied"
+RR_REASON: Final = "reason"
 
 # ══════════════════════════════════════════════════════════════════════
 # retrieval_plan step 键名  (SCHEMA-REFERENCE §1.3)
 # ══════════════════════════════════════════════════════════════════════
 
-PLAN_SOURCE = "source"
-PLAN_QUERY = "query"
-PLAN_TOP_K = "top_k"
-PLAN_FILTERS = "filters"
-PLAN_DENIED = "denied"
-PLAN_REASON = "reason"
+PLAN_SOURCE: Final = "source"
+PLAN_QUERY: Final = "query"
+PLAN_TOP_K: Final = "top_k"
+PLAN_FILTERS: Final = "filters"
+PLAN_DENIED: Final = "denied"
+PLAN_REASON: Final = "reason"
 
 # ══════════════════════════════════════════════════════════════════════
 # AssistantState 字段键名  (SCHEMA-REFERENCE §3.4)
 # ══════════════════════════════════════════════════════════════════════
 
-STATE_USER_ID = "user_id"
-STATE_USER_ROLE = "user_role"
-STATE_DEPARTMENT = "department"
-STATE_DATA_PERMISSIONS = "data_permissions"
-STATE_CLIENT_ID = "client_id"
-STATE_ORIGINAL_QUERY = "original_query"
-STATE_REWRITTEN_QUERY = "rewritten_query"
-STATE_INTENT = "intent"
-STATE_ENTITIES = "entities"
-STATE_AMBIGUITY = "ambiguity"
-STATE_QUERY_TYPE = "query_type"
-STATE_RETRIEVAL_ATTEMPTS = "retrieval_attempts"
-STATE_RETRIEVAL_PLAN = "retrieval_plan"
-STATE_RETRIEVAL_RESULTS = "retrieval_results"
-STATE_MESSAGES = "messages"
-STATE_TOOL_CALLS = "tool_calls"
-STATE_INTERMEDIATE_STEPS = "intermediate_steps"
-STATE_VERIFICATION = "verification"
-STATE_COMPLIANCE = "compliance"
-STATE_FINAL_ANSWER = "final_answer"
-STATE_CITATIONS = "citations"
-STATE_CONFIDENCE = "confidence"
-STATE_RISK_DISCLOSURE = "risk_disclosure"
-STATE_AUDIT_TRAIL = "audit_trail"
+STATE_USER_ID: Final = "user_id"
+STATE_USER_ROLE: Final = "user_role"
+STATE_DEPARTMENT: Final = "department"
+STATE_DATA_PERMISSIONS: Final = "data_permissions"
+STATE_CLIENT_ID: Final = "client_id"
+STATE_ORIGINAL_QUERY: Final = "original_query"
+STATE_REWRITTEN_QUERY: Final = "rewritten_query"
+STATE_INTENT: Final = "intent"
+STATE_ENTITIES: Final = "entities"
+STATE_AMBIGUITY: Final = "ambiguity"
+STATE_QUERY_TYPE: Final = "query_type"
+STATE_RETRIEVAL_ATTEMPTS: Final = "retrieval_attempts"
+STATE_RETRIEVAL_PLAN: Final = "retrieval_plan"
+STATE_RETRIEVAL_RESULTS: Final = "retrieval_results"
+STATE_MESSAGES: Final = "messages"
+STATE_TOOL_CALLS: Final = "tool_calls"
+STATE_INTERMEDIATE_STEPS: Final = "intermediate_steps"
+STATE_VERIFICATION: Final = "verification"
+STATE_COMPLIANCE: Final = "compliance"
+STATE_FINAL_ANSWER: Final = "final_answer"
+STATE_CITATIONS: Final = "citations"
+STATE_CONFIDENCE: Final = "confidence"
+STATE_RISK_DISCLOSURE: Final = "risk_disclosure"
+STATE_AUDIT_TRAIL: Final = "audit_trail"
 
 # audit_trail 字段键名（SCHEMA-REFERENCE §3.3）
-AUDIT_REQUEST_ID = "request_id"
-AUDIT_TIMESTAMP = "timestamp"
-AUDIT_STARTED_PERF_COUNTER = "_started_perf_counter"
-AUDIT_QUERY = "query"
-AUDIT_RETRIEVAL = "retrieval"
-AUDIT_REASONING = "reasoning"
-AUDIT_VERIFICATION = "verification"
-AUDIT_COMPLIANCE = "compliance"
-AUDIT_RESPONSE = "response"
-AUDIT_QUERY_ORIGINAL = "original"
-AUDIT_QUERY_REWRITTEN = "rewritten"
-AUDIT_QUERY_INTENT = "intent"
-AUDIT_QUERY_TYPE = "query_type"
-AUDIT_QUERY_ENTITIES = "entities"
-AUDIT_RETRIEVAL_PLAN = "plan"
-AUDIT_RETRIEVAL_SOURCES = "sources"
-AUDIT_RETRIEVAL_TOTAL_CHUNKS = "total_chunks"
-AUDIT_RETRIEVAL_FILTERED_CHUNKS = "filtered_chunks"
-AUDIT_REASONING_TOOL_CALLS = "tool_calls"
-AUDIT_REASONING_ITERATIONS = "iterations"
-AUDIT_REASONING_DURATION_MS = "duration_ms"
-AUDIT_RESPONSE_CITATIONS = "citations"
-AUDIT_RESPONSE_CONFIDENCE = "confidence"
-AUDIT_RESPONSE_RISK_DISCLOSURE = "risk_disclosure"
+AUDIT_REQUEST_ID: Final = "request_id"
+AUDIT_TIMESTAMP: Final = "timestamp"
+AUDIT_STARTED_PERF_COUNTER: Final = "_started_perf_counter"
+AUDIT_QUERY: Final = "query"
+AUDIT_RETRIEVAL: Final = "retrieval"
+AUDIT_REASONING: Final = "reasoning"
+AUDIT_VERIFICATION: Final = "verification"
+AUDIT_COMPLIANCE: Final = "compliance"
+AUDIT_RESPONSE: Final = "response"
+AUDIT_QUERY_ORIGINAL: Final = "original"
+AUDIT_QUERY_REWRITTEN: Final = "rewritten"
+AUDIT_QUERY_INTENT: Final = "intent"
+AUDIT_QUERY_TYPE: Final = "query_type"
+AUDIT_QUERY_ENTITIES: Final = "entities"
+AUDIT_RETRIEVAL_PLAN: Final = "plan"
+AUDIT_RETRIEVAL_SOURCES: Final = "sources"
+AUDIT_RETRIEVAL_TOTAL_CHUNKS: Final = "total_chunks"
+AUDIT_RETRIEVAL_FILTERED_CHUNKS: Final = "filtered_chunks"
+AUDIT_REASONING_TOOL_CALLS: Final = "tool_calls"
+AUDIT_REASONING_ITERATIONS: Final = "iterations"
+AUDIT_REASONING_DURATION_MS: Final = "duration_ms"
+AUDIT_RESPONSE_CITATIONS: Final = "citations"
+AUDIT_RESPONSE_CONFIDENCE: Final = "confidence"
+AUDIT_RESPONSE_RISK_DISCLOSURE: Final = "risk_disclosure"
 
 # ══════════════════════════════════════════════════════════════════════
 # doc_type 枚举  (SCHEMA-REFERENCE §2.1)
 # ══════════════════════════════════════════════════════════════════════
 
-DOC_TYPE_RESEARCH_REPORT = "research_report"
-DOC_TYPE_ANNOUNCEMENT = "announcement"
-DOC_TYPE_REGULATION = "regulation"
-DOC_TYPE_FINANCIAL_DATA = "financial_data"
-DOC_TYPE_MEETING_MINUTES = "meeting_minutes"
-DOC_TYPE_PRODUCT = "product"
-DOC_TYPE_FAQ = "faq"
-
-DocType = Literal[
-    DOC_TYPE_RESEARCH_REPORT,
-    DOC_TYPE_ANNOUNCEMENT,
-    DOC_TYPE_REGULATION,
-    DOC_TYPE_FINANCIAL_DATA,
-    DOC_TYPE_MEETING_MINUTES,
-    DOC_TYPE_PRODUCT,
-    DOC_TYPE_FAQ,
-]
+DOC_TYPE_RESEARCH_REPORT: Final = "research_report"
+DOC_TYPE_ANNOUNCEMENT: Final = "announcement"
+DOC_TYPE_REGULATION: Final = "regulation"
+DOC_TYPE_FINANCIAL_DATA: Final = "financial_data"
+DOC_TYPE_MEETING_MINUTES: Final = "meeting_minutes"
+DOC_TYPE_PRODUCT: Final = "product"
+DOC_TYPE_FAQ: Final = "faq"
 
 ALL_VALID_DOC_TYPES: set[str] = {
     DOC_TYPE_RESEARCH_REPORT,
@@ -142,11 +128,11 @@ ALL_VALID_DOC_TYPES: set[str] = {
 # 用户角色枚举  (SCHEMA-REFERENCE §2.2)
 # ══════════════════════════════════════════════════════════════════════
 
-ROLE_ADVISOR = "advisor"
-ROLE_INSTITUTIONAL_SALES = "institutional_sales"
-ROLE_COMPLIANCE = "compliance"
-ROLE_OPERATIONS = "operations"
-ROLE_TECHNICAL = "technical"
+ROLE_ADVISOR: Final = "advisor"
+ROLE_INSTITUTIONAL_SALES: Final = "institutional_sales"
+ROLE_COMPLIANCE: Final = "compliance"
+ROLE_OPERATIONS: Final = "operations"
+ROLE_TECHNICAL: Final = "technical"
 
 UserRole = Literal[
     ROLE_ADVISOR,
@@ -160,9 +146,9 @@ UserRole = Literal[
 # confidence 枚举  (SCHEMA-REFERENCE §2.3)
 # ══════════════════════════════════════════════════════════════════════
 
-CONFIDENCE_HIGH = "high"
-CONFIDENCE_MEDIUM = "medium"
-CONFIDENCE_LOW = "low"
+CONFIDENCE_HIGH: Final = "high"
+CONFIDENCE_MEDIUM: Final = "medium"
+CONFIDENCE_LOW: Final = "low"
 
 Confidence = Literal[CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, CONFIDENCE_LOW]
 
@@ -170,31 +156,29 @@ Confidence = Literal[CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, CONFIDENCE_LOW]
 # permission_level 枚举  (SCHEMA-REFERENCE §2.4)
 # ══════════════════════════════════════════════════════════════════════
 
-PERMISSION_PUBLIC = "public"
-PERMISSION_INTERNAL = "internal"
-PERMISSION_CONFIDENTIAL = "confidential"
-
-PermissionLevel = Literal[PERMISSION_PUBLIC, PERMISSION_INTERNAL, PERMISSION_CONFIDENTIAL]
+PERMISSION_PUBLIC: Final = "public"
+PERMISSION_INTERNAL: Final = "internal"
+PERMISSION_CONFIDENTIAL: Final = "confidential"
 
 # ══════════════════════════════════════════════════════════════════════
 # retrieval_source 枚举  (SCHEMA-REFERENCE §2.6)
 # ══════════════════════════════════════════════════════════════════════
 
-SOURCE_PRODUCT = "product_search"
-SOURCE_REGULATION = "regulation_search"
-SOURCE_REPORT = "report_search"
-SOURCE_FAQ = "faq_search"
+SOURCE_PRODUCT: Final = "product_search"
+SOURCE_REGULATION: Final = "regulation_search"
+SOURCE_REPORT: Final = "report_search"
+SOURCE_FAQ: Final = "faq_search"
 
 # ══════════════════════════════════════════════════════════════════════
 # query_type 枚举  (SCHEMA-REFERENCE §2.5)
 # ══════════════════════════════════════════════════════════════════════
 
-QT_PRODUCT_INQUIRY = "product_inquiry"
-QT_RULE_INQUIRY = "rule_inquiry"
-QT_REGULATION_INQUIRY = "regulation_inquiry"
-QT_REPORT_INQUIRY = "report_inquiry"
-QT_FAQ_INQUIRY = "faq_inquiry"
-QT_TECHNICAL_INQUIRY = "technical_inquiry"
+QT_PRODUCT_INQUIRY: Final = "product_inquiry"
+QT_RULE_INQUIRY: Final = "rule_inquiry"
+QT_REGULATION_INQUIRY: Final = "regulation_inquiry"
+QT_REPORT_INQUIRY: Final = "report_inquiry"
+QT_FAQ_INQUIRY: Final = "faq_inquiry"
+QT_TECHNICAL_INQUIRY: Final = "technical_inquiry"
 
 QueryType = Literal[
     QT_PRODUCT_INQUIRY,
@@ -249,12 +233,10 @@ ROLE_DATA_PERMISSIONS: dict[str, list[str]] = {
 DEFAULT_TOP_K = 5
 DEFAULT_MAX_HOPS = 3
 GRADE_TOP_K = 10
-DEFAULT_RERANK_TOP_K = 5
 
 CONFIDENCE_HIGH_THRESHOLD = 0.75
 CONFIDENCE_MEDIUM_THRESHOLD = 0.5
 CONFIDENCE_HIGH_MIN_RESULTS = 3
-HALLUCINATION_THRESHOLD = 0.3
 RETRIEVAL_MIN_SCORE = 0.6
 
 # ══════════════════════════════════════════════════════════════════════
@@ -277,5 +259,5 @@ LLM_DEFAULT_TEMPERATURE = 0.1
 # LLM 提供方标识  (SCHEMA-REFERENCE §2.7)
 # ══════════════════════════════════════════════════════════════════════
 
-LLM_PROVIDER_OPENAI = "openai"
-LLM_PROVIDER_OLLAMA = "ollama"
+LLM_PROVIDER_OPENAI: Final = "openai"
+LLM_PROVIDER_OLLAMA: Final = "ollama"

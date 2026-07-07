@@ -11,6 +11,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.schemas.constants import DEFAULT_TOP_K
+from src.schemas.typed_dicts import AuditTrail, CitationDict, ComplianceResult
 
 
 class QARequest(BaseModel):
@@ -26,7 +27,7 @@ class QARequest(BaseModel):
 
 class QAResponse(BaseModel):
     answer: str
-    citations: list[dict]  # 序列化后的 Citation（SCHEMA-REFERENCE §3.1）
+    citations: list[CitationDict]  # 序列化后的 Citation（SCHEMA-REFERENCE §3.1）
     confidence: str  # CONFIDENCE_HIGH / CONFIDENCE_MEDIUM / CONFIDENCE_LOW（SCHEMA-REFERENCE §2.3）
     retrieval_path: list[str]
 
@@ -46,7 +47,7 @@ class AssistantQARequest(BaseModel):
 
 class AssistantQAResponse(BaseModel):
     answer: str
-    citations: list[dict]  # 序列化 Citation（SCHEMA-REFERENCE §3.1）
+    citations: list[CitationDict]  # 序列化 Citation（SCHEMA-REFERENCE §3.1）
     confidence: str  # SCHEMA-REFERENCE §2.3
-    compliance: dict  # {passed, flags, risk_disclosure}
-    audit_trail: dict  # 序列化 AuditEntry（SCHEMA-REFERENCE §3.3）
+    compliance: ComplianceResult
+    audit_trail: AuditTrail

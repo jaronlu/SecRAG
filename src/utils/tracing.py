@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Any, Callable, TypeVar
+
+from src.schemas.typed_dicts import ToolCallDict
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -17,6 +19,17 @@ class ToolCallTrace:
     duration_ms: float
     success: bool
     error: str = ""
+
+
+def tool_call_trace_to_dict(trace: ToolCallTrace) -> ToolCallDict:
+    return ToolCallDict(
+        tool=trace.tool,
+        input=trace.input,
+        output=trace.output,
+        duration_ms=trace.duration_ms,
+        success=trace.success,
+        error=trace.error,
+    )
 
 
 class Tracer:
@@ -65,5 +78,5 @@ class Tracer:
             "avg_duration_ms": (
                 sum(trace.duration_ms for trace in self.traces) / total if total else 0
             ),
-            "calls": [asdict(trace) for trace in self.traces],
+            "calls": [tool_call_trace_to_dict(trace) for trace in self.traces],
         }

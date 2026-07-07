@@ -4,10 +4,11 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import Header, HTTPException, status
 
+from src.agents.state import AssistantState
 from src.schemas.constants import (
     AUDIT_REQUEST_ID,
     AUDIT_STARTED_PERF_COUNTER,
@@ -89,10 +90,10 @@ def authenticate_user(
 def build_assistant_initial_state(
     request: AssistantQARequest,
     user: AuthenticatedUser,
-) -> dict:
+) -> AssistantState:
     data_permissions = ROLE_DATA_PERMISSIONS.get(user.role, ["public"])
 
-    return {
+    return cast(AssistantState, {
         STATE_USER_ID: user.user_id,
         STATE_USER_ROLE: user.role,
         STATE_DEPARTMENT: user.department,
@@ -120,4 +121,4 @@ def build_assistant_initial_state(
             AUDIT_TIMESTAMP: datetime.now(timezone.utc).isoformat(),
             AUDIT_STARTED_PERF_COUNTER: time.perf_counter(),
         },
-    }
+    })

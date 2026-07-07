@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional, cast
 
 import chromadb
 
@@ -16,10 +16,8 @@ from src.schemas.constants import (
     CHROMA_COLLECTION_NAME,
     CHROMA_SPACE,
     DEFAULT_TOP_K,
-    RR_CONTENT,
-    RR_METADATA,
-    RR_SCORE,
 )
+from src.schemas.typed_dicts import RetrievalResult
 
 
 class ChromaVectorRetriever(BaseRetriever):
@@ -39,7 +37,7 @@ class ChromaVectorRetriever(BaseRetriever):
         query: str,
         top_k: int = DEFAULT_TOP_K,
         filters: Optional[Dict] = None,
-    ) -> List[Dict]:
+    ) -> List[RetrievalResult]:
         query_embedding = self._embed(query)
         results = self.collection.query(
             query_embeddings=[query_embedding],
@@ -56,8 +54,8 @@ class ChromaVectorRetriever(BaseRetriever):
             self._model = get_embedding_model(config.embedding.model)
         return self._model.embed_query(text)
 
-    def _format(self, results: QueryResult) -> List[Dict]:
-        formatted = []
+    def _format(self, results: QueryResult) -> list[RetrievalResult]:
+        formatted: list[RetrievalResult] = []
         documents = results.get("documents")
         metadatas = results.get("metadatas")
         distances = results.get("distances")
@@ -68,9 +66,11 @@ class ChromaVectorRetriever(BaseRetriever):
             metadatas[0],
             distances[0],
         ):
-            formatted.append({
-                RR_CONTENT: doc,
-                RR_METADATA: meta,
-                RR_SCORE: 1 - dist,  # cosine distance -> similarity
-            })
+            formatted.append(
+                RetrievalResult(
+                    content=doc,
+                    metadata=cast(dict, meta or {}),
+                    score=1 - dist,  # cosine distance -> similarity
+                )
+            )
         return formatted
