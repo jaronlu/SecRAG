@@ -6,7 +6,12 @@ from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 
 # ⚡ 字段统一：配置常量见 src/schemas/constants.py
-from src.schemas.constants import CHROMA_COLLECTION_NAME, CHROMA_SPACE, DEFAULT_EMBEDDING_MODEL
+from src.schemas.constants import (
+    CHROMA_COLLECTION_NAME,
+    CHROMA_SPACE,
+    DEFAULT_EMBEDDING_MODEL,
+    META_DOC_ID,
+)
 
 
 def _detect_device() -> str:
@@ -75,3 +80,64 @@ def embed_and_store(
         },
     )
     return vectorstore  # 返回 Chroma 实例；≈ 返回 NSPersistentContainer，后续可用 .similarity_search() 做检索
+
+
+def get_vectorstore(
+    persist_directory: str,
+    embedding_model: HuggingFaceEmbeddings,
+) -> Chroma:
+    """打开既有 Chroma 集合，不隐式写入文档。"""
+    return Chroma(
+        embedding_function=embedding_model,
+        persist_directory=persist_directory,
+        collection_name=CHROMA_COLLECTION_NAME,
+        collection_metadata={
+            "hnsw:space": CHROMA_SPACE,
+        },
+    )
+
+
+def upsert_chunks(
+    chunks: list[Document],
+    persist_directory: str,
+    embedding_model: HuggingFaceEmbeddings,
+) -> None:
+    """按稳定 chunk.id upsert，重复执行不会产生重复 chunk。"""
+    if not chunks:
+        return
+    vectorstore = get_vectorstore(
+        persist_directory=persist_directory,
+        embedding_model=embedding_model,
+    )
+    vectorstore.add_documents(chunks, ids=[str(chunk.id) for chunk in chunks])
+
+
+def list_chunk_ids_by_doc_id(
+    doc_id: str,
+    persist_directory: str,
+    embedding_model: HuggingFaceEmbeddings,
+) -> list[str]:
+    """列出某个 doc_id 当前在 Chroma 中的 chunk IDs。"""
+    vectorstore = get_vectorstore(
+        persist_directory=persist_directory,
+        embedding_model=embedding_model,
+    )
+    results = vectorstore.get(where={META_DOC_ID: doc_id}, include=[])
+    ids = results.get("ids", [])
+    return [str(chunk_id) for chunk_id in ids]
+
+
+def delete_chunk_ids(
+    chunk_ids: set[str] | list[str],
+    persist_directory: str,
+    embedding_model: HuggingFaceEmbeddings,
+) -> None:
+    """按显式 chunk IDs 删除 stale chunks。"""
+    ids = sorted(chunk_ids)
+    if not ids:
+        return
+    vectorstore = get_vectorstore(
+        persist_directory=persist_directory,
+        embedding_model=embedding_model,
+    )
+    vectorstore.delete(ids=ids)

@@ -50,3 +50,66 @@ def test_embed_and_store_uses_provided_embedding_model(monkeypatch, tmp_path):
         "collection_name": "securities_docs",
         "collection_metadata": {"hnsw:space": "cosine"},
     }
+
+
+def test_upsert_chunks_uses_stable_document_ids(monkeypatch, tmp_path):
+    chunks = [
+        Document(page_content="测试内容", metadata={"doc_id": "doc-1"}, id="chunk-1"),
+        Document(page_content="更多内容", metadata={"doc_id": "doc-1"}, id="chunk-2"),
+    ]
+    embedding_model: Any = object()
+    captured = {}
+
+    class FakeChroma:
+        def __init__(self, **kwargs):
+            captured["init"] = kwargs
+
+        def add_documents(self, documents, ids):
+            captured["documents"] = documents
+            captured["ids"] = ids
+
+    monkeypatch.setattr(embedder, "Chroma", FakeChroma)
+
+    embedder.upsert_chunks(chunks, str(tmp_path), embedding_model)
+
+    assert captured["init"]["persist_directory"] == str(tmp_path)
+    assert captured["documents"] == chunks
+    assert captured["ids"] == ["chunk-1", "chunk-2"]
+
+
+def test_list_chunk_ids_by_doc_id_filters_on_doc_id(monkeypatch, tmp_path):
+    embedding_model: Any = object()
+    captured = {}
+
+    class FakeChroma:
+        def __init__(self, **kwargs):
+            captured["init"] = kwargs
+
+        def get(self, **kwargs):
+            captured["get"] = kwargs
+            return {"ids": ["old-1", "old-2"]}
+
+    monkeypatch.setattr(embedder, "Chroma", FakeChroma)
+
+    ids = embedder.list_chunk_ids_by_doc_id("doc-1", str(tmp_path), embedding_model)
+
+    assert ids == ["old-1", "old-2"]
+    assert captured["get"] == {"where": {"doc_id": "doc-1"}, "include": []}
+
+
+def test_delete_chunk_ids_deletes_sorted_ids(monkeypatch, tmp_path):
+    embedding_model: Any = object()
+    captured = {}
+
+    class FakeChroma:
+        def __init__(self, **kwargs):
+            captured["init"] = kwargs
+
+        def delete(self, ids):
+            captured["ids"] = ids
+
+    monkeypatch.setattr(embedder, "Chroma", FakeChroma)
+
+    embedder.delete_chunk_ids({"old-2", "old-1"}, str(tmp_path), embedding_model)
+
+    assert captured["ids"] == ["old-1", "old-2"]
