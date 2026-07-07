@@ -14,6 +14,7 @@ from src.config import config
 from src.retrieval.base import BaseRetriever
 from src.schemas.constants import (
     CHROMA_COLLECTION_NAME,
+    CHROMA_HNSW_SPACE_KEY,
     CHROMA_SPACE,
     DEFAULT_TOP_K,
 )
@@ -28,7 +29,7 @@ class ChromaVectorRetriever(BaseRetriever):
         )
         self.collection = self.client.get_or_create_collection(
             name=CHROMA_COLLECTION_NAME,
-            metadata={"hnsw:space": CHROMA_SPACE},
+            metadata={CHROMA_HNSW_SPACE_KEY: CHROMA_SPACE},
         )
         self._model = None
 

@@ -8,6 +8,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 # ⚡ 字段统一：配置常量见 src/schemas/constants.py
 from src.schemas.constants import (
     CHROMA_COLLECTION_NAME,
+    CHROMA_HNSW_SPACE_KEY,
     CHROMA_SPACE,
     DEFAULT_EMBEDDING_MODEL,
     META_DOC_ID,
@@ -76,7 +77,7 @@ def embed_and_store(
         persist_directory=persist_directory,
         collection_name=CHROMA_COLLECTION_NAME,
         collection_metadata={
-            "hnsw:space": CHROMA_SPACE,
+            CHROMA_HNSW_SPACE_KEY: CHROMA_SPACE,
         },
     )
     return vectorstore  # 返回 Chroma 实例；≈ 返回 NSPersistentContainer，后续可用 .similarity_search() 做检索
@@ -92,7 +93,7 @@ def get_vectorstore(
         persist_directory=persist_directory,
         collection_name=CHROMA_COLLECTION_NAME,
         collection_metadata={
-            "hnsw:space": CHROMA_SPACE,
+            CHROMA_HNSW_SPACE_KEY: CHROMA_SPACE,
         },
     )
 

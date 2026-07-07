@@ -206,6 +206,7 @@ QueryType = Literal[
 
 CHROMA_COLLECTION_NAME = "securities_docs"
 CHROMA_DEFAULT_PERSIST_DIR = "./data/chroma"
+CHROMA_HNSW_SPACE_KEY = "hnsw:space"
 CHROMA_SPACE = "cosine"
 FINANCIAL_DB_PATH = "data/financial.db"
 AUDIT_DB_PATH = "data/audit.db"

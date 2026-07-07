@@ -3,6 +3,7 @@ from typing import Any
 from langchain_core.documents import Document
 
 from src.ingestion import embedder
+from src.schemas.constants import CHROMA_HNSW_SPACE_KEY, CHROMA_SPACE
 
 
 def test_get_embedding_model_uses_financial_defaults(monkeypatch):
@@ -48,7 +49,7 @@ def test_embed_and_store_uses_provided_embedding_model(monkeypatch, tmp_path):
         "embedding": embedding_model,
         "persist_directory": str(tmp_path),
         "collection_name": "securities_docs",
-        "collection_metadata": {"hnsw:space": "cosine"},
+        "collection_metadata": {CHROMA_HNSW_SPACE_KEY: CHROMA_SPACE},
     }
 
 
