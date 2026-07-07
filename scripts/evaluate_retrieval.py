@@ -4,13 +4,17 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 from src.retrieval.hybrid_retriever import HybridRetriever
 from src.schemas.constants import (
     META_CHUNK_ID,
+    PLAN_DENIED,
+    PLAN_FILTERS,
     PLAN_QUERY,
+    PLAN_REASON,
     PLAN_SOURCE,
     PLAN_TOP_K,
     QT_FAQ_INQUIRY,
@@ -27,6 +31,7 @@ from src.schemas.constants import (
     SOURCE_REGULATION,
     SOURCE_REPORT,
 )
+from src.schemas.typed_dicts import RetrievalPlanStep, RetrievalResult
 
 _QUERY_TYPE_TO_SOURCE = {
     QT_PRODUCT_INQUIRY: SOURCE_PRODUCT,
@@ -55,12 +60,31 @@ def _contains_placeholder_chunk_ids(dataset: list[dict[str, Any]]) -> bool:
     return False
 
 
-def _normalize_plan(item: dict[str, Any]) -> list[dict[str, Any]]:
+def _normalize_plan(item: dict[str, Any]) -> list[RetrievalPlanStep]:
     if "plan" in item:
-        plan = item["plan"]
-        if not isinstance(plan, list):
+        raw_plan = item["plan"]
+        if not isinstance(raw_plan, list):
             raise ValueError("评估样本中的 plan 必须是列表")
-        return plan
+        normalized_plan: list[RetrievalPlanStep] = []
+        for raw_step in raw_plan:
+            if not isinstance(raw_step, dict):
+                raise ValueError("评估样本中的 plan step 必须是对象")
+
+            step = RetrievalPlanStep(
+                source=str(raw_step.get(PLAN_SOURCE, "")),
+                query=str(raw_step.get(PLAN_QUERY, item.get("query", ""))),
+                top_k=int(raw_step.get(PLAN_TOP_K, item.get("top_k", 10))),
+            )
+            filters = raw_step.get(PLAN_FILTERS)
+            if PLAN_FILTERS in raw_step:
+                step[PLAN_FILTERS] = filters if isinstance(filters, dict) else None
+            if PLAN_DENIED in raw_step:
+                step[PLAN_DENIED] = bool(raw_step[PLAN_DENIED])
+            reason = raw_step.get(PLAN_REASON)
+            if isinstance(reason, str):
+                step[PLAN_REASON] = reason
+            normalized_plan.append(step)
+        return normalized_plan
 
     query = item.get("query", "")
     source = item.get("source")
@@ -70,18 +94,18 @@ def _normalize_plan(item: dict[str, Any]) -> list[dict[str, Any]]:
             source = _QUERY_TYPE_TO_SOURCE.get(query_type)
 
     if source is None:
-        raise ValueError(
-            "评估样本缺少检索计划。请提供 plan、source 或 expected_query_type。"
+        raise ValueError("评估样本缺少检索计划。请提供 plan、source 或 expected_query_type。")
+
+    return [
+        RetrievalPlanStep(
+            source=source,
+            query=query,
+            top_k=item.get("top_k", 10),
         )
-
-    return [{
-        PLAN_SOURCE: source,
-        PLAN_QUERY: query,
-        PLAN_TOP_K: item.get("top_k", 10),
-    }]
+    ]
 
 
-def _collect_chunk_ids(results: list[dict[str, Any]], limit: int) -> set[str]:
+def _collect_chunk_ids(results: Sequence[RetrievalResult], limit: int) -> set[str]:
     ids = set()
     for result in results[:limit]:
         chunk_id = result.get(RR_METADATA, {}).get(META_CHUNK_ID)
@@ -90,7 +114,9 @@ def _collect_chunk_ids(results: list[dict[str, Any]], limit: int) -> set[str]:
     return ids
 
 
-def _first_relevant_rank(results: list[dict[str, Any]], relevant_doc_ids: set[str]) -> int | None:
+def _first_relevant_rank(
+    results: Sequence[RetrievalResult], relevant_doc_ids: set[str]
+) -> int | None:
     for index, result in enumerate(results, start=1):
         chunk_id = result.get(RR_METADATA, {}).get(META_CHUNK_ID)
         if chunk_id and str(chunk_id) in relevant_doc_ids:
@@ -98,7 +124,7 @@ def _first_relevant_rank(results: list[dict[str, Any]], relevant_doc_ids: set[st
     return None
 
 
-def _has_permission_denied(results: list[dict[str, Any]]) -> bool:
+def _has_permission_denied(results: Sequence[RetrievalResult]) -> bool:
     return any(bool(result.get(RR_DENIED)) for result in results)
 
 
@@ -145,7 +171,9 @@ def evaluate_retrieval(dataset_path: str | Path) -> dict[str, float]:
             precision5 = 0.0
             coverage = 1.0 if expect_permission_denied == actual_permission_denied else 0.0
 
-        permission_block_accuracy = 1.0 if actual_permission_denied == expect_permission_denied else 0.0
+        permission_block_accuracy = (
+            1.0 if actual_permission_denied == expect_permission_denied else 0.0
+        )
 
         metrics["recall@5"].append(recall5)
         metrics["recall@10"].append(recall10)
@@ -180,7 +208,9 @@ def main() -> None:
     summary = evaluate_retrieval(dataset_path)
     print(f"评估集: {dataset_path}")
     if _contains_placeholder_chunk_ids(dataset):
-        print("提示: 当前评估集包含占位 relevant_doc_ids，请替换为真实 chunk_id 后再解读召回/MRR 指标。")
+        print(
+            "提示: 当前评估集包含占位 relevant_doc_ids，请替换为真实 chunk_id 后再解读召回/MRR 指标。"
+        )
     print("检索评估结果：")
     for metric, value in summary.items():
         if metric == "samples":
