@@ -1,19 +1,21 @@
 from pathlib import Path
+from typing import cast
 
 from langchain_core.documents import Document
+from langchain_huggingface import HuggingFaceEmbeddings
 
-from scripts import ingest
-from scripts.ingest import (
-    _load_sample_metadata,
+from src.ingestion import pipeline
+from src.ingestion.identity import (
     derive_doc_id,
-    ingest_document,
+    load_sample_metadata,
     normalize_chunks,
 )
+from src.ingestion.pipeline import ingest_document
 from src.ingestion.registry import DocumentRegistryStore
 from src.schemas.constants import (
     DOC_TYPE_ANNOUNCEMENT,
-    DOC_TYPE_FINANCIAL_DATA,
     DOC_TYPE_FAQ,
+    DOC_TYPE_FINANCIAL_DATA,
     DOC_TYPE_RESEARCH_REPORT,
     META_ALLOWED_ROLES,
     META_DOC_ID,
@@ -31,8 +33,12 @@ from src.schemas.constants import (
 )
 
 
+def _fake_embedding_model() -> HuggingFaceEmbeddings:
+    return cast(HuggingFaceEmbeddings, object())
+
+
 def test_loads_sample_metadata_manifest():
-    metadata = _load_sample_metadata(
+    metadata = load_sample_metadata(
         Path("data/raw/demo_knowledge_base/samples/faq/sample_project_technical_faq.html")
     )
 
@@ -43,7 +49,7 @@ def test_loads_sample_metadata_manifest():
 
 
 def test_loads_announcements_metadata_manifest():
-    metadata = _load_sample_metadata(
+    metadata = load_sample_metadata(
         Path("data/raw/demo_knowledge_base/announcements/local-source-repos.pdf")
     )
 
@@ -54,7 +60,7 @@ def test_loads_announcements_metadata_manifest():
 
 
 def test_loads_financial_csv_metadata_manifest():
-    metadata = _load_sample_metadata(
+    metadata = load_sample_metadata(
         Path("data/raw/demo_knowledge_base/announcements/sample-financial.csv")
     )
 
@@ -65,7 +71,7 @@ def test_loads_financial_csv_metadata_manifest():
 
 
 def test_loads_real_securities_data_metadata_manifest():
-    metadata = _load_sample_metadata(
+    metadata = load_sample_metadata(
         Path("data/raw/real_securities_data/reports/000001_2025_2026.pdf")
     )
 
@@ -100,7 +106,7 @@ def test_normalize_chunks_embeds_permission_metadata():
         chunks=chunks,
         file_path=file_path,
         doc_type=DOC_TYPE_FAQ,
-        sample_metadata=_load_sample_metadata(file_path),
+        sample_metadata=load_sample_metadata(file_path),
     )
 
     metadata = normalized[0].metadata
@@ -111,16 +117,16 @@ def test_normalize_chunks_embeds_permission_metadata():
 
 
 def test_derives_real_data_doc_ids_from_stable_sources():
-    annual_metadata = _load_sample_metadata(
+    annual_metadata = load_sample_metadata(
         Path("data/raw/real_securities_data/announcements/000001_2025.pdf")
     )
-    research_metadata = _load_sample_metadata(
+    research_metadata = load_sample_metadata(
         Path("data/raw/real_securities_data/reports/000001_2025_2026.pdf")
     )
-    csv_metadata = _load_sample_metadata(
+    csv_metadata = load_sample_metadata(
         Path("data/raw/real_securities_data/financials/baostock_600519_valuation_202501.csv")
     )
-    efinance_metadata = _load_sample_metadata(
+    efinance_metadata = load_sample_metadata(
         Path("data/raw/real_securities_data/financials/efinance_600519_base_info.csv")
     )
 
@@ -180,7 +186,7 @@ def test_normalize_chunks_overwrites_loader_path_doc_id():
         chunks=chunks,
         file_path=file_path,
         doc_type=DOC_TYPE_FINANCIAL_DATA,
-        sample_metadata=_load_sample_metadata(file_path),
+        sample_metadata=load_sample_metadata(file_path),
         doc_id="dataset:efinance:eastmoney:get_base_info:600519",
     )
 
@@ -191,7 +197,6 @@ def test_ingest_document_skips_unchanged_file(monkeypatch, tmp_path):
     file_path = tmp_path / "stable.csv"
     file_path.write_text("code,year\n600519,2026\n", encoding="utf-8")
     registry = DocumentRegistryStore(tmp_path / "registry.db")
-    embedding_model = object()
     run_id = "run-1"
     metadata = {
         META_DOC_TYPE: DOC_TYPE_FINANCIAL_DATA,
@@ -199,16 +204,19 @@ def test_ingest_document_skips_unchanged_file(monkeypatch, tmp_path):
         META_TITLE: "stable",
     }
 
-    monkeypatch.setattr(ingest, "_load_sample_metadata", lambda _: metadata)
-    monkeypatch.setattr(ingest, "upsert_chunks", lambda **_: None)
-    monkeypatch.setattr(ingest, "list_chunk_ids_by_doc_id", lambda **_: [])
-    monkeypatch.setattr(ingest, "delete_chunk_ids", lambda **_: None)
+    monkeypatch.setattr(pipeline, "load_sample_metadata", lambda _: metadata)
+    monkeypatch.setattr(pipeline, "get_embedding_model", lambda _: _fake_embedding_model())
+    monkeypatch.setattr(pipeline, "upsert_chunks", lambda **_: None)
+    monkeypatch.setattr(pipeline, "list_chunk_ids_by_doc_id", lambda **_: [])
+    monkeypatch.setattr(pipeline, "delete_chunk_ids", lambda **_: None)
     monkeypatch.setattr(
-        ingest,
-        "_load_documents",
+        pipeline,
+        "load_documents",
         lambda _: [Document(page_content="code: 600519", metadata={})],
     )
-    registry.start_run(run_id, tmp_path.as_uri(), full_scan=False, started_at="2026-07-07T00:00:00Z")
+    registry.start_run(
+        run_id, tmp_path.as_uri(), full_scan=False, started_at="2026-07-07T00:00:00Z"
+    )
 
     first_action = ingest_document(
         file_path,
@@ -216,7 +224,6 @@ def test_ingest_document_skips_unchanged_file(monkeypatch, tmp_path):
         registry_store=registry,
         run_id=run_id,
         root_dir=tmp_path,
-        embedding_model=embedding_model,
         persist_directory=str(tmp_path / "chroma"),
     )
     second_action = ingest_document(
@@ -225,7 +232,6 @@ def test_ingest_document_skips_unchanged_file(monkeypatch, tmp_path):
         registry_store=registry,
         run_id=run_id,
         root_dir=tmp_path,
-        embedding_model=embedding_model,
         persist_directory=str(tmp_path / "chroma"),
     )
 
@@ -237,7 +243,6 @@ def test_ingest_document_deletes_stale_chunks_after_upsert(monkeypatch, tmp_path
     file_path = tmp_path / "stable.csv"
     file_path.write_text("code,year\n600519,2026\n", encoding="utf-8")
     registry = DocumentRegistryStore(tmp_path / "registry.db")
-    embedding_model = object()
     run_id = "run-1"
     metadata = {
         META_DOC_TYPE: DOC_TYPE_FINANCIAL_DATA,
@@ -246,8 +251,9 @@ def test_ingest_document_deletes_stale_chunks_after_upsert(monkeypatch, tmp_path
     }
     calls: list[tuple[str, list[str]]] = []
 
-    monkeypatch.setattr(ingest, "_load_sample_metadata", lambda _: metadata)
-    monkeypatch.setattr(ingest, "list_chunk_ids_by_doc_id", lambda **_: ["old-1", "old-2"])
+    monkeypatch.setattr(pipeline, "load_sample_metadata", lambda _: metadata)
+    monkeypatch.setattr(pipeline, "get_embedding_model", lambda _: _fake_embedding_model())
+    monkeypatch.setattr(pipeline, "list_chunk_ids_by_doc_id", lambda **_: ["old-1", "old-2"])
 
     def fake_upsert_chunks(**kwargs):
         calls.append(("upsert", [str(chunk.id) for chunk in kwargs["chunks"]]))
@@ -255,14 +261,16 @@ def test_ingest_document_deletes_stale_chunks_after_upsert(monkeypatch, tmp_path
     def fake_delete_chunk_ids(**kwargs):
         calls.append(("delete", sorted(kwargs["chunk_ids"])))
 
-    monkeypatch.setattr(ingest, "upsert_chunks", fake_upsert_chunks)
-    monkeypatch.setattr(ingest, "delete_chunk_ids", fake_delete_chunk_ids)
+    monkeypatch.setattr(pipeline, "upsert_chunks", fake_upsert_chunks)
+    monkeypatch.setattr(pipeline, "delete_chunk_ids", fake_delete_chunk_ids)
     monkeypatch.setattr(
-        ingest,
-        "_load_documents",
+        pipeline,
+        "load_documents",
         lambda _: [Document(page_content="new content", metadata={})],
     )
-    registry.start_run(run_id, tmp_path.as_uri(), full_scan=False, started_at="2026-07-07T00:00:00Z")
+    registry.start_run(
+        run_id, tmp_path.as_uri(), full_scan=False, started_at="2026-07-07T00:00:00Z"
+    )
 
     action = ingest_document(
         file_path,
@@ -270,7 +278,6 @@ def test_ingest_document_deletes_stale_chunks_after_upsert(monkeypatch, tmp_path
         registry_store=registry,
         run_id=run_id,
         root_dir=tmp_path,
-        embedding_model=embedding_model,
         persist_directory=str(tmp_path / "chroma"),
     )
 
@@ -283,7 +290,6 @@ def test_ingest_document_failure_keeps_existing_chunks(monkeypatch, tmp_path):
     file_path = tmp_path / "stable.csv"
     file_path.write_text("code,year\n600519,2026\n", encoding="utf-8")
     registry = DocumentRegistryStore(tmp_path / "registry.db")
-    embedding_model = object()
     run_id = "run-1"
     metadata = {
         META_DOC_TYPE: DOC_TYPE_FINANCIAL_DATA,
@@ -292,12 +298,15 @@ def test_ingest_document_failure_keeps_existing_chunks(monkeypatch, tmp_path):
     }
     calls: list[str] = []
 
-    monkeypatch.setattr(ingest, "_load_sample_metadata", lambda _: metadata)
-    monkeypatch.setattr(ingest, "_load_documents", lambda _: [])
-    monkeypatch.setattr(ingest, "list_chunk_ids_by_doc_id", lambda **_: ["old-1"])
-    monkeypatch.setattr(ingest, "upsert_chunks", lambda **_: calls.append("upsert"))
-    monkeypatch.setattr(ingest, "delete_chunk_ids", lambda **_: calls.append("delete"))
-    registry.start_run(run_id, tmp_path.as_uri(), full_scan=False, started_at="2026-07-07T00:00:00Z")
+    monkeypatch.setattr(pipeline, "load_sample_metadata", lambda _: metadata)
+    monkeypatch.setattr(pipeline, "get_embedding_model", lambda _: _fake_embedding_model())
+    monkeypatch.setattr(pipeline, "load_documents", lambda _: [])
+    monkeypatch.setattr(pipeline, "list_chunk_ids_by_doc_id", lambda **_: ["old-1"])
+    monkeypatch.setattr(pipeline, "upsert_chunks", lambda **_: calls.append("upsert"))
+    monkeypatch.setattr(pipeline, "delete_chunk_ids", lambda **_: calls.append("delete"))
+    registry.start_run(
+        run_id, tmp_path.as_uri(), full_scan=False, started_at="2026-07-07T00:00:00Z"
+    )
 
     action = ingest_document(
         file_path,
@@ -305,7 +314,6 @@ def test_ingest_document_failure_keeps_existing_chunks(monkeypatch, tmp_path):
         registry_store=registry,
         run_id=run_id,
         root_dir=tmp_path,
-        embedding_model=embedding_model,
         persist_directory=str(tmp_path / "chroma"),
     )
 

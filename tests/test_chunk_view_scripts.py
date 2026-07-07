@@ -2,7 +2,8 @@ from typing import Any
 
 from langchain_core.documents import Document
 
-from scripts import inspect_chunks, preview_chunks
+from scripts import preview_chunks
+from src.ingestion import chunk_view
 from src.schemas.constants import (
     DOC_TYPE_FINANCIAL_DATA,
     META_CHUNK_HASH,
@@ -35,8 +36,8 @@ def test_build_chunk_views_and_markdown_preview():
         )
     ]
 
-    rows = preview_chunks.build_chunk_views(chunks, preview_chars=12)
-    markdown = preview_chunks.render_markdown(rows, title="Chunk Preview")
+    rows = chunk_view.build_chunk_views(chunks, preview_chars=12)
+    markdown = chunk_view.render_markdown(rows, title="Chunk Preview")
 
     assert rows[0]["doc_id"] == "doc-1"
     assert rows[0]["content_length"] == len(chunks[0].page_content)
@@ -46,7 +47,7 @@ def test_build_chunk_views_and_markdown_preview():
 
 
 def test_render_jsonl_outputs_one_row_per_chunk():
-    rows: list[preview_chunks.ChunkView] = [
+    rows: list[chunk_view.ChunkView] = [
         {
             "doc_id": "doc-1",
             "chunk_id": "chunk-1",
@@ -63,13 +64,13 @@ def test_render_jsonl_outputs_one_row_per_chunk():
         }
     ]
 
-    output = preview_chunks.render_jsonl(rows)
+    output = chunk_view.render_jsonl(rows)
 
     assert output.count("\n") == 1
     assert '"doc_id": "doc-1"' in output
 
 
-def test_preview_file_uses_ingest_normalization(monkeypatch, tmp_path):
+def test_build_file_chunk_views_uses_ingest_normalization(monkeypatch, tmp_path):
     file_path = tmp_path / "stable.csv"
     file_path.write_text("code,year\n600519,2026\n", encoding="utf-8")
     metadata = {
@@ -78,14 +79,14 @@ def test_preview_file_uses_ingest_normalization(monkeypatch, tmp_path):
         META_TITLE: "stable",
     }
 
-    monkeypatch.setattr(preview_chunks, "_load_sample_metadata", lambda _: metadata)
+    monkeypatch.setattr(chunk_view, "load_sample_metadata", lambda _: metadata)
     monkeypatch.setattr(
-        preview_chunks,
-        "_load_documents",
+        chunk_view,
+        "load_documents",
         lambda _: [Document(page_content="code: 600519\nyear: 2026", metadata={})],
     )
 
-    rows = preview_chunks.preview_file(file_path, DOC_TYPE_FINANCIAL_DATA, limit=1)
+    rows = chunk_view.build_file_chunk_views(file_path, DOC_TYPE_FINANCIAL_DATA, limit=1)
 
     assert rows[0]["doc_id"] == "dataset:manual:stable-id"
     assert rows[0]["chunk_index"] == 0
@@ -116,9 +117,9 @@ def test_inspect_doc_id_reads_chroma_without_embedding(monkeypatch):
                 ],
             }
 
-    monkeypatch.setattr(inspect_chunks, "Chroma", FakeChroma)
+    monkeypatch.setattr(chunk_view, "Chroma", FakeChroma)
 
-    rows = inspect_chunks.inspect_doc_id("doc-1", persist_directory="/tmp/chroma", limit=10)
+    rows = chunk_view.inspect_doc_id("doc-1", persist_directory="/tmp/chroma", limit=10)
 
     assert captured["init"]["embedding_function"] is None
     assert captured["init"]["create_collection_if_not_exists"] is False
@@ -129,3 +130,45 @@ def test_inspect_doc_id_reads_chroma_without_embedding(monkeypatch):
     }
     assert rows[0]["chunk_id"] == "chunk-1"
     assert rows[0]["content_preview"] == "stored content"
+
+
+def test_preview_cli_reads_stored_chunks_by_doc_id(monkeypatch, capsys):
+    captured: dict[str, Any] = {}
+
+    def fake_inspect_doc_id(doc_id, **kwargs):
+        captured["doc_id"] = doc_id
+        captured.update(kwargs)
+        return [
+            {
+                "doc_id": "doc-1",
+                "chunk_id": "chunk-1",
+                "chunk_index": 0,
+                "chunk_hash": "hash-1",
+                "doc_type": DOC_TYPE_FINANCIAL_DATA,
+                "source": "source.csv",
+                "title": "标题",
+                "stock_code": "600519",
+                "date": "2026",
+                "page_number": "",
+                "content_length": 10,
+                "content_preview": "stored",
+            }
+        ]
+
+    monkeypatch.setattr(preview_chunks, "inspect_doc_id", fake_inspect_doc_id)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["preview_chunks.py", "doc-1", "--limit", "1", "--persist-directory", "/tmp/chroma"],
+    )
+
+    exit_code = preview_chunks.main()
+
+    assert exit_code == 0
+    assert captured == {
+        "doc_id": "doc-1",
+        "persist_directory": "/tmp/chroma",
+        "limit": 1,
+        "full_content": False,
+        "preview_chars": 500,
+    }
+    assert "Chunk Preview: doc-1" in capsys.readouterr().out
