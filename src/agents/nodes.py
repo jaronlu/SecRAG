@@ -59,6 +59,7 @@ from src.schemas.constants import (
     STATE_USER_ROLE,
     STATE_VERIFICATION,
 )
+from src.utils.compliance import ComplianceChecker, INVESTMENT_ADVICE_PATTERNS
 
 
 def _build_llm():
@@ -94,18 +95,8 @@ def _get_audit_store():
 # 共享规则关键词（verify 与 compliance_check 共用，避免重复定义漂移）
 # ══════════════════════════════════════════════════════════════════════
 
-_ADVICE_KEYWORDS: tuple[str, ...] = (
-    "推荐" + "买" + "入",
-    "建议" + "卖" + "出",
-    "目标" + "价",
-    "评级",
-    "买" + "入",
-    "卖" + "出",
-    "增" + "持",
-    "减" + "持",
-)
-_SENSITIVE_KEYWORDS: tuple[str, ...] = ("内" + "幕" + "信息", "未" + "公开", "业绩" + "预测")
-_ARTICLE_REFERENCE_PATTERN = r"第[一二三四五六七八九十百千]+条|第\d+条|Article\s+\d+"
+_ADVICE_KEYWORDS = INVESTMENT_ADVICE_PATTERNS
+_COMPLIANCE_CHECKER = ComplianceChecker()
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -376,52 +367,16 @@ def verify(state: AssistantState) -> AssistantState:
 
 def compliance_check(state: AssistantState) -> AssistantState:
     """合规检查：敏感词、业务建议、风险提示、适当性"""
-    import re
-
     answer = state.get(STATE_FINAL_ANSWER, "")
-    flags = []
-
-    # 敏感词检测
-    for kw in _SENSITIVE_KEYWORDS:
-        if kw in answer:
-            flags.append(f"sensitive:{kw}")
-
-    # 业务建议检测
-    for pat in _ADVICE_KEYWORDS:
-        if pat in answer:
-            flags.append(f"advice:{pat}")
-
-    role = state.get(STATE_USER_ROLE)
-    if role == ROLE_COMPLIANCE and not re.search(_ARTICLE_REFERENCE_PATTERN, answer):
-        flags.append("citation_precision:missing_article")
-
-    # 客户适当性检查（投顾场景）
-    suitability_warning = ""
-    if role == ROLE_ADVISOR and state.get(STATE_CLIENT_ID):
-        high_risk_products = ["标的型" + "产品", "混合型" + "产品", "私" + "募" + "产品"]
-        for prod in high_risk_products:
-            if prod in answer:
-                suitability_warning = (
-                    "\n\n【适当性提示】该产品风险等级较高，请确认客户风险承受能力是否匹配。"
-                )
-                flags.append(f"suitability:{prod}")
-                break
-
-    # 风险提示（强制追加）
-    risk_disclosure = "\n\n【风险提示】本回答仅供参考，不构成业务建议。市场有风险，业务需谨慎。"
-
-    passed = not any(
-        flag.startswith("sensitive:") or flag.startswith("citation_precision:") for flag in flags
+    compliance = _COMPLIANCE_CHECKER.check(
+        answer,
+        user_role=state.get(STATE_USER_ROLE),
+        client_id=state.get(STATE_CLIENT_ID),
     )
 
     return {
         **state,
-        STATE_COMPLIANCE: {
-            "passed": passed,
-            "flags": flags,
-            "risk_disclosure": risk_disclosure,
-            "suitability_warning": suitability_warning,
-        },
+        STATE_COMPLIANCE: dict(compliance),
     }
 
 
