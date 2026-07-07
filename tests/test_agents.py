@@ -7,6 +7,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, cast
 from unittest.mock import MagicMock
 
+import pytest
+
 from src.agents.graph import (
     build_agent_graph,
     is_compliant,
@@ -31,6 +33,7 @@ from src.schemas.constants import (
     AUDIT_REASONING_DURATION_MS,
     AUDIT_REQUEST_ID,
     AUDIT_RESPONSE,
+    AUDIT_RESPONSE_CONFIDENCE,
     AUDIT_RETRIEVAL,
     AUDIT_RETRIEVAL_SOURCES,
     AUDIT_RETRIEVAL_TOTAL_CHUNKS,
@@ -77,6 +80,7 @@ from src.schemas.constants import (
     STATE_USER_ROLE,
     STATE_VERIFICATION,
 )
+from src.utils.audit import SQLiteAuditStore
 
 
 def _result(content: str, score: float = 0.9, meta: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -222,8 +226,9 @@ class TestVerify:
             STATE_FINAL_ANSWER: "根据相关规定，股东行为需要披露",
             STATE_RETRIEVAL_RESULTS: [_result("法规内容")],
         })
-        result = verify(state)
-        assert any("条款" in i for i in result[STATE_VERIFICATION]["issues"])
+        result = compliance_check(state)
+        assert result[STATE_COMPLIANCE]["passed"] is False
+        assert "citation_precision:missing_article" in result[STATE_COMPLIANCE]["flags"]
 
     def test_compliance_with_article_number_passes(self):
         state = _state(**{
@@ -231,8 +236,8 @@ class TestVerify:
             STATE_FINAL_ANSWER: "根据第5条规定，股东行为需要披露",
             STATE_RETRIEVAL_RESULTS: [_result("法规内容")],
         })
-        result = verify(state)
-        assert result[STATE_VERIFICATION]["passed"] is True
+        result = compliance_check(state)
+        assert result[STATE_COMPLIANCE]["passed"] is True
 
     def test_confidence_low_on_issues(self):
         state = _state(**{
@@ -493,6 +498,11 @@ class TestCompose:
 
 
 class TestAuditLog:
+    @pytest.fixture(autouse=True)
+    def _use_temp_audit_store(self, monkeypatch, tmp_path):
+        self.audit_store = SQLiteAuditStore(tmp_path / "audit.db")
+        monkeypatch.setattr("src.agents.nodes._get_audit_store", lambda: self.audit_store)
+
     def test_creates_audit_entry(self):
         state = _state(**{
             STATE_FINAL_ANSWER: "回答",
@@ -550,6 +560,28 @@ class TestAuditLog:
         assert result[STATE_AUDIT_TRAIL][AUDIT_TIMESTAMP] == timestamp
         assert AUDIT_STARTED_PERF_COUNTER not in result[STATE_AUDIT_TRAIL]
         assert result[STATE_AUDIT_TRAIL][AUDIT_REASONING][AUDIT_REASONING_DURATION_MS] > 0
+
+    def test_persists_audit_entry_for_lookup(self):
+        timestamp = datetime.now(timezone.utc).isoformat()
+        state = _state(**{
+            STATE_AUDIT_TRAIL: {
+                AUDIT_REQUEST_ID: "request-lookup",
+                AUDIT_TIMESTAMP: timestamp,
+            },
+            STATE_FINAL_ANSWER: "回答",
+            STATE_CONFIDENCE: CONFIDENCE_MEDIUM,
+        })
+
+        result = audit_log(state)
+
+        persisted = self.audit_store.get_by_request_id("request-lookup")
+        assert persisted is not None
+        assert persisted[AUDIT_REQUEST_ID] == "request-lookup"
+        assert persisted[AUDIT_TIMESTAMP] == timestamp
+        assert (
+            persisted[AUDIT_RESPONSE][AUDIT_RESPONSE_CONFIDENCE]
+            == result[STATE_AUDIT_TRAIL][AUDIT_RESPONSE][AUDIT_RESPONSE_CONFIDENCE]
+        )
 
 
 # ══════════════════════════════════════════════════════════════════════

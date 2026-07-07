@@ -2,6 +2,7 @@ from pydantic import BaseModel, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from src.schemas.constants import (
+    AUDIT_DB_PATH,
     CHROMA_DEFAULT_PERSIST_DIR,
     LLM_DEFAULT_TEMPERATURE,
     LLM_PROVIDER_OLLAMA,
@@ -59,6 +60,9 @@ class Settings(BaseSettings):
 
     # Chroma
     chroma_persist_directory: str = CHROMA_DEFAULT_PERSIST_DIR
+
+    # Audit
+    audit_db_path: str = AUDIT_DB_PATH
 
     @model_validator(mode="after")
     def _check_openai_key(self):

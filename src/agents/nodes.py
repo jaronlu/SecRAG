@@ -84,6 +84,12 @@ def _build_llm():
 llm = _build_llm()
 
 
+def _get_audit_store():
+    from src.utils.audit import SQLiteAuditStore
+
+    return SQLiteAuditStore(config.audit_db_path)
+
+
 # ══════════════════════════════════════════════════════════════════════
 # 共享规则关键词（verify 与 compliance_check 共用，避免重复定义漂移）
 # ══════════════════════════════════════════════════════════════════════
@@ -99,6 +105,7 @@ _ADVICE_KEYWORDS: tuple[str, ...] = (
     "减" + "持",
 )
 _SENSITIVE_KEYWORDS: tuple[str, ...] = ("内" + "幕" + "信息", "未" + "公开", "业绩" + "预测")
+_ARTICLE_REFERENCE_PATTERN = r"第[一二三四五六七八九十百千]+条|第\d+条|Article\s+\d+"
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -352,11 +359,6 @@ def verify(state: AssistantState) -> AssistantState:
             if pat in answer:
                 issues.append(f"投顾/销售角色不得输出业务建议: {pat}")
 
-    # 规则 4：合规场景检查引用精度
-    if role == ROLE_COMPLIANCE:
-        if not re.search(r"第[一二三四五六七八九十百千]+条|第\d+条|Article\s+\d+", answer):
-            issues.append("合规引用必须精确到条款/条文号")
-
     return {
         **state,
         STATE_VERIFICATION: {
@@ -374,6 +376,8 @@ def verify(state: AssistantState) -> AssistantState:
 
 def compliance_check(state: AssistantState) -> AssistantState:
     """合规检查：敏感词、业务建议、风险提示、适当性"""
+    import re
+
     answer = state.get(STATE_FINAL_ANSWER, "")
     flags = []
 
@@ -387,9 +391,12 @@ def compliance_check(state: AssistantState) -> AssistantState:
         if pat in answer:
             flags.append(f"advice:{pat}")
 
+    role = state.get(STATE_USER_ROLE)
+    if role == ROLE_COMPLIANCE and not re.search(_ARTICLE_REFERENCE_PATTERN, answer):
+        flags.append("citation_precision:missing_article")
+
     # 客户适当性检查（投顾场景）
     suitability_warning = ""
-    role = state.get(STATE_USER_ROLE)
     if role == ROLE_ADVISOR and state.get(STATE_CLIENT_ID):
         high_risk_products = ["标的型" + "产品", "混合型" + "产品", "私" + "募" + "产品"]
         for prod in high_risk_products:
@@ -403,7 +410,9 @@ def compliance_check(state: AssistantState) -> AssistantState:
     # 风险提示（强制追加）
     risk_disclosure = "\n\n【风险提示】本回答仅供参考，不构成业务建议。市场有风险，业务需谨慎。"
 
-    passed = len([f for f in flags if f.startswith("sensitive:")]) == 0
+    passed = not any(
+        flag.startswith("sensitive:") or flag.startswith("citation_precision:") for flag in flags
+    )
 
     return {
         **state,
@@ -471,9 +480,7 @@ def audit_log(state: AssistantState) -> AssistantState:
     from src.utils.audit import AuditLogger
 
     audit_entry = AuditLogger().log(state)
-
-    # TODO: 写入追踪数据库
-    # audit_db.insert(asdict(audit_entry))
+    _get_audit_store().insert(audit_entry)
 
     return {
         **state,
