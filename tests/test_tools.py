@@ -5,10 +5,10 @@ import sqlite3
 from pathlib import Path
 
 from src.tools.calculator import calculator, safe_eval
-from src.tools.financial_ratios import financial_ratios_tool
-from src.tools.market_data import market_data_tool
+from src.tools.financial_ratios import financial_ratios_tool, query_financial_ratios
+from src.tools.market_data import market_data_tool, query_market_data
 from src.tools.rerank import RerankService, rerank_tool
-from src.tools.sql_query import normalize_select_sql, sql_query_tool
+from src.tools.sql_query import normalize_select_sql, run_select_query, sql_query_tool
 from src.tools.suitability import suitability_check
 from src.utils.tracing import Tracer
 
@@ -32,9 +32,10 @@ def test_calculator_rejects_invalid_expression():
 
 def test_suitability_check_returns_match_result():
     payload = json.loads(
-        suitability_check.invoke(
-            {"client_id": "client_balanced", "product_id": "product_bond_fund"}
-        )
+        suitability_check.invoke({
+            "client_id": "client_balanced",
+            "product_id": "product_bond_fund",
+        })
     )
     assert payload["matched"] is True
     assert payload["client_risk_level"] == "R3"
@@ -42,9 +43,10 @@ def test_suitability_check_returns_match_result():
 
 def test_suitability_check_handles_missing_master_data():
     payload = json.loads(
-        suitability_check.invoke(
-            {"client_id": "unknown_client", "product_id": "product_private_fund"}
-        )
+        suitability_check.invoke({
+            "client_id": "unknown_client",
+            "product_id": "product_private_fund",
+        })
     )
     assert payload["matched"] is False
     assert "主数据" in payload["reason"]
@@ -72,40 +74,63 @@ def _create_financial_db(db_path: Path) -> None:
 
 
 def test_normalize_select_sql_adds_limit():
-    assert normalize_select_sql("SELECT * FROM financial_ratios") == "SELECT * FROM financial_ratios LIMIT 100"
+    assert (
+        normalize_select_sql("SELECT * FROM financial_ratios")
+        == "SELECT * FROM financial_ratios LIMIT 100"
+    )
 
 
 def test_normalize_select_sql_rejects_non_select():
     assert normalize_select_sql("DELETE FROM financial_ratios") is None
 
 
-def test_sql_query_tool_returns_rows(tmp_path):
+def test_normalize_select_sql_rejects_unknown_table():
+    assert normalize_select_sql("SELECT * FROM users") is None
+
+
+def test_normalize_select_sql_rejects_unknown_column():
+    assert normalize_select_sql("SELECT password FROM financial_ratios") is None
+
+
+def test_run_select_query_returns_rows(tmp_path):
     db_path = tmp_path / "financial.db"
     _create_financial_db(db_path)
 
-    payload = json.loads(
-        sql_query_tool.invoke(
-            {"query": "SELECT stock_code, year FROM financial_ratios", "db_path": str(db_path)}
-        )
+    rows = run_select_query(
+        query="SELECT stock_code, year FROM financial_ratios",
+        db_path=db_path,
     )
-    assert payload[0]["stock_code"] == "600519"
+    assert rows[0]["stock_code"] == "600519"
+
+
+def test_sql_query_tool_does_not_expose_db_path():
+    assert "db_path" not in sql_query_tool.args
 
 
 def test_sql_query_tool_rejects_dangerous_sql(tmp_path):
     db_path = tmp_path / "financial.db"
     _create_financial_db(db_path)
 
-    result = sql_query_tool.invoke(
-        {"query": "SELECT * FROM financial_ratios; DROP TABLE financial_ratios", "db_path": str(db_path)}
+    result = run_select_query(
+        query="SELECT * FROM financial_ratios",
+        db_path=db_path,
     )
+    assert result
+
+    unsafe = normalize_select_sql("SELECT * FROM financial_ratios; DROP TABLE financial_ratios")
+    assert unsafe is None
+
+    result = sql_query_tool.invoke({"query": "SELECT * FROM financial_ratios; DROP TABLE x"})
     assert "查询错误" in result
 
 
 def test_financial_ratios_tool_returns_phase2_skeleton():
     payload = json.loads(
-        financial_ratios_tool.invoke(
-            {"stock_code": "600519", "year": 2024, "report_type": "annual"}
-        )
+        financial_ratios_tool.invoke({
+            "stock_code": "600519",
+            "year": 2024,
+            "report_type": "annual",
+        })
     )
     assert payload["stock_code"] == "600519"
     assert payload["year"] == 2024
@@ -119,16 +144,15 @@ def test_financial_ratios_tool_returns_rows(tmp_path):
     _create_financial_db(db_path)
 
     payload = json.loads(
-        financial_ratios_tool.invoke(
-            {
-                "stock_code": "600519",
-                "year": 2024,
-                "report_type": "annual",
-                "db_path": str(db_path),
-            }
+        query_financial_ratios(
+            stock_code="600519",
+            year=2024,
+            report_type="annual",
+            db_path=str(db_path),
         )
     )
     assert payload[0]["pe"] == "28.5000"
+    assert "db_path" not in financial_ratios_tool.args
 
 
 def test_market_data_tool_reads_local_history(tmp_path):
@@ -136,16 +160,15 @@ def test_market_data_tool_reads_local_history(tmp_path):
     _create_financial_db(db_path)
 
     payload = json.loads(
-        market_data_tool.invoke(
-            {
-                "stock_code": "sh.600519",
-                "start_date": "2024-01-01",
-                "end_date": "2024-01-31",
-                "db_path": str(db_path),
-            }
+        query_market_data(
+            stock_code="sh.600519",
+            start_date="2024-01-01",
+            end_date="2024-01-31",
+            db_path=str(db_path),
         )
     )
     assert payload[0]["close"] == "1680.00"
+    assert "db_path" not in market_data_tool.args
 
 
 class FakeRerankModel:

@@ -43,10 +43,11 @@ class AssistantState(TypedDict):
     # 检索结果 — STATE_RETRIEVAL_RESULTS（reducer: concatenate）
     retrieval_results: Annotated[list[RetrievalResult], "concatenate"]
 
-    # 推理过程 — STATE_MESSAGES / STATE_TOOL_CALLS / STATE_INTERMEDIATE_STEPS
+    # 推理过程 — STATE_MESSAGES / STATE_TOOL_CALLS / STATE_INTERMEDIATE_STEPS / STATE_REASON_ATTEMPTS
     messages: Annotated[Sequence[BaseMessage], add_messages]
     tool_calls: list[ToolCallDict]
     intermediate_steps: list[IntermediateStep]
+    reason_attempts: int
 
     # 验证结果 — STATE_VERIFICATION
     verification: VerificationResult

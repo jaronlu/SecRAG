@@ -46,11 +46,12 @@ def _local_market_data(
             return run_select_query(
                 query=(
                     f"SELECT {columns} FROM {table} "
-                    f"WHERE code = '{stock_code}' "
-                    f"AND date >= '{start_date}' AND date <= '{end_date}' "
+                    "WHERE code = ? "
+                    "AND date >= ? AND date <= ? "
                     "ORDER BY date DESC"
                 ),
                 db_path=db_path,
+                params=(stock_code, start_date, end_date),
             )
         except (ValueError, sqlite3.Error):
             continue
@@ -98,9 +99,19 @@ def market_data_tool(
     start_date: str = "",
     end_date: str = "",
     fields: str = DEFAULT_MARKET_FIELDS,
-    db_path: str = str(DEFAULT_DB_PATH),
 ) -> str:
     """Get A-share market data from local tables, falling back to BaoStock when available."""
+    return query_market_data(stock_code, start_date=start_date, end_date=end_date, fields=fields)
+
+
+def query_market_data(
+    stock_code: str,
+    start_date: str = "",
+    end_date: str = "",
+    fields: str = DEFAULT_MARKET_FIELDS,
+    db_path: str = str(DEFAULT_DB_PATH),
+) -> str:
+    """Get A-share market data; db_path is internal for tests and offline fixtures."""
     try:
         start, end = _default_dates(start_date, end_date)
         rows = _local_market_data(stock_code, start, end, fields, db_path)

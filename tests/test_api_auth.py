@@ -14,6 +14,8 @@ from src.schemas.constants import (
     STATE_AUDIT_TRAIL,
     STATE_DATA_PERMISSIONS,
     STATE_DEPARTMENT,
+    STATE_REASON_ATTEMPTS,
+    STATE_RETRIEVAL_ATTEMPTS,
     STATE_USER_ID,
     STATE_USER_ROLE,
 )
@@ -53,9 +55,12 @@ def test_build_initial_state_uses_authenticated_user():
     assert state[STATE_USER_ROLE] == ROLE_TECHNICAL
     assert state[STATE_DEPARTMENT] == "tech"
     assert state[STATE_DATA_PERMISSIONS]
-    assert state[STATE_AUDIT_TRAIL][AUDIT_REQUEST_ID]
-    assert state[STATE_AUDIT_TRAIL][AUDIT_TIMESTAMP]
-    assert state[STATE_AUDIT_TRAIL][AUDIT_STARTED_PERF_COUNTER] > 0
+    audit_trail = state[STATE_AUDIT_TRAIL]
+    assert audit_trail.get(AUDIT_REQUEST_ID)
+    assert audit_trail.get(AUDIT_TIMESTAMP)
+    assert audit_trail.get(AUDIT_STARTED_PERF_COUNTER, 0) > 0
+    assert state[STATE_RETRIEVAL_ATTEMPTS] == 0
+    assert state[STATE_REASON_ATTEMPTS] == 0
     assert SOURCE_FAQ in ROLE_ALLOWED_SOURCES[state[STATE_USER_ROLE]]
     assert SOURCE_REPORT not in ROLE_ALLOWED_SOURCES[state[STATE_USER_ROLE]]
 

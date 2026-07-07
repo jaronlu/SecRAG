@@ -32,29 +32,42 @@ def financial_ratios_tool(
     stock_code: str,
     year: int | None = None,
     report_type: str | None = None,
-    db_path: str = str(DEFAULT_DB_PATH),
 ) -> str:
     """Query PE/PB/ROE and other financial ratios from the financial_ratios table."""
+    return query_financial_ratios(stock_code, year=year, report_type=report_type)
+
+
+def query_financial_ratios(
+    stock_code: str,
+    year: int | None = None,
+    report_type: str | None = None,
+    db_path: str = str(DEFAULT_DB_PATH),
+) -> str:
+    """Query PE/PB/ROE and other financial ratios from an allowlisted local table."""
     if not _STOCK_CODE_PATTERN.fullmatch(stock_code):
         return "财务指标查询错误: 标的代码格式不合法"
     if report_type and not _REPORT_TYPE_PATTERN.fullmatch(report_type):
         return "财务指标查询错误: 报告类型格式不合法"
 
-    filters = [f"stock_code = '{stock_code}'"]
+    filters = ["stock_code = ?"]
+    params: list[str | int] = [stock_code]
     if year is not None:
-        filters.append(f"year = {year}")
+        filters.append("year = ?")
+        params.append(year)
     if report_type:
-        filters.append(f"report_type = '{report_type}'")
+        filters.append("report_type = ?")
+        params.append(report_type)
 
     query = f"SELECT * FROM financial_ratios WHERE {' AND '.join(filters)} ORDER BY year DESC"
 
     try:
-        rows = run_select_query(query=query, db_path=db_path)
+        rows = run_select_query(query=query, db_path=db_path, params=tuple(params))
         if rows:
             return json.dumps(rows, ensure_ascii=False)
         return _missing_payload(stock_code, year, report_type)
     except sqlite3.OperationalError as exc:
-        if "no such table" in str(exc):
+        message = str(exc)
+        if "no such table" in message or "unable to open database file" in message:
             return _missing_payload(stock_code, year, report_type)
         return f"财务指标查询错误: {exc}"
     except ValueError as exc:

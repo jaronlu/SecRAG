@@ -73,6 +73,7 @@ from src.schemas.constants import (
     STATE_FINAL_ANSWER,
     STATE_MESSAGES,
     STATE_ORIGINAL_QUERY,
+    STATE_REASON_ATTEMPTS,
     STATE_RETRIEVAL_ATTEMPTS,
     STATE_RETRIEVAL_PLAN,
     STATE_RETRIEVAL_RESULTS,
@@ -166,8 +167,9 @@ class TestVerify:
             STATE_RETRIEVAL_RESULTS: [],
         })
         result = verify(state)
-        assert result[STATE_VERIFICATION]["passed"] is False
-        assert any("数字" in i for i in result[STATE_VERIFICATION]["issues"])
+        verification = result[STATE_VERIFICATION]
+        assert verification.get("passed") is False
+        assert any("数字" in i for i in verification.get("issues", []))
 
     def test_numbers_with_results_passes(self):
         state = _state(**{
@@ -175,7 +177,17 @@ class TestVerify:
             STATE_RETRIEVAL_RESULTS: [_result("净利润 747 亿元")],
         })
         result = verify(state)
-        assert result[STATE_VERIFICATION]["passed"] is True
+        assert result[STATE_VERIFICATION].get("passed") is True
+
+    def test_numbers_not_in_results_fails(self):
+        state = _state(**{
+            STATE_FINAL_ANSWER: "净利润 888 亿元",
+            STATE_RETRIEVAL_RESULTS: [_result("净利润 747 亿元")],
+        })
+        result = verify(state)
+        verification = result[STATE_VERIFICATION]
+        assert verification.get("passed") is False
+        assert any("888" in issue for issue in verification.get("issues", []))
 
     def test_permission_denied(self):
         state = _state(**{
@@ -189,7 +201,7 @@ class TestVerify:
             ],
         })
         result = verify(state)
-        assert any("权限不足" in i for i in result[STATE_VERIFICATION]["issues"])
+        assert any("权限不足" in i for i in result[STATE_VERIFICATION].get("issues", []))
 
     def test_investment_advice_blocked_for_advisor(self):
         state = _state(**{
@@ -198,7 +210,7 @@ class TestVerify:
             STATE_RETRIEVAL_RESULTS: [_result(ADVICE_BUY)],
         })
         result = verify(state)
-        assert any("业务建议" in i for i in result[STATE_VERIFICATION]["issues"])
+        assert any("业务建议" in i for i in result[STATE_VERIFICATION].get("issues", []))
 
     def test_investment_advice_blocked_for_sales(self):
         state = _state(**{
@@ -207,7 +219,7 @@ class TestVerify:
             STATE_RETRIEVAL_RESULTS: [_result("卖" + "出建议")],
         })
         result = verify(state)
-        assert any("业务建议" in i for i in result[STATE_VERIFICATION]["issues"])
+        assert any("业务建议" in i for i in result[STATE_VERIFICATION].get("issues", []))
 
     def test_no_advice_check_for_compliance(self):
         """合规角色不触发业务建议检查"""
@@ -217,7 +229,7 @@ class TestVerify:
             STATE_RETRIEVAL_RESULTS: [_result("数据")],
         })
         result = verify(state)
-        advice_issues = [i for i in result[STATE_VERIFICATION]["issues"] if "业务建议" in i]
+        advice_issues = [i for i in result[STATE_VERIFICATION].get("issues", []) if "业务建议" in i]
         assert len(advice_issues) == 0
 
     def test_compliance_requires_article_number(self):
@@ -227,8 +239,9 @@ class TestVerify:
             STATE_RETRIEVAL_RESULTS: [_result("法规内容")],
         })
         result = compliance_check(state)
-        assert result[STATE_COMPLIANCE]["passed"] is False
-        assert "citation_precision:missing_article" in result[STATE_COMPLIANCE]["flags"]
+        compliance = result[STATE_COMPLIANCE]
+        assert compliance.get("passed") is False
+        assert "citation_precision:missing_article" in compliance.get("flags", [])
 
     def test_compliance_with_article_number_passes(self):
         state = _state(**{
@@ -237,7 +250,7 @@ class TestVerify:
             STATE_RETRIEVAL_RESULTS: [_result("法规内容")],
         })
         result = compliance_check(state)
-        assert result[STATE_COMPLIANCE]["passed"] is True
+        assert result[STATE_COMPLIANCE].get("passed") is True
 
     def test_confidence_low_on_issues(self):
         state = _state(**{
@@ -245,7 +258,7 @@ class TestVerify:
             STATE_RETRIEVAL_RESULTS: [],
         })
         result = verify(state)
-        assert result[STATE_VERIFICATION]["confidence"] == CONFIDENCE_LOW
+        assert result[STATE_VERIFICATION].get("confidence") == CONFIDENCE_LOW
 
     def test_confidence_high_on_clean(self):
         state = _state(**{
@@ -253,7 +266,7 @@ class TestVerify:
             STATE_RETRIEVAL_RESULTS: [_result("正常内容")],
         })
         result = verify(state)
-        assert result[STATE_VERIFICATION]["confidence"] == CONFIDENCE_HIGH
+        assert result[STATE_VERIFICATION].get("confidence") == CONFIDENCE_HIGH
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -265,23 +278,24 @@ class TestComplianceCheck:
     def test_sensitive_keyword_blocked(self):
         state = _state(**{STATE_FINAL_ANSWER: f"这是{SENSITIVE_FIXTURE_TEXT}"})
         result = compliance_check(state)
-        assert result[STATE_COMPLIANCE]["passed"] is False
-        assert any("sensitive" in f for f in result[STATE_COMPLIANCE]["flags"])
+        compliance = result[STATE_COMPLIANCE]
+        assert compliance.get("passed") is False
+        assert any("sensitive" in f for f in compliance.get("flags", []))
 
     def test_investment_advice_flagged(self):
         state = _state(**{STATE_FINAL_ANSWER: f"{ADVICE_BUY}这只标的"})
         result = compliance_check(state)
-        assert any("advice" in f for f in result[STATE_COMPLIANCE]["flags"])
+        assert any("advice" in f for f in result[STATE_COMPLIANCE].get("flags", []))
 
     def test_risk_disclosure_appended(self):
         state = _state(**{STATE_FINAL_ANSWER: "正常回答"})
         result = compliance_check(state)
-        assert "风险提示" in result[STATE_COMPLIANCE]["risk_disclosure"]
+        assert "风险提示" in result[STATE_COMPLIANCE].get("risk_disclosure", "")
 
     def test_clean_answer_passes(self):
         state = _state(**{STATE_FINAL_ANSWER: "该产品风险等级为R3，适合稳健型及以上业务者"})
         result = compliance_check(state)
-        assert result[STATE_COMPLIANCE]["passed"] is True
+        assert result[STATE_COMPLIANCE].get("passed") is True
 
     def test_suitability_warning_for_advisor_with_high_risk(self):
         state = _state(**{
@@ -290,7 +304,7 @@ class TestComplianceCheck:
             STATE_FINAL_ANSWER: f"该{HIGH_RISK_PRODUCT}预期收益较高",
         })
         result = compliance_check(state)
-        assert "适当性" in result[STATE_COMPLIANCE]["suitability_warning"]
+        assert "适当性" in result[STATE_COMPLIANCE].get("suitability_warning", "")
 
     def test_no_suitability_without_client_id(self):
         # _state 默认无 STATE_CLIENT_ID，state.get() 返回 None
@@ -299,7 +313,7 @@ class TestComplianceCheck:
             STATE_FINAL_ANSWER: f"该{HIGH_RISK_PRODUCT}预期收益较高",
         })
         result = compliance_check(state)
-        assert result[STATE_COMPLIANCE]["suitability_warning"] == ""
+        assert result[STATE_COMPLIANCE].get("suitability_warning") == ""
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -426,6 +440,7 @@ class TestRoleAwareTools:
         assert SOURCE_FAQ in captured["tool_names"]
         assert SOURCE_REPORT not in captured["tool_names"]
         assert result[STATE_FINAL_ANSWER] == "ok"
+        assert result[STATE_REASON_ATTEMPTS] == 1
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -450,8 +465,9 @@ class TestCompose:
         })
         result = compose(state)
         assert len(result[STATE_CITATIONS]) == 1
-        assert result[STATE_CITATIONS][0]["doc_title"] == "2024年报"
-        assert result[STATE_CITATIONS][0]["source"] == "report.pdf"
+        citation = result[STATE_CITATIONS][0]
+        assert citation.get("doc_title") == "2024年报"
+        assert citation.get("source") == "report.pdf"
 
     def test_risk_disclosure_in_answer(self):
         state = _state(**{
@@ -512,8 +528,8 @@ class TestAuditLog:
         entry = result[STATE_AUDIT_TRAIL]
         assert AUDIT_REQUEST_ID in entry
         assert AUDIT_TIMESTAMP in entry
-        assert entry[AUDIT_QUERY][AUDIT_QUERY_ORIGINAL] == ""
-        assert entry[AUDIT_RETRIEVAL][AUDIT_RETRIEVAL_TOTAL_CHUNKS] == 1
+        assert entry.get(AUDIT_QUERY, {}).get(AUDIT_QUERY_ORIGINAL) == ""
+        assert entry.get(AUDIT_RETRIEVAL, {}).get(AUDIT_RETRIEVAL_TOTAL_CHUNKS) == 1
 
     def test_audit_includes_all_sections(self):
         state = _state()
@@ -539,7 +555,8 @@ class TestAuditLog:
         })
         result = audit_log(state)
 
-        assert result[STATE_AUDIT_TRAIL][AUDIT_RETRIEVAL][AUDIT_RETRIEVAL_SOURCES] == [
+        audit_trail = result[STATE_AUDIT_TRAIL]
+        assert audit_trail.get(AUDIT_RETRIEVAL, {}).get(AUDIT_RETRIEVAL_SOURCES) == [
             "faq.html",
             "product.html",
         ]
@@ -556,10 +573,11 @@ class TestAuditLog:
 
         result = audit_log(state)
 
-        assert result[STATE_AUDIT_TRAIL][AUDIT_REQUEST_ID] == "request-123"
-        assert result[STATE_AUDIT_TRAIL][AUDIT_TIMESTAMP] == timestamp
-        assert AUDIT_STARTED_PERF_COUNTER not in result[STATE_AUDIT_TRAIL]
-        assert result[STATE_AUDIT_TRAIL][AUDIT_REASONING][AUDIT_REASONING_DURATION_MS] > 0
+        audit_trail = result[STATE_AUDIT_TRAIL]
+        assert audit_trail.get(AUDIT_REQUEST_ID) == "request-123"
+        assert audit_trail.get(AUDIT_TIMESTAMP) == timestamp
+        assert AUDIT_STARTED_PERF_COUNTER not in audit_trail
+        assert audit_trail.get(AUDIT_REASONING, {}).get(AUDIT_REASONING_DURATION_MS, 0) > 0
 
     def test_persists_audit_entry_for_lookup(self):
         timestamp = datetime.now(timezone.utc).isoformat()
@@ -576,12 +594,12 @@ class TestAuditLog:
 
         persisted = self.audit_store.get_by_request_id("request-lookup")
         assert persisted is not None
-        assert persisted[AUDIT_REQUEST_ID] == "request-lookup"
-        assert persisted[AUDIT_TIMESTAMP] == timestamp
-        assert (
-            persisted[AUDIT_RESPONSE][AUDIT_RESPONSE_CONFIDENCE]
-            == result[STATE_AUDIT_TRAIL][AUDIT_RESPONSE][AUDIT_RESPONSE_CONFIDENCE]
-        )
+        assert persisted.get(AUDIT_REQUEST_ID) == "request-lookup"
+        assert persisted.get(AUDIT_TIMESTAMP) == timestamp
+        audit_trail = result[STATE_AUDIT_TRAIL]
+        assert persisted.get(AUDIT_RESPONSE, {}).get(AUDIT_RESPONSE_CONFIDENCE) == audit_trail.get(
+            AUDIT_RESPONSE, {}
+        ).get(AUDIT_RESPONSE_CONFIDENCE)
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -604,11 +622,15 @@ class TestShouldRetryRetrieval:
 
 class TestShouldReasonAgain:
     def test_not_passed(self):
-        state = _state(**{STATE_VERIFICATION: {"passed": False}})
+        state = _state(**{STATE_VERIFICATION: {"passed": False}, STATE_REASON_ATTEMPTS: 1})
         assert should_reason_again(state) == "retry"
 
     def test_passed(self):
         state = _state(**{STATE_VERIFICATION: {"passed": True}})
+        assert should_reason_again(state) == "continue"
+
+    def test_not_passed_stops_after_max_reason_attempts(self):
+        state = _state(**{STATE_VERIFICATION: {"passed": False}, STATE_REASON_ATTEMPTS: 2})
         assert should_reason_again(state) == "continue"
 
 

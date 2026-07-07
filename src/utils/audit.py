@@ -1,6 +1,6 @@
 """审计日志模型与记录器
 
-⚡ 字段统一：AuditEntry 模型以 SCHEMA-REFERENCE §3.3 为权威，
+⚡ 字段统一：AuditEntry 模型以 SCHEMA-REFERENCE §3.5 为权威，
 本文件对应设计 impl-06 §6.1 中的 src/utils/audit.py。
 """
 
@@ -57,7 +57,7 @@ from src.schemas.typed_dicts import (
 
 @dataclass
 class AuditEntry:
-    """审计日志条目 — 权威定义，字段对应 SCHEMA-REFERENCE §3.3"""
+    """审计日志条目 — 权威定义，字段对应 SCHEMA-REFERENCE §3.5"""
 
     request_id: str
     timestamp: str

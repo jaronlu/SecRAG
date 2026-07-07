@@ -52,6 +52,7 @@ from src.schemas.constants import (
     STATE_MESSAGES,
     STATE_ORIGINAL_QUERY,
     STATE_QUERY_TYPE,
+    STATE_REASON_ATTEMPTS,
     STATE_RETRIEVAL_ATTEMPTS,
     STATE_RETRIEVAL_PLAN,
     STATE_RETRIEVAL_RESULTS,
@@ -300,9 +301,11 @@ def reason(state: AssistantState) -> AssistantState:
     from src.agents.tools import get_tools_for_role
 
     results = state.get(STATE_RETRIEVAL_RESULTS, [])
+    reason_attempts = state.get(STATE_REASON_ATTEMPTS, 0) + 1
     if not results:
         return _with_state_updates(state, {
             STATE_FINAL_ANSWER: "未检索到足够相关的资料，无法基于当前知识库回答该问题。",
+            STATE_REASON_ATTEMPTS: reason_attempts,
         })
 
     # 构建 context
@@ -346,6 +349,7 @@ def reason(state: AssistantState) -> AssistantState:
     return _with_state_updates(state, {
         STATE_MESSAGES: state.get(STATE_MESSAGES, []) + response[STATE_MESSAGES],
         STATE_FINAL_ANSWER: final_content,
+        STATE_REASON_ATTEMPTS: reason_attempts,
     })
 
 
@@ -362,10 +366,15 @@ def verify(state: AssistantState) -> AssistantState:
     results = state.get(STATE_RETRIEVAL_RESULTS, [])
     issues = []
 
-    # 规则 1：检查是否有数字但无来源
+    # 规则 1：检查答案数字是否能在检索内容中找到直接支撑。
     numbers = re.findall(r"\d+\.?\d*%?", answer)
     if numbers and not results:
         issues.append("答案包含数字但无检索结果支撑")
+    elif numbers:
+        all_content = "\n".join(result.get(RR_CONTENT, "") for result in results)
+        for number in numbers:
+            if number not in all_content:
+                issues.append(f"数字 {number} 在检索结果中未找到")
 
     # 规则 2：检查来源是否在权限范围内
     for r in results:

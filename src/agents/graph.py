@@ -16,8 +16,10 @@ from src.agents.nodes import (
 from src.agents.state import AssistantState
 from src.schemas.constants import (
     DEFAULT_MAX_HOPS,
+    MAX_REASON_ATTEMPTS,
     RR_SCORE,
     STATE_COMPLIANCE,
+    STATE_REASON_ATTEMPTS,
     STATE_RETRIEVAL_ATTEMPTS,
     STATE_RETRIEVAL_RESULTS,
     STATE_VERIFICATION,
@@ -44,9 +46,10 @@ def should_retry_retrieval(state: AssistantState) -> str:
 
 
 def should_reason_again(state: AssistantState) -> str:
-    """判断验证是否通过"""
+    """判断验证是否通过；失败重推受 MAX_REASON_ATTEMPTS 显式限制。"""
     verification = state.get(STATE_VERIFICATION, {})
-    if not verification.get("passed", False):
+    attempts = state.get(STATE_REASON_ATTEMPTS, 0)
+    if not verification.get("passed", False) and attempts < MAX_REASON_ATTEMPTS:
         return "retry"
     return "continue"
 

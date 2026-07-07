@@ -58,7 +58,7 @@ PLAN_DENIED: Final = "denied"
 PLAN_REASON: Final = "reason"
 
 # ══════════════════════════════════════════════════════════════════════
-# AssistantState 字段键名  (SCHEMA-REFERENCE §3.4)
+# AssistantState 字段键名  (SCHEMA-REFERENCE §3.7)
 # ══════════════════════════════════════════════════════════════════════
 
 STATE_USER_ID: Final = "user_id"
@@ -73,6 +73,7 @@ STATE_ENTITIES: Final = "entities"
 STATE_AMBIGUITY: Final = "ambiguity"
 STATE_QUERY_TYPE: Final = "query_type"
 STATE_RETRIEVAL_ATTEMPTS: Final = "retrieval_attempts"
+STATE_REASON_ATTEMPTS: Final = "reason_attempts"
 STATE_RETRIEVAL_PLAN: Final = "retrieval_plan"
 STATE_RETRIEVAL_RESULTS: Final = "retrieval_results"
 STATE_MESSAGES: Final = "messages"
@@ -86,7 +87,7 @@ STATE_CONFIDENCE: Final = "confidence"
 STATE_RISK_DISCLOSURE: Final = "risk_disclosure"
 STATE_AUDIT_TRAIL: Final = "audit_trail"
 
-# audit_trail 字段键名（SCHEMA-REFERENCE §3.3）
+# audit_trail 字段键名（SCHEMA-REFERENCE §3.5）
 AUDIT_REQUEST_ID: Final = "request_id"
 AUDIT_TIMESTAMP: Final = "timestamp"
 AUDIT_STARTED_PERF_COUNTER: Final = "_started_perf_counter"
@@ -243,6 +244,7 @@ ROLE_DATA_PERMISSIONS: dict[str, list[str]] = {
 
 DEFAULT_TOP_K = 5
 DEFAULT_MAX_HOPS = 3
+MAX_REASON_ATTEMPTS = 2
 GRADE_TOP_K = 10
 
 CONFIDENCE_HIGH_THRESHOLD = 0.75
