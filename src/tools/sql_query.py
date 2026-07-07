@@ -8,7 +8,9 @@ from pathlib import Path
 
 from langchain_core.tools import tool
 
-DEFAULT_DB_PATH = Path("data/financial.db")
+from src.schemas.constants import FINANCIAL_DB_PATH
+
+DEFAULT_DB_PATH = Path(FINANCIAL_DB_PATH)
 MAX_SQL_ROWS = 100
 FORBIDDEN_KEYWORDS = (
     "DROP",

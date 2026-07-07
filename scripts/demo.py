@@ -24,6 +24,8 @@ import sys
 
 import httpx
 
+from src.schemas.constants import API_ROUTE_ASSISTANT_QA, API_ROUTE_QA
+
 _SEP = "=" * 70
 
 
@@ -57,7 +59,7 @@ def _print_assistant_response(data: dict) -> None:
 def demo_simple_qa(client: httpx.Client) -> None:
     """单轮 RAG：/v1/qa，不涉及角色权限，仅演示检索 + 生成 + 引用。"""
     _print_section("1. /v1/qa —— 单轮 RAG（理财产品风险等级咨询）")
-    resp = client.post("/v1/qa", json={
+    resp = client.post(API_ROUTE_QA, json={
         "query": "这款理财产品风险等级是多少？适合哪类客户？",
         "top_k": 5,
     })
@@ -69,7 +71,7 @@ def demo_agent_qa_allowed(client: httpx.Client) -> None:
     """完整 Agent：服务端从 demo token 派生角色。"""
     _print_section("2. /v1/assistant/qa —— demo-advisor token 查询产品风险")
     resp = client.post(
-        "/v1/assistant/qa",
+        API_ROUTE_ASSISTANT_QA,
         headers={"Authorization": "Bearer demo-advisor"},
         json={"query": "这款理财产品风险等级是多少？"},
     )
@@ -81,7 +83,7 @@ def demo_agent_qa_denied(client: httpx.Client) -> None:
     """完整 Agent：demo-tech token 只能走其服务端绑定范围。"""
     _print_section("3. /v1/assistant/qa —— demo-tech token 查询受限资料")
     resp = client.post(
-        "/v1/assistant/qa",
+        API_ROUTE_ASSISTANT_QA,
         headers={"Authorization": "Bearer demo-tech"},
         json={"query": "内部研究摘要里对新能源板块怎么看？"},
     )

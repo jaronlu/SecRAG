@@ -212,6 +212,10 @@ QueryType = Literal[
 CHROMA_COLLECTION_NAME = "securities_docs"
 CHROMA_DEFAULT_PERSIST_DIR = "./data/chroma"
 CHROMA_SPACE = "cosine"
+FINANCIAL_DB_PATH = "data/financial.db"
+SAMPLE_METADATA_FILENAME = "metadata.json"
+API_ROUTE_QA = "/v1/qa"
+API_ROUTE_ASSISTANT_QA = "/v1/assistant/qa"
 
 # ══════════════════════════════════════════════════════════════════════
 # 角色 → 可用的检索源映射  (SCHEMA-REFERENCE §5.1)

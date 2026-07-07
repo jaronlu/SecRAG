@@ -20,6 +20,8 @@ from src.rag.chain import build_rag_chain, format_docs
 from src.rag.formatter import estimate_confidence, format_citations
 from src.retrieval.vector_retriever import ChromaVectorRetriever
 from src.schemas.constants import (
+    API_ROUTE_ASSISTANT_QA,
+    API_ROUTE_QA,
     META_SOURCE,
     ROLE_ADVISOR,
     ROLE_COMPLIANCE,
@@ -411,7 +413,7 @@ async def ui():
       lastResultText = "";
 
       try {
-        const response = await fetch("/v1/assistant/qa", {
+        const response = await fetch("__ASSISTANT_QA_PATH__", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -461,7 +463,10 @@ async def ui():
     });
   </script>
 </body>
-</html>""".replace("__IDENTITY_OPTIONS__", _render_identity_options())
+</html>""".replace("__IDENTITY_OPTIONS__", _render_identity_options()).replace(
+        "__ASSISTANT_QA_PATH__",
+        API_ROUTE_ASSISTANT_QA,
+    )
 
 
 @app.get("/favicon.ico", include_in_schema=False)
@@ -484,7 +489,7 @@ retriever = ChromaVectorRetriever(persist_directory=config.chroma.persist_direct
 audit_logger = logging.getLogger("secrag.audit")
 
 
-@app.post("/v1/qa", response_model=QAResponse)
+@app.post(API_ROUTE_QA, response_model=QAResponse)
 async def qa(request: QARequest):
     request_id = str(uuid.uuid4())
 
@@ -555,7 +560,7 @@ def _is_provider_unavailable(exc: Exception) -> bool:
     return False
 
 
-@app.post("/v1/assistant/qa", response_model=AssistantQAResponse)
+@app.post(API_ROUTE_ASSISTANT_QA, response_model=AssistantQAResponse)
 async def assistant_qa(
     request: AssistantQARequest,
     user: AuthenticatedUser = Depends(authenticate_user),

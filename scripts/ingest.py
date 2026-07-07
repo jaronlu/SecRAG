@@ -21,6 +21,7 @@ from src.schemas.constants import (
     META_SOURCE,
     META_TITLE,
     PERMISSION_INTERNAL,
+    SAMPLE_METADATA_FILENAME,
 )
 
 SUPPORTED_SUFFIXES = {".pdf", ".docx", ".doc", ".html", ".htm", ".csv"}
@@ -40,7 +41,7 @@ def _sanitize_metadata(meta: dict) -> dict:
 
 def _load_sample_metadata(file_path: Path) -> dict:
     for parent in (file_path.parent, *file_path.parents):
-        manifest = parent / "metadata.json"
+        manifest = parent / SAMPLE_METADATA_FILENAME
         if not manifest.exists():
             continue
         metadata = json.loads(manifest.read_text(encoding="utf-8"))
