@@ -2,7 +2,11 @@ __pycache__/
 *.pyc
 .DS_Store
 .venv/
-/data/
+
+# 运行时生成的数据，不提交
+data/chroma/
+data/*.db
+data/.DS_Store
 
 # 环境变量（含 API Key）
 .env

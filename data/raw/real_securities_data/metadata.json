@@ -1,0 +1,134 @@
+{
+  "announcements/000001_2025.pdf": {
+    "doc_type": "announcement",
+    "retrieval_source": "report_search",
+    "permission_level": "internal",
+    "allowed_roles": [
+      "advisor",
+      "institutional_sales",
+      "compliance"
+    ],
+    "title": "平安银行2025年年度报告",
+    "date": "2026-03-21",
+    "stock_code": "000001",
+    "source": "http://static.cninfo.com.cn/finalpage/2026-03-21/1225022887.PDF",
+    "provider": "cninfo",
+    "sha256": "2273565ecbe1b32536631fd4a019a4f4a990f4c793cfd5b70eae90d44d3ff16c"
+  },
+  "announcements/300750_2025.pdf": {
+    "doc_type": "announcement",
+    "retrieval_source": "report_search",
+    "permission_level": "internal",
+    "allowed_roles": [
+      "advisor",
+      "institutional_sales",
+      "compliance"
+    ],
+    "title": "宁德时代2025年年度报告",
+    "date": "2026-03-10",
+    "stock_code": "300750",
+    "source": "http://static.cninfo.com.cn/finalpage/2026-03-10/1225002214.PDF",
+    "provider": "cninfo",
+    "sha256": "c15272977147dee7e6935a38ea0e4fd6855370aabb106f54cfe20f7cf6048ec9"
+  },
+  "reports/000001_2025_2026.pdf": {
+    "doc_type": "research_report",
+    "retrieval_source": "report_search",
+    "permission_level": "internal",
+    "allowed_roles": [
+      "advisor",
+      "institutional_sales",
+      "compliance"
+    ],
+    "title": "平安银行2025年报及2026一季报点评：收入利润增速均回正",
+    "date": "2026-04-26",
+    "stock_code": "000001",
+    "source": "https://pdf.dfcfw.com/pdf/H3_AP202604261821586763_1.pdf",
+    "provider": "akshare/eastmoney",
+    "institution": "国信证券",
+    "rating": "中性",
+    "sha256": "1ef15973ad913e500264d57f440ab68422ebc1d5c258b636e5165ff5e38885e4"
+  },
+  "reports/600519_2025_2026.pdf": {
+    "doc_type": "research_report",
+    "retrieval_source": "report_search",
+    "permission_level": "internal",
+    "allowed_roles": [
+      "advisor",
+      "institutional_sales",
+      "compliance"
+    ],
+    "title": "贵州茅台2025年年报及2026年一季报点评：顺势出清舒缓压力巩固优势稳健前行",
+    "date": "2026-05-25",
+    "stock_code": "600519",
+    "source": "https://pdf.dfcfw.com/pdf/H3_AP202605251822844635_1.pdf",
+    "provider": "akshare/eastmoney",
+    "institution": "诚通证券",
+    "rating": "买入",
+    "sha256": "a16088a541a7db8f30c1955546f8aed52c45d632ba772164b8695a41fb8c66f1"
+  },
+  "financials/research_reports_index.csv": {
+    "doc_type": "financial_data",
+    "retrieval_source": "sql_query",
+    "permission_level": "internal",
+    "allowed_roles": [
+      "advisor",
+      "institutional_sales",
+      "compliance"
+    ],
+    "title": "AKShare 东方财富研报索引样本",
+    "date": "2026-07-07",
+    "stock_code": "",
+    "source": "akshare.stock_research_report_em",
+    "provider": "akshare/eastmoney",
+    "sha256": "8b87456b637ecbca02c5f03efaec3e777683e7ef939e1cbb6412f58dc1d91381"
+  },
+  "financials/efinance_600519_base_info.csv": {
+    "doc_type": "financial_data",
+    "retrieval_source": "sql_query",
+    "permission_level": "internal",
+    "allowed_roles": [
+      "advisor",
+      "institutional_sales",
+      "compliance"
+    ],
+    "title": "贵州茅台 efinance 基础财务估值样本",
+    "date": "2026",
+    "stock_code": "600519",
+    "source": "efinance.stock.get_base_info",
+    "provider": "efinance/eastmoney",
+    "sha256": "2ddb8dd259e546b7ed4117b15f48f320a2d36ea3f3f213084a81abb850cdb4e7"
+  },
+  "financials/baostock_stock_basic.csv": {
+    "doc_type": "financial_data",
+    "retrieval_source": "sql_query",
+    "permission_level": "internal",
+    "allowed_roles": [
+      "advisor",
+      "institutional_sales",
+      "compliance"
+    ],
+    "title": "A 股股票基础信息样本",
+    "date": "2026",
+    "stock_code": "",
+    "source": "baostock.query_stock_basic",
+    "provider": "baostock",
+    "sha256": "88f502450e14a35724ed7aae1486902990082f1377795c5ca1d50a61969e5f53"
+  },
+  "financials/baostock_600519_valuation_202501.csv": {
+    "doc_type": "financial_data",
+    "retrieval_source": "sql_query",
+    "permission_level": "internal",
+    "allowed_roles": [
+      "advisor",
+      "institutional_sales",
+      "compliance"
+    ],
+    "title": "贵州茅台 2025 年 1 月估值行情样本",
+    "date": "2025",
+    "stock_code": "600519",
+    "source": "baostock.query_history_k_data_plus",
+    "provider": "baostock",
+    "sha256": "599babad843d023eda6df6bd506d080d4b9d736b19e328ec8427c3271b7ed75a"
+  }
+}

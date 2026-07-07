@@ -50,10 +50,10 @@ cp .env.example .env
 # 编辑 .env，至少填入 OPENAI_API_KEY（或切换 LLM_PROVIDER=ollama 使用本地模型）
 
 # 3. 入库示例数据
-uv run python scripts/ingest.py src/data/samples/product product
-uv run python scripts/ingest.py src/data/samples/regulation regulation
-uv run python scripts/ingest.py src/data/samples/faq faq
-uv run python scripts/ingest.py src/data/samples/report research_report
+uv run python scripts/ingest.py data/raw/demo_knowledge_base/samples/product product
+uv run python scripts/ingest.py data/raw/demo_knowledge_base/samples/regulation regulation
+uv run python scripts/ingest.py data/raw/demo_knowledge_base/samples/faq faq
+uv run python scripts/ingest.py data/raw/demo_knowledge_base/samples/report research_report
 
 # 4. 启动服务
 uv run uvicorn src.api.main:app --port 8000
@@ -108,6 +108,31 @@ mrr: 0.640
 precision@5: 0.240
 coverage: 1.000
 permission_block_accuracy: 1.000
+```
+
+### 真实证券数据
+
+仓库包含一组最小真实证券数据，用于验证财报、研报、CSV 的解析、切片和查询：
+
+- `data/raw/real_securities_data/announcements/`：巨潮资讯财报 PDF
+- `data/raw/real_securities_data/reports/`：AKShare/东方财富研报 PDF
+- `data/raw/real_securities_data/financials/`：研报索引、股票基础信息、估值行情 CSV
+- `data/raw/real_securities_data/metadata.json`：来源 URL、发布日期、股票代码、权限和 sha256
+
+重新拉取数据：
+
+```bash
+uv run --with akshare --with efinance --with baostock python scripts/fetch_real_securities_data.py
+```
+
+当前环境中 `efinance` 的东方财富历史行情接口可能出现远端断连；脚本会降级抓取 `efinance.stock.get_base_info`，并继续用 Baostock 生成结构化样本。
+
+入库测试：
+
+```bash
+uv run python scripts/ingest.py data/raw/real_securities_data/announcements announcement
+uv run python scripts/ingest.py data/raw/real_securities_data/reports research_report
+uv run python scripts/ingest.py data/raw/real_securities_data/financials financial_data
 ```
 
 ### 权限验收

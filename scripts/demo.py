@@ -2,10 +2,10 @@
 
 前置条件：
   1. 已完成入库：
-     uv run python scripts/ingest.py src/data/samples/product product
-     uv run python scripts/ingest.py src/data/samples/regulation regulation
-     uv run python scripts/ingest.py src/data/samples/faq faq
-     uv run python scripts/ingest.py src/data/samples/report research_report
+     uv run python scripts/ingest.py data/raw/demo_knowledge_base/samples/product product
+     uv run python scripts/ingest.py data/raw/demo_knowledge_base/samples/regulation regulation
+     uv run python scripts/ingest.py data/raw/demo_knowledge_base/samples/faq faq
+     uv run python scripts/ingest.py data/raw/demo_knowledge_base/samples/report research_report
   2. 已启动服务：
      uv run uvicorn src.api.main:app --port 8000
 

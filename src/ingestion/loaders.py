@@ -104,7 +104,8 @@ if __name__ == "__main__":
 
     # 加载示例财务 CSV 并打印，手动验证解析结果
     documents = load_financial_csv(
-        Path(__file__).parent.parent / "data/announcements/sample-financial.csv"
+        Path(__file__).parents[2]
+        / "data/raw/demo_knowledge_base/announcements/sample-financial.csv"
     )
     print(f"共加载 {len(documents)} 条财务数据：")
     # enumerate(documents, 1) 从 1 开始编号；ObjC 类比：for (int i = 0; i < [docs count]; i++)
