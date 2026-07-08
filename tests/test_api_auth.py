@@ -12,10 +12,16 @@ from src.schemas.constants import (
     SOURCE_FAQ,
     SOURCE_REPORT,
     STATE_AUDIT_TRAIL,
+    STATE_CHAT_HISTORY,
+    STATE_CONVERSATION_SUMMARY,
     STATE_DATA_PERMISSIONS,
     STATE_DEPARTMENT,
+    STATE_RESOLVED_QUERY,
     STATE_REASON_ATTEMPTS,
     STATE_RETRIEVAL_ATTEMPTS,
+    STATE_THREAD_ID,
+    STATE_TURN_ID,
+    STATE_TURN_INDEX,
     STATE_USER_ID,
     STATE_USER_ROLE,
 )
@@ -55,6 +61,12 @@ def test_build_initial_state_uses_authenticated_user():
     assert state[STATE_USER_ROLE] == ROLE_TECHNICAL
     assert state[STATE_DEPARTMENT] == "tech"
     assert state[STATE_DATA_PERMISSIONS]
+    assert state[STATE_THREAD_ID]
+    assert state[STATE_TURN_ID]
+    assert state[STATE_TURN_INDEX] == 0
+    assert state[STATE_CHAT_HISTORY] == []
+    assert state[STATE_CONVERSATION_SUMMARY] == ""
+    assert state[STATE_RESOLVED_QUERY] == ""
     audit_trail = state[STATE_AUDIT_TRAIL]
     assert audit_trail.get(AUDIT_REQUEST_ID)
     assert audit_trail.get(AUDIT_TIMESTAMP)

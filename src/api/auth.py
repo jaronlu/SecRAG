@@ -22,8 +22,10 @@ from src.schemas.constants import (
     STATE_AMBIGUITY,
     STATE_AUDIT_TRAIL,
     STATE_CITATIONS,
+    STATE_CHAT_HISTORY,
     STATE_CLIENT_ID,
     STATE_COMPLIANCE,
+    STATE_CONVERSATION_SUMMARY,
     STATE_CONFIDENCE,
     STATE_DATA_PERMISSIONS,
     STATE_DEPARTMENT,
@@ -34,13 +36,17 @@ from src.schemas.constants import (
     STATE_MESSAGES,
     STATE_ORIGINAL_QUERY,
     STATE_QUERY_TYPE,
+    STATE_RESOLVED_QUERY,
     STATE_REASON_ATTEMPTS,
     STATE_RETRIEVAL_PLAN,
     STATE_RETRIEVAL_ATTEMPTS,
     STATE_RETRIEVAL_RESULTS,
     STATE_REWRITTEN_QUERY,
     STATE_RISK_DISCLOSURE,
+    STATE_THREAD_ID,
     STATE_TOOL_CALLS,
+    STATE_TURN_ID,
+    STATE_TURN_INDEX,
     STATE_USER_ID,
     STATE_USER_ROLE,
     STATE_VERIFICATION,
@@ -92,8 +98,16 @@ def authenticate_user(
 def build_assistant_initial_state(
     request: AssistantQARequest,
     user: AuthenticatedUser,
+    *,
+    thread_id: str | None = None,
+    turn_id: str | None = None,
+    request_id: str | None = None,
+    turn_index: int = 0,
 ) -> AssistantState:
     data_permissions = ROLE_DATA_PERMISSIONS.get(user.role, ["public"])
+    effective_thread_id = thread_id or request.thread_id or str(uuid.uuid4())
+    effective_turn_id = turn_id or str(uuid.uuid4())
+    effective_request_id = request_id or str(uuid.uuid4())
 
     return cast(AssistantState, {
         STATE_USER_ID: user.user_id,
@@ -101,6 +115,12 @@ def build_assistant_initial_state(
         STATE_DEPARTMENT: user.department,
         STATE_DATA_PERMISSIONS: data_permissions,
         STATE_CLIENT_ID: request.client_id,
+        STATE_THREAD_ID: effective_thread_id,
+        STATE_TURN_ID: effective_turn_id,
+        STATE_TURN_INDEX: turn_index,
+        STATE_CHAT_HISTORY: [],
+        STATE_CONVERSATION_SUMMARY: "",
+        STATE_RESOLVED_QUERY: "",
         STATE_ORIGINAL_QUERY: request.query,
         STATE_REWRITTEN_QUERY: "",
         STATE_INTENT: "",
@@ -121,7 +141,7 @@ def build_assistant_initial_state(
         STATE_CONFIDENCE: "low",
         STATE_RISK_DISCLOSURE: "",
         STATE_AUDIT_TRAIL: {
-            AUDIT_REQUEST_ID: str(uuid.uuid4()),
+            AUDIT_REQUEST_ID: effective_request_id,
             AUDIT_TIMESTAMP: datetime.now(timezone.utc).isoformat(),
             AUDIT_STARTED_PERF_COUNTER: time.perf_counter(),
         },

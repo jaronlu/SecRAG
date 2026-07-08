@@ -28,6 +28,8 @@ from src.schemas.constants import (
     STATE_COMPLIANCE,
     STATE_CONFIDENCE,
     STATE_FINAL_ANSWER,
+    STATE_THREAD_ID,
+    STATE_TURN_ID,
 )
 from src.schemas.request_response import (
     AssistantQARequest,
@@ -149,7 +151,8 @@ async def assistant_qa(
     user: AuthenticatedUser = Depends(authenticate_user),
 ):
     thread_id = request.thread_id or str(uuid.uuid4())
-    initial_state = build_assistant_initial_state(request, user)
+    turn_id = str(uuid.uuid4())
+    initial_state = build_assistant_initial_state(request, user, thread_id=thread_id, turn_id=turn_id)
 
     app = _get_agent_app()
     config: RunnableConfig = {"configurable": {"thread_id": thread_id}, "recursion_limit": 20}
@@ -175,6 +178,8 @@ async def assistant_qa(
         raise HTTPException(status_code=500, detail="内部处理错误") from exc
 
     return AssistantQAResponse(
+        thread_id=result.get(STATE_THREAD_ID, thread_id),
+        turn_id=result.get(STATE_TURN_ID, turn_id),
         answer=result[STATE_FINAL_ANSWER],
         citations=result[STATE_CITATIONS],
         confidence=result[STATE_CONFIDENCE],

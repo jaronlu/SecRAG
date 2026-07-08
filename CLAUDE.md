@@ -17,6 +17,7 @@
 | 04-多跳检索 | `docs/design/implementation-04-multi-hop-retrieval.md` |
 | 05-业务工具 | `docs/design/implementation-05-financial-tools.md` |
 | 06-引用与验证 | `docs/design/implementation-06-citation-verification.md` |
+| 07-多轮会话与聊天持久化 | `docs/design/implementation-07-conversation-management.md` |
 
 ## 核心规则
 

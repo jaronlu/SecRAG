@@ -46,6 +46,8 @@ class AssistantQARequest(BaseModel):
 
 
 class AssistantQAResponse(BaseModel):
+    thread_id: str
+    turn_id: str
     answer: str
     citations: list[CitationDict]  # 序列化 Citation（SCHEMA-REFERENCE §3.1）
     confidence: str  # SCHEMA-REFERENCE §2.3

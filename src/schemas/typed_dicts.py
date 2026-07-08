@@ -98,6 +98,49 @@ class CitationDict(TypedDict, total=False):
     page_number: int | None
 
 
+class ConversationThreadDict(TypedDict, total=False):
+    """Conversation thread metadata."""
+
+    thread_id: str
+    user_id: str
+    user_role: str
+    client_id: str | None
+    title: str
+    status: str
+    turn_count: int
+    created_at: str
+    updated_at: str
+    deleted_at: str | None
+
+
+class ConversationMessageDict(TypedDict, total=False):
+    """User-visible conversation message."""
+
+    message_id: str
+    thread_id: str
+    turn_id: str
+    role: str
+    content: str
+    sequence: int
+    created_at: str
+    request_id: str | None
+    deleted_at: str | None
+
+
+class ConversationTurnDict(TypedDict, total=False):
+    """Structured QA turn summary."""
+
+    turn_id: str
+    thread_id: str
+    user_query: str
+    resolved_query: str
+    answer_summary: str
+    entities: QueryEntities
+    citations: list[CitationDict]
+    request_id: str
+    created_at: str
+
+
 class AuditQuery(TypedDict, total=False):
     original: str
     rewritten: str

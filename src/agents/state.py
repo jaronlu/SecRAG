@@ -7,6 +7,7 @@ from src.schemas.typed_dicts import (
     AuditTrail,
     CitationDict,
     ComplianceResult,
+    ConversationMessageDict,
     IntermediateStep,
     QueryEntities,
     RetrievalPlanStep,
@@ -27,6 +28,14 @@ class AssistantState(TypedDict):
     department: str
     data_permissions: list[str]  # 值域见 src.schemas.constants.ROLE_DATA_PERMISSIONS
     client_id: Optional[str]  # 投顾/销售场景关联客户
+    thread_id: str
+    turn_id: str
+    turn_index: int
+
+    # 会话上下文 — STATE_CHAT_HISTORY / STATE_CONVERSATION_SUMMARY / STATE_RESOLVED_QUERY
+    chat_history: list[ConversationMessageDict]
+    conversation_summary: str
+    resolved_query: str
 
     # 查询理解 — STATE_ORIGINAL_QUERY / STATE_REWRITTEN_QUERY / STATE_INTENT / STATE_ENTITIES / STATE_AMBIGUITY / STATE_QUERY_TYPE
     original_query: str
