@@ -18,6 +18,7 @@
 | 05-业务工具 | `docs/design/implementation-05-financial-tools.md` |
 | 06-引用与验证 | `docs/design/implementation-06-citation-verification.md` |
 | 07-多轮会话与聊天持久化 | `docs/design/implementation-07-conversation-management.md` |
+| 08-RAG 文档合并策略 | `docs/design/implementation-08-rag-document-combine.md` |
 
 ## 核心规则
 
