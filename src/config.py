@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _check_openai_key(self):
         if self.llm_provider == LLM_PROVIDER_OPENAI and not self.openai_api_key:
-            raise ValueError("OPENAI_API_KEY 未设置。请在 .env 文件中添加：OPENAI_API_KEY=你的密钥")
+            raise ValueError("OPENAI_API_KEY 未设置。请在 .env 文件中配置有效密钥")
         return self
 
     @property
