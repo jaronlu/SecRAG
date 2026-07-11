@@ -12,6 +12,7 @@ from src.schemas.constants import (
     DEFAULT_TOP_K,
     META_ALLOWED_ROLES,
     META_ERROR,
+    META_PERMISSION_LEVEL,
     META_SOURCE,
     PLAN_DENIED,
     PLAN_FILTERS,
@@ -19,6 +20,7 @@ from src.schemas.constants import (
     PLAN_REASON,
     PLAN_SOURCE,
     PLAN_TOP_K,
+    PERMISSION_PUBLIC,
     ROLE_ALLOWED_SOURCES,
     RR_METADATA,
     SOURCE_FAQ,
@@ -39,9 +41,10 @@ _SOURCE_RETRIEVER_FACTORIES: dict[str, Callable[[BaseRetriever], BaseRetriever]]
 class HybridRetriever:
     """执行 Planner 生成的检索计划，并在执行层再次做角色权限过滤。"""
 
-    def __init__(self, user_role: str):
+    def __init__(self, user_role: str, data_permissions: list[str] | None = None):
         self.user_role = user_role
-        self.allowed_sources = ROLE_ALLOWED_SOURCES.get(user_role, [SOURCE_FAQ])
+        self.allowed_sources = ROLE_ALLOWED_SOURCES.get(user_role, [])
+        self.data_permissions = set(data_permissions or [PERMISSION_PUBLIC])
         self._retriever_cache: dict[str, BaseRetriever] = {}
         self._vector_engine: Optional[ChromaVectorRetriever] = None
 
@@ -114,9 +117,27 @@ class HybridRetriever:
         filtered: list[RetrievalResult] = []
         for result in results:
             metadata = result.get(RR_METADATA, {})
+            permission_level = metadata.get(META_PERMISSION_LEVEL, PERMISSION_PUBLIC)
+            if permission_level not in self.data_permissions:
+                filtered.append(
+                    self._permission_denied_result(
+                        metadata.get(META_SOURCE),
+                        f"角色 {self.user_role} 无权访问 {permission_level} 数据",
+                    )
+                )
+                continue
+
             allowed_roles = metadata.get(META_ALLOWED_ROLES)
             if not allowed_roles:
-                filtered.append(result)
+                if permission_level == PERMISSION_PUBLIC:
+                    filtered.append(result)
+                else:
+                    filtered.append(
+                        self._permission_denied_result(
+                            metadata.get(META_SOURCE),
+                            "非公开数据缺少 allowed_roles，已默认拒绝",
+                        )
+                    )
                 continue
 
             if isinstance(allowed_roles, str):
@@ -126,7 +147,23 @@ class HybridRetriever:
 
             if self.user_role in allowed:
                 filtered.append(result)
+            else:
+                filtered.append(
+                    self._permission_denied_result(
+                        metadata.get(META_SOURCE),
+                        f"角色 {self.user_role} 不在 allowed_roles 中",
+                    )
+                )
         return filtered
+
+    def _permission_denied_result(self, source: object, reason: str) -> RetrievalResult:
+        return RetrievalResult(
+            content="",
+            metadata={META_SOURCE: source, "permission_denied": True},
+            score=0.0,
+            denied=True,
+            reason=reason,
+        )
 
     def _denied_result(self, step: RetrievalPlanStep) -> RetrievalResult:
         source = step.get(PLAN_SOURCE)
