@@ -29,8 +29,9 @@ def test_evaluate_retrieval_uses_explicit_plan(monkeypatch, tmp_path):
     captured = {}
 
     class FakeHybridRetriever:
-        def __init__(self, user_role: str):
+        def __init__(self, user_role: str, data_permissions: list[str]):
             captured["user_role"] = user_role
+            captured["data_permissions"] = data_permissions
 
         def retrieve(self, plan):
             captured["plan"] = plan
@@ -67,8 +68,9 @@ def test_evaluate_retrieval_infers_source_from_query_type(monkeypatch, tmp_path)
     captured = {}
 
     class FakeHybridRetriever:
-        def __init__(self, user_role: str):
+        def __init__(self, user_role: str, data_permissions: list[str]):
             captured["user_role"] = user_role
+            captured["data_permissions"] = data_permissions
 
         def retrieve(self, plan):
             captured["plan"] = plan
@@ -95,7 +97,7 @@ def test_evaluate_retrieval_infers_source_from_query_type(monkeypatch, tmp_path)
 
 def test_evaluate_retrieval_computes_permission_accuracy(monkeypatch, tmp_path):
     class FakeHybridRetriever:
-        def __init__(self, user_role: str):
+        def __init__(self, user_role: str, data_permissions: list[str]):
             self.user_role = user_role
 
         def retrieve(self, plan):
@@ -143,10 +145,33 @@ def test_evaluate_retrieval_requires_plan_or_source_hint(tmp_path):
         raise AssertionError("expected ValueError")
 
 
-def test_main_uses_default_sample_dataset(monkeypatch, capsys):
-    monkeypatch.setattr(eval_script, "evaluate_retrieval", lambda path: {"samples": 1.0, "mrr": 0.5})
+def test_admission_requires_all_blocking_thresholds():
+    assert eval_script.admission_passed({
+        "recall@5": 0.8,
+        "recall@10": 0.9,
+        "permission_block_accuracy": 1.0,
+    })
+    assert not eval_script.admission_passed({
+        "recall@5": 0.79,
+        "recall@10": 0.9,
+        "permission_block_accuracy": 1.0,
+    })
 
-    with patch("sys.argv", ["evaluate_retrieval.py"]):
+
+def test_main_uses_default_sample_dataset(monkeypatch, capsys, tmp_path):
+    monkeypatch.setattr(
+        eval_script,
+        "evaluate_retrieval",
+        lambda path: {
+            "samples": 1.0,
+            "recall@5": 0.8,
+            "recall@10": 0.9,
+            "permission_block_accuracy": 1.0,
+        },
+    )
+    monkeypatch.setattr(eval_script, "_contains_placeholder_chunk_ids", lambda dataset: False)
+
+    with patch("sys.argv", ["evaluate_retrieval.py", "--output-root", str(tmp_path)]):
         eval_script.main()
 
     output = capsys.readouterr().out

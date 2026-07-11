@@ -24,6 +24,7 @@ from src.schemas.constants import (
     QT_RULE_INQUIRY,
     QT_TECHNICAL_INQUIRY,
     ROLE_ADVISOR,
+    ROLE_DATA_PERMISSIONS,
     RR_DENIED,
     RR_METADATA,
     SOURCE_FAQ,
@@ -32,6 +33,7 @@ from src.schemas.constants import (
     SOURCE_REPORT,
 )
 from src.schemas.typed_dicts import RetrievalPlanStep, RetrievalResult
+from scripts.evaluation_common import write_artifact
 
 _QUERY_TYPE_TO_SOURCE = {
     QT_PRODUCT_INQUIRY: SOURCE_PRODUCT,
@@ -43,6 +45,11 @@ _QUERY_TYPE_TO_SOURCE = {
 }
 DEFAULT_DATASET_PATH = Path(__file__).with_name("evaluate_retrieval.sample.json")
 _PLACEHOLDER_CHUNK_ID_PREFIXES = ("replace_me_", "example_", "sample_")
+ADMISSION_THRESHOLDS = {
+    "recall@5": 0.80,
+    "recall@10": 0.90,
+    "permission_block_accuracy": 1.0,
+}
 
 
 def _load_dataset(dataset_path: str | Path) -> list[dict[str, Any]]:
@@ -54,7 +61,7 @@ def _load_dataset(dataset_path: str | Path) -> list[dict[str, Any]]:
 
 def _contains_placeholder_chunk_ids(dataset: list[dict[str, Any]]) -> bool:
     for item in dataset:
-        for doc_id in item.get("relevant_doc_ids", []):
+        for doc_id in item.get("relevant_chunk_ids", item.get("relevant_doc_ids", [])):
             if isinstance(doc_id, str) and doc_id.startswith(_PLACEHOLDER_CHUNK_ID_PREFIXES):
                 return True
     return False
@@ -145,12 +152,18 @@ def evaluate_retrieval(dataset_path: str | Path) -> dict[str, float]:
     }
 
     for item in dataset:
-        relevant_doc_ids = {str(doc_id) for doc_id in item.get("relevant_doc_ids", [])}
+        relevant_doc_ids = {
+            str(doc_id)
+            for doc_id in item.get("relevant_chunk_ids", item.get("relevant_doc_ids", []))
+        }
         user_role = item.get("user_role", ROLE_ADVISOR)
         expect_permission_denied = bool(item.get("expected_permission_denied", False))
         plan = _normalize_plan(item)
 
-        retriever = HybridRetriever(user_role=user_role)
+        retriever = HybridRetriever(
+            user_role=user_role,
+            data_permissions=ROLE_DATA_PERMISSIONS.get(user_role, []),
+        )
         results = retriever.retrieve(plan=plan)
 
         top5_ids = _collect_chunk_ids(results, limit=5)
@@ -193,6 +206,10 @@ def evaluate_retrieval(dataset_path: str | Path) -> dict[str, float]:
     }
 
 
+def admission_passed(summary: dict[str, float]) -> bool:
+    return all(summary.get(metric, 0.0) >= threshold for metric, threshold in ADMISSION_THRESHOLDS.items())
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="评估 HybridRetriever 检索效果")
     parser.add_argument(
@@ -201,6 +218,7 @@ def main() -> None:
         default=str(DEFAULT_DATASET_PATH),
         help=f"评估集 JSON 文件路径，默认使用 {DEFAULT_DATASET_PATH.name}",
     )
+    parser.add_argument("--output-root", default="artifacts/evaluation")
     args = parser.parse_args()
 
     dataset_path = Path(args.dataset_path)
@@ -217,6 +235,15 @@ def main() -> None:
             print(f"  {metric}: {int(value)}")
         else:
             print(f"  {metric}: {value:.3f}")
+    artifact = write_artifact(
+        name="retrieval",
+        dataset_path=dataset_path,
+        summary=summary,
+        output_root=args.output_root,
+    )
+    print(f"评估产物: {artifact}")
+    if _contains_placeholder_chunk_ids(dataset) or not admission_passed(summary):
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

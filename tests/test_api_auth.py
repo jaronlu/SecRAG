@@ -74,7 +74,7 @@ def test_build_initial_state_uses_authenticated_user():
     assert state[STATE_RETRIEVAL_ATTEMPTS] == 0
     assert state[STATE_REASON_ATTEMPTS] == 0
     assert SOURCE_FAQ in ROLE_ALLOWED_SOURCES[state[STATE_USER_ROLE]]
-    assert SOURCE_REPORT not in ROLE_ALLOWED_SOURCES[state[STATE_USER_ROLE]]
+    assert SOURCE_REPORT in ROLE_ALLOWED_SOURCES[state[STATE_USER_ROLE]]
 
 
 def test_assistant_request_rejects_removed_identity_fields():

@@ -92,6 +92,20 @@ def test_normalize_select_sql_rejects_unknown_column():
     assert normalize_select_sql("SELECT password FROM financial_ratios") is None
 
 
+def test_normalize_select_sql_rejects_join_union_subquery_and_oversized_limit():
+    assert normalize_select_sql(
+        "SELECT * FROM financial_ratios JOIN income_statement USING (stock_code)"
+    ) is None
+    assert normalize_select_sql(
+        "SELECT stock_code FROM financial_ratios UNION SELECT stock_code FROM income_statement"
+    ) is None
+    assert normalize_select_sql(
+        "SELECT * FROM financial_ratios WHERE stock_code IN "
+        "(SELECT stock_code FROM income_statement)"
+    ) is None
+    assert normalize_select_sql("SELECT * FROM financial_ratios LIMIT 101") is None
+
+
 def test_run_select_query_returns_rows(tmp_path):
     db_path = tmp_path / "financial.db"
     _create_financial_db(db_path)

@@ -9,12 +9,14 @@ from src.retrieval.hybrid_retriever import HybridRetriever
 from src.schemas.constants import (
     META_ALLOWED_ROLES,
     META_ERROR,
+    META_PERMISSION_LEVEL,
     META_SOURCE,
     PLAN_FILTERS,
     PLAN_QUERY,
     PLAN_SOURCE,
     PLAN_TOP_K,
     ROLE_ADVISOR,
+    ROLE_COMPLIANCE,
     ROLE_TECHNICAL,
     RR_CONTENT,
     RR_DENIED,
@@ -84,6 +86,21 @@ class RoleTaggedRetriever(BaseRetriever):
         ]
 
 
+class RestrictedRetriever(BaseRetriever):
+    def retrieve(self, query: str, top_k: int = 5, filters: Optional[Dict] = None) -> List[Dict]:
+        return [
+            {
+                RR_CONTENT: "confidential",
+                RR_METADATA: {
+                    META_SOURCE: "restricted",
+                    META_PERMISSION_LEVEL: "confidential",
+                    META_ALLOWED_ROLES: [ROLE_COMPLIANCE],
+                },
+                RR_SCORE: 0.9,
+            }
+        ]
+
+
 class TestHybridRetriever:
     def test_executes_allowed_plan_and_passes_arguments(self):
         fake = FakeRetriever()
@@ -108,8 +125,8 @@ class TestHybridRetriever:
             }
         ]
 
-    def test_denies_source_not_allowed_for_role(self):
-        retriever = HybridRetriever(user_role=ROLE_TECHNICAL)
+    def test_denies_source_not_allowed_for_unmapped_role(self):
+        retriever = HybridRetriever(user_role="unknown")
 
         results = retriever.retrieve([
             {
@@ -124,10 +141,8 @@ class TestHybridRetriever:
         assert "无权限访问" in results[0][RR_REASON]
         assert results[0][RR_METADATA][META_SOURCE] == SOURCE_REPORT
 
-    def test_unknown_role_falls_back_to_faq(self):
-        fake = FakeRetriever()
+    def test_unknown_role_fails_closed(self):
         retriever = HybridRetriever(user_role="unknown")
-        retriever._retriever_cache[SOURCE_FAQ] = fake
 
         results = retriever.retrieve([
             {
@@ -136,11 +151,11 @@ class TestHybridRetriever:
             }
         ])
 
-        assert results[0][RR_CONTENT] == "操作流程:5"
-        assert fake.calls[0]["top_k"] == 5
+        assert results[0][RR_DENIED] is True
+        assert results[0][RR_CONTENT] == ""
 
     def test_unknown_source_returns_error_result(self):
-        retriever = HybridRetriever(user_role=ROLE_ADVISOR)
+        retriever = HybridRetriever(user_role=ROLE_TECHNICAL)
 
         results = retriever.retrieve([
             {
@@ -173,7 +188,7 @@ class TestHybridRetriever:
     def test_merges_multiple_allowed_sources(self):
         product = FakeRetriever()
         faq = FakeRetriever()
-        retriever = HybridRetriever(user_role=ROLE_ADVISOR)
+        retriever = HybridRetriever(user_role=ROLE_TECHNICAL)
         retriever._retriever_cache[SOURCE_PRODUCT] = product
         retriever._retriever_cache[SOURCE_FAQ] = faq
 
@@ -184,10 +199,11 @@ class TestHybridRetriever:
 
         assert [r[RR_CONTENT] for r in results] == ["产品:2", "FAQ:1"]
 
-    def test_mixed_allowed_and_denied_sources_preserves_both_results(self):
+    def test_chunk_permission_denial_preserves_safe_placeholder(self):
         fake = FakeRetriever()
         retriever = HybridRetriever(user_role=ROLE_TECHNICAL)
         retriever._retriever_cache[SOURCE_FAQ] = fake
+        retriever._retriever_cache[SOURCE_REGULATION] = RestrictedRetriever()
 
         results = retriever.retrieve([
             {PLAN_SOURCE: SOURCE_FAQ, PLAN_QUERY: "FAQ"},
@@ -196,6 +212,7 @@ class TestHybridRetriever:
 
         assert results[0][RR_CONTENT] == "FAQ:5"
         assert results[1][RR_DENIED] is True
+        assert "confidential" not in results[1][RR_CONTENT]
 
     def test_filters_allowed_roles_metadata_within_allowed_source(self):
         retriever = HybridRetriever(user_role=ROLE_TECHNICAL)
@@ -203,7 +220,10 @@ class TestHybridRetriever:
 
         results = retriever.retrieve([{PLAN_SOURCE: SOURCE_FAQ, PLAN_QUERY: "LangGraph"}])
 
-        assert [r[RR_CONTENT] for r in results] == ["tech-only", "untagged"]
+        usable = [result for result in results if not result.get(RR_DENIED)]
+        denied = [result for result in results if result.get(RR_DENIED)]
+        assert [r[RR_CONTENT] for r in usable] == ["tech-only", "untagged"]
+        assert len(denied) == 1
 
     def test_domain_retrievers_share_one_vector_engine(self, monkeypatch):
         created_engines = []

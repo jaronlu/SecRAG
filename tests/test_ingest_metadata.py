@@ -1,12 +1,15 @@
 from pathlib import Path
 from typing import cast
 
+import pandas as pd
+import pytest
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 
 from src.ingestion import pipeline
 from src.ingestion.identity import (
     derive_doc_id,
+    load_documents,
     load_sample_metadata,
     normalize_chunks,
 )
@@ -46,6 +49,40 @@ def test_loads_sample_metadata_manifest():
     assert metadata[META_RETRIEVAL_SOURCE] == SOURCE_FAQ
     assert metadata[META_PERMISSION_LEVEL] == "internal"
     assert metadata[META_ALLOWED_ROLES] == ["technical"]
+
+
+def test_requires_sibling_access_manifest(tmp_path):
+    file_path = tmp_path / "missing.csv"
+    file_path.write_text("code,year\n600519,2026\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="缺少权限清单"):
+        load_sample_metadata(file_path)
+
+
+def test_non_public_manifest_requires_allowed_roles(tmp_path):
+    file_path = tmp_path / "restricted.csv"
+    file_path.write_text("code,year\n600519,2026\n", encoding="utf-8")
+    file_path.with_name(file_path.name + ".meta.json").write_text(
+        '{"permission_level":"internal"}',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="必须声明 allowed_roles"):
+        load_sample_metadata(file_path)
+
+
+def test_loads_excel_with_same_document_contract(tmp_path):
+    file_path = tmp_path / "financials.xlsx"
+    pd.DataFrame([{"code": "600519", "year": 2026, "revenue": 100}]).to_excel(
+        file_path,
+        index=False,
+    )
+
+    documents = load_documents(file_path)
+
+    assert len(documents) == 1
+    assert documents[0].metadata[META_DOC_TYPE] == DOC_TYPE_FINANCIAL_DATA
+    assert documents[0].metadata[META_PERMISSION_LEVEL] == "internal"
 
 
 def test_loads_announcements_metadata_manifest():
@@ -237,6 +274,58 @@ def test_ingest_document_skips_unchanged_file(monkeypatch, tmp_path):
 
     assert first_action == "created"
     assert second_action == "skipped"
+
+
+def test_manifest_metadata_is_applied_before_chunking(monkeypatch, tmp_path):
+    file_path = tmp_path / "stable.csv"
+    file_path.write_text("code,year\n600519,2026\n", encoding="utf-8")
+    file_path.with_name(file_path.name + ".meta.json").write_text(
+        """{
+          "doc_type": "financial_data",
+          "permission_level": "internal",
+          "allowed_roles": ["compliance"],
+          "title": "manifest title"
+        }""",
+        encoding="utf-8",
+    )
+    registry = DocumentRegistryStore(tmp_path / "registry.db")
+    registry.start_run(
+        "run-manifest",
+        tmp_path.as_uri(),
+        full_scan=False,
+        started_at="2026-07-11T00:00:00Z",
+    )
+    captured = {}
+
+    monkeypatch.setattr(pipeline, "get_embedding_model", lambda _: _fake_embedding_model())
+    monkeypatch.setattr(pipeline, "upsert_chunks", lambda **_: None)
+    monkeypatch.setattr(pipeline, "list_chunk_ids_by_doc_id", lambda **_: [])
+    monkeypatch.setattr(pipeline, "delete_chunk_ids", lambda **_: None)
+    monkeypatch.setattr(
+        pipeline,
+        "load_documents",
+        lambda _: [Document(page_content="code: 600519", metadata={})],
+    )
+
+    def fake_chunk_documents(documents, doc_type):
+        captured["metadata"] = dict(documents[0].metadata)
+        return documents
+
+    monkeypatch.setattr(pipeline, "chunk_documents", fake_chunk_documents)
+
+    action = ingest_document(
+        file_path,
+        DOC_TYPE_FINANCIAL_DATA,
+        registry_store=registry,
+        run_id="run-manifest",
+        root_dir=tmp_path,
+        persist_directory=str(tmp_path / "chroma"),
+    )
+
+    assert action == "created"
+    assert captured["metadata"][META_PERMISSION_LEVEL] == "internal"
+    assert captured["metadata"][META_ALLOWED_ROLES] == "compliance"
+    assert captured["metadata"][META_TITLE] == "manifest title"
 
 
 def test_ingest_document_deletes_stale_chunks_after_upsert(monkeypatch, tmp_path):

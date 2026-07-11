@@ -3,7 +3,7 @@
     "query": "这款理财产品风险等级是多少",
     "user_role": "advisor",
     "source": "product_search",
-    "relevant_doc_ids": [
+    "relevant_chunk_ids": [
       "719a5a1dba5d05d83d2e7d6e",
       "155535074f1bc3c3ed135783"
     ]
@@ -12,7 +12,7 @@
     "query": "客户适当性管理相关法规",
     "user_role": "compliance",
     "source": "regulation_search",
-    "relevant_doc_ids": [
+    "relevant_chunk_ids": [
       "40626eb8f0139671844815cb",
       "9d40cbef87eaefd876264cba"
     ]
@@ -21,7 +21,7 @@
     "query": "内部系统操作流程",
     "user_role": "technical",
     "expected_query_type": "technical_inquiry",
-    "relevant_doc_ids": [
+    "relevant_chunk_ids": [
       "2313bb5ef7bdee06f175b66d"
     ]
   },
@@ -29,7 +29,7 @@
     "query": "LangGraph",
     "user_role": "technical",
     "source": "faq_search",
-    "relevant_doc_ids": [
+    "relevant_chunk_ids": [
       "2ffa8bf679221432ce6c61ab",
       "b1ac82f745ab3df083ee9ed5"
     ]
@@ -38,7 +38,7 @@
     "query": "内部研报摘要",
     "user_role": "technical",
     "source": "report_search",
-    "relevant_doc_ids": [],
+    "relevant_chunk_ids": [],
     "expected_permission_denied": true
   }
 ]

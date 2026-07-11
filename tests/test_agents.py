@@ -19,6 +19,7 @@ from src.agents.nodes import (
     audit_log,
     compliance_check,
     compose,
+    extract_citations,
     grade_and_filter,
     reason,
     retrieve,
@@ -44,10 +45,8 @@ from src.schemas.constants import (
     CONFIDENCE_LOW,
     CONFIDENCE_MEDIUM,
     META_CHUNK_ID,
-    META_PERMISSION_LEVEL,
     META_SOURCE,
     META_TITLE,
-    PERMISSION_PUBLIC,
     PLAN_FILTERS,
     PLAN_QUERY,
     PLAN_SOURCE,
@@ -68,7 +67,6 @@ from src.schemas.constants import (
     STATE_CLIENT_ID,
     STATE_COMPLIANCE,
     STATE_CONFIDENCE,
-    STATE_DATA_PERMISSIONS,
     STATE_DEPARTMENT,
     STATE_FINAL_ANSWER,
     STATE_MESSAGES,
@@ -149,6 +147,17 @@ class TestGradeAndFilter:
         result = grade_and_filter(state)
         assert len(result[STATE_RETRIEVAL_RESULTS]) <= 10
 
+    def test_deduplicates_same_source_chunk_across_retrieval_hops(self):
+        duplicate = _result(
+            "same",
+            meta={META_SOURCE: "faq.html", META_CHUNK_ID: "chunk-1"},
+        )
+        state = _state(**{STATE_RETRIEVAL_RESULTS: [duplicate, duplicate.copy()]})
+
+        result = grade_and_filter(state)
+
+        assert len(result[STATE_RETRIEVAL_RESULTS]) == 1
+
     def test_preserves_other_state_fields(self):
         state = _state(**{STATE_FINAL_ANSWER: "unchanged"})
         result = grade_and_filter(state)
@@ -161,6 +170,23 @@ class TestGradeAndFilter:
 
 
 class TestVerify:
+    def test_extract_citations_runs_before_verification(self):
+        state = _state(**{
+            STATE_ORIGINAL_QUERY: "净利润",
+            STATE_RETRIEVAL_RESULTS: [
+                _result(
+                    "净利润 747 亿元",
+                    meta={
+                        META_TITLE: "2024年报",
+                        META_SOURCE: "report.pdf",
+                        META_CHUNK_ID: "chunk_001",
+                    },
+                )
+            ],
+        })
+        result = extract_citations(state)
+        assert result[STATE_CITATIONS][0]["chunk_id"] == "chunk_001"
+
     def test_numbers_without_results(self):
         state = _state(**{
             STATE_FINAL_ANSWER: "净利润 747 亿元",
@@ -188,20 +214,6 @@ class TestVerify:
         verification = result[STATE_VERIFICATION]
         assert verification.get("passed") is False
         assert any("888" in issue for issue in verification.get("issues", []))
-
-    def test_permission_denied(self):
-        state = _state(**{
-            STATE_FINAL_ANSWER: "正常回答",
-            STATE_DATA_PERMISSIONS: [PERMISSION_PUBLIC],
-            STATE_RETRIEVAL_RESULTS: [
-                _result(
-                    RESTRICTED_TEXT,
-                    meta={META_PERMISSION_LEVEL: "confidential", META_SOURCE: "restricted.pdf"},
-                ),
-            ],
-        })
-        result = verify(state)
-        assert any("权限不足" in i for i in result[STATE_VERIFICATION].get("issues", []))
 
     def test_investment_advice_blocked_for_advisor(self):
         state = _state(**{
@@ -326,8 +338,9 @@ class TestRetrieve:
         captured = {}
 
         class FakeHybridRetriever:
-            def __init__(self, user_role: str):
+            def __init__(self, user_role: str, data_permissions: list[str]):
                 captured["user_role"] = user_role
+                captured["data_permissions"] = data_permissions
 
             def retrieve(self, plan):
                 captured["plan"] = plan
@@ -367,8 +380,9 @@ class TestRetrieve:
         captured = {}
 
         class FakeHybridRetriever:
-            def __init__(self, user_role: str):
+            def __init__(self, user_role: str, data_permissions: list[str]):
                 captured["user_role"] = user_role
+                captured["data_permissions"] = data_permissions
 
             def retrieve(self, plan):
                 captured["plan"] = plan
@@ -402,13 +416,13 @@ class TestRetrieve:
 
 
 class TestRoleAwareTools:
-    def test_technical_role_only_gets_allowed_retrieval_tools(self):
+    def test_technical_role_gets_all_design_allowed_retrieval_tools(self):
         from src.agents.tools import get_tools_for_role
 
         tool_names = {tool.name for tool in get_tools_for_role(ROLE_TECHNICAL)}
 
         assert SOURCE_FAQ in tool_names
-        assert SOURCE_REPORT not in tool_names
+        assert SOURCE_REPORT in tool_names
         assert "calculator" in tool_names
 
     def test_reason_binds_role_filtered_tools(self, monkeypatch):
@@ -438,7 +452,7 @@ class TestRoleAwareTools:
         result = reason(state)
 
         assert SOURCE_FAQ in captured["tool_names"]
-        assert SOURCE_REPORT not in captured["tool_names"]
+        assert SOURCE_REPORT in captured["tool_names"]
         assert result[STATE_FINAL_ANSWER] == "ok"
         assert result[STATE_REASON_ATTEMPTS] == 1
 
@@ -449,25 +463,45 @@ class TestRoleAwareTools:
 
 
 class TestCompose:
-    def test_citations_built_from_results(self):
+    def test_uses_verified_citations_without_recreating_them(self):
+        citation = {
+            "citation_id": "cite_001",
+            "doc_title": "2024年报",
+            "source": "report.pdf",
+            "chunk_id": "chunk_001",
+        }
         state = _state(**{
             STATE_FINAL_ANSWER: "示例公司净利润为747亿",
-            STATE_RETRIEVAL_RESULTS: [
-                _result(
-                    "示例公司净利润747亿",
-                    meta={
-                        META_TITLE: "2024年报",
-                        META_SOURCE: "report.pdf",
-                        META_CHUNK_ID: "chunk_001",
-                    },
-                ),
-            ],
+            STATE_CITATIONS: [citation],
+            STATE_VERIFICATION: {"passed": True, "confidence": CONFIDENCE_HIGH},
+            STATE_COMPLIANCE: {"passed": True},
+            STATE_RETRIEVAL_RESULTS: [_result("a"), _result("b"), _result("c")],
         })
         result = compose(state)
         assert len(result[STATE_CITATIONS]) == 1
-        citation = result[STATE_CITATIONS][0]
-        assert citation.get("doc_title") == "2024年报"
-        assert citation.get("source") == "report.pdf"
+        assert result[STATE_CITATIONS][0] is citation
+
+    def test_verification_failure_returns_fixed_safe_response(self):
+        state = _state(**{
+            STATE_FINAL_ANSWER: RESTRICTED_TEXT,
+            STATE_CITATIONS: [{"source": "restricted.pdf"}],
+            STATE_VERIFICATION: {"passed": False, "confidence": CONFIDENCE_LOW},
+            STATE_COMPLIANCE: {"passed": True, "risk_disclosure": ""},
+        })
+        result = compose(state)
+        assert RESTRICTED_TEXT not in result[STATE_FINAL_ANSWER]
+        assert result[STATE_CITATIONS] == []
+
+    def test_compliance_failure_returns_fixed_safe_response(self):
+        state = _state(**{
+            STATE_FINAL_ANSWER: RESTRICTED_TEXT,
+            STATE_CITATIONS: [{"source": "restricted.pdf"}],
+            STATE_VERIFICATION: {"passed": True, "confidence": CONFIDENCE_HIGH},
+            STATE_COMPLIANCE: {"passed": False, "risk_disclosure": ""},
+        })
+        result = compose(state)
+        assert RESTRICTED_TEXT not in result[STATE_FINAL_ANSWER]
+        assert result[STATE_CITATIONS] == []
 
     def test_risk_disclosure_in_answer(self):
         state = _state(**{
@@ -616,8 +650,18 @@ class TestShouldRetryRetrieval:
         assert should_retry_retrieval(state) == "retrieve"
 
     def test_high_score(self):
-        state = _state(**{STATE_RETRIEVAL_RESULTS: [_result("x", score=0.9)]})
+        state = _state(**{
+            STATE_RETRIEVAL_RESULTS: [
+                _result("x", score=0.9),
+                _result("y", score=0.8),
+                _result("z", score=0.76),
+            ]
+        })
         assert should_retry_retrieval(state) == "continue"
+
+    def test_single_high_score_still_retries(self):
+        state = _state(**{STATE_RETRIEVAL_RESULTS: [_result("x", score=0.9)]})
+        assert should_retry_retrieval(state) == "retrieve"
 
 
 class TestShouldReasonAgain:
