@@ -6,11 +6,10 @@
 import json
 from typing import Any, cast
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, ToolMessage
 
 from src.agents.state import AssistantState
 from src.config import config
-from src.rag.formatter import format_citations
 from src.retrieval.hybrid_retriever import HybridRetriever
 from src.schemas.constants import (
     CONFIDENCE_HIGH,
@@ -19,7 +18,7 @@ from src.schemas.constants import (
     DEFAULT_TOP_K,
     GRADE_TOP_K,
     LLM_PROVIDER_OPENAI,
-    META_PERMISSION_LEVEL,
+    META_CHUNK_ID,
     META_SOURCE,
     META_TITLE,
     PERMISSION_PUBLIC,
@@ -35,14 +34,16 @@ from src.schemas.constants import (
     ROLE_OPERATIONS,
     ROLE_TECHNICAL,
     RR_CONTENT,
+    RR_DENIED,
     RR_METADATA,
     RR_SCORE,
-    SOURCE_FAQ,
     STATE_AMBIGUITY,
     STATE_AUDIT_TRAIL,
     STATE_CITATIONS,
+    STATE_CHAT_HISTORY,
     STATE_CLIENT_ID,
     STATE_COMPLIANCE,
+    STATE_CONVERSATION_SUMMARY,
     STATE_CONFIDENCE,
     STATE_DATA_PERMISSIONS,
     STATE_DEPARTMENT,
@@ -52,17 +53,22 @@ from src.schemas.constants import (
     STATE_MESSAGES,
     STATE_ORIGINAL_QUERY,
     STATE_QUERY_TYPE,
+    STATE_RESOLVED_QUERY,
     STATE_REASON_ATTEMPTS,
     STATE_RETRIEVAL_ATTEMPTS,
     STATE_RETRIEVAL_PLAN,
     STATE_RETRIEVAL_RESULTS,
     STATE_REWRITTEN_QUERY,
     STATE_RISK_DISCLOSURE,
+    STATE_THREAD_ID,
+    STATE_TOOL_CALLS,
+    STATE_USER_ID,
     STATE_USER_ROLE,
     STATE_VERIFICATION,
 )
-from src.schemas.typed_dicts import RetrievalPlanStep
+from src.schemas.typed_dicts import RetrievalPlanStep, ToolCallDict
 from src.utils.compliance import ComplianceChecker, INVESTMENT_ADVICE_PATTERNS
+from src.utils.verifier import CitationExtractor, ComprehensiveVerifier
 
 
 def _build_llm():
@@ -94,12 +100,20 @@ def _get_audit_store():
     return SQLiteAuditStore(config.audit_db_path)
 
 
+def _get_conversation_store():
+    from src.utils.conversation import SQLiteConversationStore
+
+    return SQLiteConversationStore(config.conversation_db_path)
+
+
 # ══════════════════════════════════════════════════════════════════════
 # 共享规则关键词（verify 与 compliance_check 共用，避免重复定义漂移）
 # ══════════════════════════════════════════════════════════════════════
 
 _ADVICE_KEYWORDS = INVESTMENT_ADVICE_PATTERNS
 _COMPLIANCE_CHECKER = ComplianceChecker()
+_CITATION_EXTRACTOR = CitationExtractor()
+_VERIFIER = ComprehensiveVerifier()
 
 
 def _with_state_updates(state: AssistantState, updates: dict[str, Any]) -> AssistantState:
@@ -127,15 +141,47 @@ def _normalize_plan_step(step: object, default_query: str = "") -> RetrievalPlan
 
 
 # ══════════════════════════════════════════════════════════════════════
+# 4.1 Conversation Context — 校验会话并加载用户可见历史
+# ══════════════════════════════════════════════════════════════════════
+
+
+def load_conversation_context(state: AssistantState) -> AssistantState:
+    """Load recent visible messages and entity summary for the current owner."""
+    history, summary = _get_conversation_store().load_context(
+        thread_id=state[STATE_THREAD_ID],
+        user_id=state[STATE_USER_ID],
+    )
+    return _with_state_updates(
+        state,
+        {
+            STATE_CHAT_HISTORY: history,
+            STATE_CONVERSATION_SUMMARY: summary,
+        },
+    )
+
+
+def resolve_followup_query(state: AssistantState) -> AssistantState:
+    """Resolve pronoun-style follow-ups using stored entity context only."""
+    query = state[STATE_ORIGINAL_QUERY]
+    summary = state.get(STATE_CONVERSATION_SUMMARY, "")
+    followup_markers = ("它", "这个", "该产品", "该公司", "那", "上述", "前面")
+    resolved = f"基于会话实体（{summary}），{query}" if summary and any(
+        marker in query for marker in followup_markers
+    ) else query
+    return _with_state_updates(state, {STATE_RESOLVED_QUERY: resolved})
+
+
+# ══════════════════════════════════════════════════════════════════════
 # 4.2 Query Understand — 意图分类、实体抽取、查询重写、歧义检测
 # ══════════════════════════════════════════════════════════════════════
 
 
 def query_understand(state: AssistantState) -> AssistantState:
     """查询理解：意图分类、实体抽取、查询重写、歧义检测"""
+    effective_query = state.get(STATE_RESOLVED_QUERY) or state[STATE_ORIGINAL_QUERY]
     prompt = f"""请分析以下行业业务查询：
 
-【用户查询】{state[STATE_ORIGINAL_QUERY]}
+【用户查询】{effective_query}
 【用户角色】{state[STATE_USER_ROLE]}
 【用户部门】{state[STATE_DEPARTMENT]}
 
@@ -161,7 +207,7 @@ def query_understand(state: AssistantState) -> AssistantState:
             "intent": "unknown",
             "query_type": "unknown",
             "entities": {},
-            "rewritten_query": state[STATE_ORIGINAL_QUERY],
+            "rewritten_query": effective_query,
             "ambiguity": [],
         }
 
@@ -169,7 +215,7 @@ def query_understand(state: AssistantState) -> AssistantState:
         STATE_INTENT: result.get("intent", "unknown"),
         STATE_QUERY_TYPE: result.get("query_type", "unknown"),
         STATE_ENTITIES: result.get("entities", {}),
-        STATE_REWRITTEN_QUERY: result.get("rewritten_query", state[STATE_ORIGINAL_QUERY]),
+        STATE_REWRITTEN_QUERY: result.get("rewritten_query", effective_query),
         STATE_AMBIGUITY: result.get("ambiguity", []),
     })
 
@@ -181,7 +227,7 @@ def query_understand(state: AssistantState) -> AssistantState:
 
 def planner(state: AssistantState) -> AssistantState:
     """检索计划生成：根据意图、角色、查询类型生成多步检索计划"""
-    allowed_sources = ROLE_ALLOWED_SOURCES.get(state[STATE_USER_ROLE], [SOURCE_FAQ])
+    allowed_sources = ROLE_ALLOWED_SOURCES.get(state[STATE_USER_ROLE], [])
 
     prompt = f"""根据以下查询理解结果，生成检索计划：
 
@@ -214,9 +260,15 @@ def planner(state: AssistantState) -> AssistantState:
             raw = str(raw)
         parsed_plan = json.loads(raw)
     except json.JSONDecodeError:
-        parsed_plan = [
-            {PLAN_SOURCE: SOURCE_FAQ, PLAN_QUERY: state[STATE_REWRITTEN_QUERY], PLAN_TOP_K: 3}
-        ]
+        parsed_plan = (
+            [{
+                PLAN_SOURCE: allowed_sources[0],
+                PLAN_QUERY: state[STATE_REWRITTEN_QUERY],
+                PLAN_TOP_K: 3,
+            }]
+            if allowed_sources
+            else []
+        )
 
     # 按角色权限过滤：去掉 LLM 可能越权生成的 source
     raw_steps = parsed_plan if isinstance(parsed_plan, list) else []
@@ -249,7 +301,10 @@ def retrieve(state: AssistantState) -> AssistantState:
             )
         )
 
-    retriever = HybridRetriever(user_role=state[STATE_USER_ROLE])
+    retriever = HybridRetriever(
+        user_role=state[STATE_USER_ROLE],
+        data_permissions=state.get(STATE_DATA_PERMISSIONS, [PERMISSION_PUBLIC]),
+    )
     results = retriever.retrieve(plan=normalized_plan)
 
     return _with_state_updates(state, {
@@ -269,14 +324,26 @@ def grade_and_filter(state: AssistantState) -> AssistantState:
     if not results:
         return state
 
-    filtered = [
-        result
-        for result in sorted(results, key=lambda x: x.get(RR_SCORE, 0), reverse=True)
-        if result.get(RR_SCORE, 0) >= RETRIEVAL_MIN_SCORE
-    ][:GRADE_TOP_K]
+    denied = [result for result in results if result.get(RR_DENIED)]
+    filtered = []
+    seen_evidence = set()
+    for result in sorted(results, key=lambda x: x.get(RR_SCORE, 0), reverse=True):
+        if result.get(RR_DENIED) or result.get(RR_SCORE, 0) < RETRIEVAL_MIN_SCORE:
+            continue
+        metadata = result.get(RR_METADATA, {})
+        key = (
+            metadata.get(META_SOURCE),
+            metadata.get(META_CHUNK_ID) or result.get(RR_CONTENT, ""),
+        )
+        if key in seen_evidence:
+            continue
+        seen_evidence.add(key)
+        filtered.append(result)
+        if len(filtered) >= GRADE_TOP_K:
+            break
 
     return _with_state_updates(state, {
-        STATE_RETRIEVAL_RESULTS: filtered,
+        STATE_RETRIEVAL_RESULTS: filtered + denied,
     })
 
 
@@ -331,71 +398,81 @@ def reason(state: AssistantState) -> AssistantState:
 【检索结果】
 {context}
 
-【用户问题】{state[STATE_ORIGINAL_QUERY]}
+    【用户问题】{state.get(STATE_RESOLVED_QUERY) or state[STATE_ORIGINAL_QUERY]}
 
 【用户角色】{role}
 
 如果需要计算或查询更多信息，可以使用工具。
 回答必须附引用标注 [来源1][来源2]。
-数字必须来自检索结果，禁止编造。
+数字必须来自检索结果或成功的工具输出，禁止编造。
 {"投顾/销售角色：不得输出" + "买" + "入/" + "卖" + "出/" + "目标" + "价等业务建议，仅提供事实信息。" if role in (ROLE_ADVISOR, ROLE_INSTITUTIONAL_SALES) else ""}
 {"合规角色：引用必须精确到条款/条文号。" if role == ROLE_COMPLIANCE else ""}"""
 
     agent = create_agent(model=llm, tools=get_tools_for_role(role), system_prompt=system_prompt)
-    response = agent.invoke({"messages": [HumanMessage(content=state[STATE_ORIGINAL_QUERY])]})
+    response = agent.invoke({
+        "messages": [
+            HumanMessage(content=state.get(STATE_RESOLVED_QUERY) or state[STATE_ORIGINAL_QUERY])
+        ]
+    })
 
     final_msg = response[STATE_MESSAGES][-1]
     final_content = final_msg.content if isinstance(final_msg.content, str) else str(final_msg.content)
+    tool_calls: list[ToolCallDict] = list(state.get(STATE_TOOL_CALLS, []))
+    for message in response[STATE_MESSAGES]:
+        if isinstance(message, ToolMessage):
+            output = message.content if isinstance(message.content, str) else str(message.content)
+            tool_calls.append(
+                ToolCallDict(
+                    tool=message.name or "unknown",
+                    output=output,
+                    success=message.status != "error",
+                )
+            )
     return _with_state_updates(state, {
         STATE_MESSAGES: state.get(STATE_MESSAGES, []) + response[STATE_MESSAGES],
+        STATE_TOOL_CALLS: tool_calls,
         STATE_FINAL_ANSWER: final_content,
         STATE_REASON_ATTEMPTS: reason_attempts,
     })
 
 
 # ══════════════════════════════════════════════════════════════════════
-# 4.7 Verify — 数字验证、权限校验、业务建议检测、合规引用精度
+# 4.7 Citation Extraction and Verification
 # ══════════════════════════════════════════════════════════════════════
 
 
+def extract_citations(state: AssistantState) -> AssistantState:
+    """Extract citations only from this turn's usable retrieval results."""
+    query = (
+        state.get(STATE_RESOLVED_QUERY)
+        or state.get(STATE_REWRITTEN_QUERY)
+        or state.get(STATE_ORIGINAL_QUERY, "")
+    )
+    citations = _CITATION_EXTRACTOR.extract(
+        state.get(STATE_RETRIEVAL_RESULTS, []),
+        query=query,
+    )
+    return _with_state_updates(state, {STATE_CITATIONS: citations})
+
+
 def verify(state: AssistantState) -> AssistantState:
-    """验证：数字是否有来源支撑、权限是否合规、是否存在业务建议"""
-    import re
+    """Run source, number, consistency, and hallucination verification."""
+    verification = _VERIFIER.verify(
+        answer=state.get(STATE_FINAL_ANSWER, ""),
+        citations=state.get(STATE_CITATIONS, []),
+        retrieval_results=state.get(STATE_RETRIEVAL_RESULTS, []),
+        tool_calls=state.get(STATE_TOOL_CALLS, []),
+    )
 
-    answer = state.get(STATE_FINAL_ANSWER, "")
-    results = state.get(STATE_RETRIEVAL_RESULTS, [])
-    issues = []
-
-    # 规则 1：检查答案数字是否能在检索内容中找到直接支撑。
-    numbers = re.findall(r"\d+\.?\d*%?", answer)
-    if numbers and not results:
-        issues.append("答案包含数字但无检索结果支撑")
-    elif numbers:
-        all_content = "\n".join(result.get(RR_CONTENT, "") for result in results)
-        for number in numbers:
-            if number not in all_content:
-                issues.append(f"数字 {number} 在检索结果中未找到")
-
-    # 规则 2：检查来源是否在权限范围内
-    for r in results:
-        perm = r.get(RR_METADATA, {}).get(META_PERMISSION_LEVEL, PERMISSION_PUBLIC)
-        if perm not in state.get(STATE_DATA_PERMISSIONS, [PERMISSION_PUBLIC]):
-            issues.append(f"来源权限不足: {r.get(RR_METADATA, {}).get(META_SOURCE)}")
-
-    # 规则 3：投顾/销售场景检查是否输出业务建议
     role = state.get(STATE_USER_ROLE)
+    issues = list(verification.get("issues", []))
     if role in (ROLE_ADVISOR, ROLE_INSTITUTIONAL_SALES):
-        for pat in _ADVICE_KEYWORDS:
-            if pat in answer:
-                issues.append(f"投顾/销售角色不得输出业务建议: {pat}")
-
-    return _with_state_updates(state, {
-        STATE_VERIFICATION: {
-            "passed": len(issues) == 0,
-            "issues": issues,
-            "confidence": CONFIDENCE_LOW if issues else CONFIDENCE_HIGH,
-        },
-    })
+        for pattern in _ADVICE_KEYWORDS:
+            if pattern in state.get(STATE_FINAL_ANSWER, ""):
+                issues.append(f"投顾/销售角色不得输出业务建议: {pattern}")
+    if issues:
+        verification.update(passed=False, issues=issues, confidence=CONFIDENCE_LOW)
+    return _with_state_updates(state, {STATE_VERIFICATION: verification})
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -417,6 +494,29 @@ def compliance_check(state: AssistantState) -> AssistantState:
     })
 
 
+def permission_denied_response(state: AssistantState) -> AssistantState:
+    """Terminate before LLM reasoning when every retrieval result is denied."""
+    return _with_state_updates(
+        state,
+        {
+            STATE_FINAL_ANSWER: "当前角色无权限访问完成该请求所需的数据源。",
+            STATE_CITATIONS: [],
+            STATE_CONFIDENCE: CONFIDENCE_LOW,
+            STATE_RISK_DISCLOSURE: "",
+            STATE_VERIFICATION: {
+                "passed": False,
+                "issues": ["permission_denied"],
+                "confidence": CONFIDENCE_LOW,
+            },
+            STATE_COMPLIANCE: {
+                "passed": False,
+                "flags": ["permission_denied"],
+                "risk_disclosure": "",
+            },
+        },
+    )
+
+
 # ══════════════════════════════════════════════════════════════════════
 # 4.9 Compose — 引用标注、置信度、风险提示
 # ══════════════════════════════════════════════════════════════════════
@@ -425,20 +525,29 @@ def compliance_check(state: AssistantState) -> AssistantState:
 def compose(state: AssistantState) -> AssistantState:
     """生成最终回答：带引用、置信度、风险提示"""
     answer = state.get(STATE_FINAL_ANSWER, "")
-
-    # 引用标注（复用 src/rag/formatter.py 的权威实现，避免重复维护 Citation 字段）
-    citations = format_citations(state.get(STATE_RETRIEVAL_RESULTS, [])[:5])
+    citations = state.get(STATE_CITATIONS, [])
 
     # 风险提示 + 适当性警告
     compliance = state.get(STATE_COMPLIANCE, {})
     risk = compliance.get("risk_disclosure", "")
     suitability = compliance.get("suitability_warning", "")
+    verification_passed = state.get(STATE_VERIFICATION, {}).get("passed", False)
+    compliance_passed = compliance.get("passed", False)
+    if not verification_passed:
+        answer = "当前答案未通过来源或数字验证，无法安全返回。请补充可验证资料后重试。"
+        citations = []
+    elif not compliance_passed:
+        answer = "当前请求或生成内容未通过合规检查，已停止输出。"
+        citations = []
     final_answer = answer + suitability + risk
 
     # 综合置信度
     verification_conf = state.get(STATE_VERIFICATION, {}).get("confidence", CONFIDENCE_MEDIUM)
-    compliance_passed = compliance.get("passed", False)
-    result_count = len(state.get(STATE_RETRIEVAL_RESULTS, []))
+    result_count = len([
+        result
+        for result in state.get(STATE_RETRIEVAL_RESULTS, [])
+        if not result.get(RR_DENIED)
+    ])
 
     if not compliance_passed:
         confidence = CONFIDENCE_LOW
@@ -455,6 +564,12 @@ def compose(state: AssistantState) -> AssistantState:
     })
 
 
+def persist_conversation_turn(state: AssistantState) -> AssistantState:
+    """Persist the visible turn and durable audit outbox event atomically."""
+    _get_conversation_store().insert_turn(state)
+    return state
+
+
 # ══════════════════════════════════════════════════════════════════════
 # 4.10 Audit Log — 全链路追踪记录
 # ══════════════════════════════════════════════════════════════════════
@@ -469,7 +584,15 @@ def audit_log(state: AssistantState) -> AssistantState:
     from src.utils.audit import AuditLogger, audit_entry_to_trail
 
     audit_entry = AuditLogger().log(state)
-    _get_audit_store().insert(audit_entry)
+    conversation_store = _get_conversation_store()
+    try:
+        _get_audit_store().insert(audit_entry)
+        if conversation_store.get_outbox_status(audit_entry.request_id) is not None:
+            conversation_store.mark_outbox_processed(audit_entry.request_id)
+    except Exception as exc:
+        if conversation_store.get_outbox_status(audit_entry.request_id) is not None:
+            conversation_store.mark_outbox_failed(audit_entry.request_id, str(exc))
+        raise
 
     return _with_state_updates(state, {
         STATE_AUDIT_TRAIL: audit_entry_to_trail(audit_entry),

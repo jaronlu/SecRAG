@@ -6,16 +6,23 @@ from src.agents.nodes import (
     audit_log,
     compliance_check,
     compose,
+    extract_citations,
     grade_and_filter,
+    load_conversation_context,
+    permission_denied_response,
     planner,
+    persist_conversation_turn,
     query_understand,
     reason,
+    resolve_followup_query,
     retrieve,
     verify,
 )
 from src.agents.state import AssistantState
 from src.schemas.constants import (
     DEFAULT_MAX_HOPS,
+    CONFIDENCE_HIGH_MIN_RESULTS,
+    CONFIDENCE_HIGH_THRESHOLD,
     MAX_REASON_ATTEMPTS,
     RR_SCORE,
     STATE_COMPLIANCE,
@@ -34,13 +41,18 @@ from src.schemas.constants import (
 def should_retry_retrieval(state: AssistantState) -> str:
     """判断是否需要补充检索（最多 DEFAULT_MAX_HOPS 次，计数器由 retrieve 节点维护）"""
     attempts = state.get(STATE_RETRIEVAL_ATTEMPTS, 0)
+    results = state.get(STATE_RETRIEVAL_RESULTS, [])
+    usable = [result for result in results if not result.get("denied")]
+    if results and not usable:
+        return "denied"
     if attempts >= DEFAULT_MAX_HOPS:
         return "continue"
 
-    results = state.get(STATE_RETRIEVAL_RESULTS, [])
     if not results:
         return "retrieve"
-    if results[0].get(RR_SCORE, 0) < 0.5:
+    if len(usable) < CONFIDENCE_HIGH_MIN_RESULTS:
+        return "retrieve"
+    if usable[0].get(RR_SCORE, 0) < CONFIDENCE_HIGH_THRESHOLD:
         return "retrieve"
     return "continue"
 
@@ -68,7 +80,7 @@ def is_compliant(state: AssistantState) -> str:
 
 
 def build_agent_graph() -> StateGraph:
-    """构建 9 节点 Agent Graph
+    """构建 fail-closed Agent Graph。
 
     流程：START → query_understand → planner → retrieve → grade_and_filter
              → reason → verify → compliance_check → compose → audit_log → END
@@ -77,19 +89,26 @@ def build_agent_graph() -> StateGraph:
     graph = StateGraph(AssistantState)
 
     # 添加节点
+    graph.add_node("load_conversation_context", load_conversation_context)
+    graph.add_node("resolve_followup_query", resolve_followup_query)
     graph.add_node("query_understand", query_understand)
     graph.add_node("planner", planner)
     graph.add_node("retrieve", retrieve)
     graph.add_node("grade_and_filter", grade_and_filter)
+    graph.add_node("permission_denied_response", permission_denied_response)
     graph.add_node("reason", reason)
+    graph.add_node("extract_citations", extract_citations)
     graph.add_node("verify", verify)
     graph.add_node("compliance_check", compliance_check)
     graph.add_node("compose", compose)
+    graph.add_node("persist_conversation_turn", persist_conversation_turn)
     graph.add_node("audit_log", audit_log)
 
     # Phase 1：auth_check 由 API Gateway / FastAPI Middleware 承担；
     # Phase 2 可下沉为图内节点。
-    graph.add_edge(START, "query_understand")
+    graph.add_edge(START, "load_conversation_context")
+    graph.add_edge("load_conversation_context", "resolve_followup_query")
+    graph.add_edge("resolve_followup_query", "query_understand")
     graph.add_edge("query_understand", "planner")
     graph.add_edge("planner", "retrieve")
     graph.add_edge("retrieve", "grade_and_filter")
@@ -101,10 +120,13 @@ def build_agent_graph() -> StateGraph:
         {
             "continue": "reason",
             "retrieve": "planner",
+            "denied": "permission_denied_response",
         },
     )
 
-    graph.add_edge("reason", "verify")
+    graph.add_edge("permission_denied_response", "persist_conversation_turn")
+    graph.add_edge("reason", "extract_citations")
+    graph.add_edge("extract_citations", "verify")
 
     # 条件路由：验证失败则重新推理
     graph.add_conditional_edges(
@@ -126,7 +148,8 @@ def build_agent_graph() -> StateGraph:
         },
     )
 
-    graph.add_edge("compose", "audit_log")
+    graph.add_edge("compose", "persist_conversation_turn")
+    graph.add_edge("persist_conversation_turn", "audit_log")
     graph.add_edge("audit_log", END)
 
     return graph
