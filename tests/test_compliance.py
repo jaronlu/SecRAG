@@ -29,6 +29,15 @@ def test_compliance_checker_blocks_advice_only_text():
     assert any(flag.startswith("advice:") for flag in result["flags"])
 
 
+def test_compliance_checker_allows_attributed_research_rating():
+    checker = ComplianceChecker()
+
+    result = checker.check("东兴证券在2025-10-28发布的报告评级为买入。")
+
+    assert result["passed"] is True
+    assert not any(flag.startswith("advice:") for flag in result["flags"])
+
+
 def test_compliance_checker_requires_article_for_compliance_role():
     checker = ComplianceChecker()
 

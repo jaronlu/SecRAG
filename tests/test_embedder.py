@@ -59,23 +59,35 @@ def test_upsert_chunks_uses_stable_document_ids(monkeypatch, tmp_path):
         Document(page_content="更多内容", metadata={"doc_id": "doc-1"}, id="chunk-2"),
     ]
     embedding_model: Any = object()
-    captured = {}
+    captured = {"batches": []}
 
     class FakeChroma:
         def __init__(self, **kwargs):
             captured["init"] = kwargs
 
         def add_documents(self, documents, ids):
-            captured["documents"] = documents
-            captured["ids"] = ids
+            captured["batches"].append((documents, ids))
 
     monkeypatch.setattr(embedder, "Chroma", FakeChroma)
 
-    embedder.upsert_chunks(chunks, str(tmp_path), embedding_model)
+    embedder.upsert_chunks(chunks, str(tmp_path), embedding_model, batch_size=1)
 
     assert captured["init"]["persist_directory"] == str(tmp_path)
-    assert captured["documents"] == chunks
-    assert captured["ids"] == ["chunk-1", "chunk-2"]
+    assert captured["batches"] == [
+        ([chunks[0]], ["chunk-1"]),
+        ([chunks[1]], ["chunk-2"]),
+    ]
+
+
+def test_upsert_chunks_rejects_invalid_batch_size(tmp_path):
+    chunks = [Document(page_content="测试内容", metadata={}, id="chunk-1")]
+
+    try:
+        embedder.upsert_chunks(chunks, str(tmp_path), object(), batch_size=0)
+    except ValueError as exc:
+        assert "batch_size" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
 
 
 def test_list_chunk_ids_by_doc_id_filters_on_doc_id(monkeypatch, tmp_path):

@@ -11,6 +11,7 @@ from src.tools.rerank import RerankService, rerank_tool
 from src.tools.sql_query import normalize_select_sql, run_select_query, sql_query_tool
 from src.tools.suitability import suitability_check
 from src.utils.tracing import Tracer
+from src.ingestion.financial_store import import_research_reports_index
 
 
 def test_safe_eval_uses_decimal_precision():
@@ -115,6 +116,33 @@ def test_run_select_query_returns_rows(tmp_path):
         db_path=db_path,
     )
     assert rows[0]["stock_code"] == "600519"
+
+
+def test_import_and_query_research_report_index(tmp_path):
+    csv_path = tmp_path / "reports.csv"
+    csv_path.write_text(
+        "序号,股票代码,股票简称,报告名称,东财评级,机构,近一月个股研报数,"
+        "2026-盈利预测-收益,2026-盈利预测-市盈率,2027-盈利预测-收益,"
+        "2027-盈利预测-市盈率,2028-盈利预测-收益,2028-盈利预测-市盈率,"
+        "行业,日期,报告PDF链接,sample_stock_code\n"
+        "1,000001,平安银行,年报点评,中性,国信证券,0,2.08,5.3,2.09,5.3,2.11,5.2,"
+        "银行,2026-04-26,https://example.com/report.pdf,000001\n",
+        encoding="utf-8",
+    )
+    db_path = tmp_path / "financial.db"
+
+    assert import_research_reports_index(csv_path, db_path) == 1
+    rows = run_select_query(
+        "SELECT stock_code, report_name, institution FROM research_reports_index",
+        db_path=db_path,
+    )
+    assert rows == [
+        {
+            "stock_code": "000001",
+            "report_name": "年报点评",
+            "institution": "国信证券",
+        }
+    ]
 
 
 def test_sql_query_tool_does_not_expose_db_path():

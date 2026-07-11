@@ -1,0 +1,6 @@
+{
+  "doc_type": "regulation",
+  "retrieval_source": "regulation_search",
+  "permission_level": "internal",
+  "allowed_roles": ["institutional_sales", "compliance", "operations"]
+}

@@ -1,0 +1,14 @@
+{
+  "doc_type": "research_report",
+  "retrieval_source": "report_search",
+  "permission_level": "internal",
+  "allowed_roles": ["advisor", "institutional_sales", "compliance"],
+  "title": "平安银行2025年报及2026一季报点评：收入利润增速均回正",
+  "date": "2026-04-26",
+  "stock_code": "000001",
+  "source": "https://pdf.dfcfw.com/pdf/H3_AP202604261821586763_1.pdf",
+  "provider": "akshare/eastmoney",
+  "institution": "国信证券",
+  "rating": "中性",
+  "sha256": "1ef15973ad913e500264d57f440ab68422ebc1d5c258b636e5165ff5e38885e4"
+}

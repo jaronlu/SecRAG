@@ -37,7 +37,6 @@ from src.schemas.constants import (
     ROLE_ADVISOR,
     ROLE_COMPLIANCE,
     ROLE_INSTITUTIONAL_SALES,
-    SAMPLE_METADATA_FILENAME,
     SOURCE_REPORT,
 )
 
@@ -457,7 +456,6 @@ def fetch_baostock_valuation_history(output_dir: Path) -> MetadataRecord:
 
 
 def write_metadata(output_dir: Path, records: list[MetadataRecord]) -> None:
-    metadata: dict[str, ManifestMetadata] = {}
     for record in records:
         relative_path = record["relative_path"]
         manifest_record: ManifestMetadata = {
@@ -476,10 +474,13 @@ def write_metadata(output_dir: Path, records: list[MetadataRecord]) -> None:
             manifest_record["institution"] = record["institution"]
         if "rating" in record:
             manifest_record["rating"] = record["rating"]
-        metadata[relative_path] = manifest_record
-    manifest = output_dir / SAMPLE_METADATA_FILENAME
-    manifest.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"metadata: {manifest}")
+        source_path = output_dir / relative_path
+        manifest = source_path.with_name(source_path.name + ".meta.json")
+        manifest.write_text(
+            json.dumps(manifest_record, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        print(f"metadata: {manifest}")
 
 
 def main() -> None:

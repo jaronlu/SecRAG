@@ -1,0 +1,12 @@
+{
+  "doc_type": "financial_data",
+  "retrieval_source": "sql_query",
+  "permission_level": "internal",
+  "allowed_roles": ["advisor", "institutional_sales", "compliance"],
+  "title": "贵州茅台 2025 年 1 月估值行情样本",
+  "date": "2025",
+  "stock_code": "600519",
+  "source": "baostock.query_history_k_data_plus",
+  "provider": "baostock",
+  "sha256": "599babad843d023eda6df6bd506d080d4b9d736b19e328ec8427c3271b7ed75a"
+}

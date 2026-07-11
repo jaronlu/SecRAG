@@ -1,0 +1,12 @@
+{
+  "doc_type": "announcement",
+  "retrieval_source": "report_search",
+  "permission_level": "internal",
+  "allowed_roles": ["advisor", "institutional_sales", "compliance"],
+  "title": "平安银行2025年年度报告",
+  "date": "2026-03-21",
+  "stock_code": "000001",
+  "source": "http://static.cninfo.com.cn/finalpage/2026-03-21/1225022887.PDF",
+  "provider": "cninfo",
+  "sha256": "2273565ecbe1b32536631fd4a019a4f4a990f4c793cfd5b70eae90d44d3ff16c"
+}

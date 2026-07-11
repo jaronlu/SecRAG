@@ -1,0 +1,12 @@
+{
+  "doc_type": "financial_data",
+  "retrieval_source": "sql_query",
+  "permission_level": "internal",
+  "allowed_roles": ["advisor", "institutional_sales", "compliance"],
+  "title": "贵州茅台 efinance 基础财务估值样本",
+  "date": "2026",
+  "stock_code": "600519",
+  "source": "efinance.stock.get_base_info",
+  "provider": "efinance/eastmoney",
+  "sha256": "2ddb8dd259e546b7ed4117b15f48f320a2d36ea3f3f213084a81abb850cdb4e7"
+}

@@ -10,6 +10,7 @@ from src.schemas.constants import (
     CHROMA_COLLECTION_NAME,
     CHROMA_HNSW_SPACE_KEY,
     CHROMA_SPACE,
+    CHROMA_UPSERT_BATCH_SIZE,
     DEFAULT_EMBEDDING_MODEL,
     META_DOC_ID,
 )
@@ -102,15 +103,20 @@ def upsert_chunks(
     chunks: list[Document],
     persist_directory: str,
     embedding_model: HuggingFaceEmbeddings,
+    batch_size: int = CHROMA_UPSERT_BATCH_SIZE,
 ) -> None:
-    """按稳定 chunk.id upsert，重复执行不会产生重复 chunk。"""
+    """按稳定 chunk.id 分批 upsert，避免超过 Chroma 单批上限。"""
     if not chunks:
         return
+    if batch_size <= 0:
+        raise ValueError("batch_size 必须大于 0")
     vectorstore = get_vectorstore(
         persist_directory=persist_directory,
         embedding_model=embedding_model,
     )
-    vectorstore.add_documents(chunks, ids=[str(chunk.id) for chunk in chunks])
+    for start in range(0, len(chunks), batch_size):
+        batch = chunks[start : start + batch_size]
+        vectorstore.add_documents(batch, ids=[str(chunk.id) for chunk in batch])
 
 
 def list_chunk_ids_by_doc_id(

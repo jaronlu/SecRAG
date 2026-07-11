@@ -137,18 +137,36 @@ class ConsistencyVerifier:
 
 
 class HallucinationDetector:
-    def detect(self, answer: str, retrieval_results: list[RetrievalResult]) -> dict:
+    def detect(
+        self,
+        answer: str,
+        retrieval_results: list[RetrievalResult],
+        tool_calls: list[ToolCallDict],
+    ) -> dict:
         usable = [result for result in retrieval_results if not result.get(RR_DENIED)]
-        if not usable:
+        evidence = [result.get(RR_CONTENT, "") for result in usable]
+        evidence.extend(
+            str(call.get("output", "")) for call in tool_calls if call.get("success", False)
+        )
+        structured_tool_evidence = [
+            str(call.get("output", ""))
+            for call in tool_calls
+            if call.get("success", False) and self._is_structured_output(call.get("output", ""))
+        ]
+        if not evidence:
             return {
                 "passed": False,
-                "issues": ["无检索结果支撑"],
+                "issues": ["无检索结果或成功工具输出支撑"],
                 "hallucination_score": 1.0,
             }
 
-        sentences = [part.strip() for part in re.split(r"[。；\n]", answer) if part.strip()]
+        sentences = self._answer_sentences(answer)
         coverage = [
-            any(self._similar(sentence, result.get(RR_CONTENT, "")) for result in usable)
+            any(self._similar(sentence, item) for item in evidence)
+            or any(
+                self._structured_claim_supported(sentence, item)
+                for item in structured_tool_evidence
+            )
             for sentence in sentences
             if not sentence.startswith(("【风险提示】", "【适当性提示】"))
         ]
@@ -164,6 +182,37 @@ class HallucinationDetector:
         if not tokens1:
             return False
         return len(tokens1 & tokens2) / len(tokens1) > 0.5
+
+    def _answer_sentences(self, answer: str) -> list[str]:
+        lines = answer.splitlines()
+        sentences: list[str] = []
+        for index, line in enumerate(lines):
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or self._is_table_separator(stripped):
+                continue
+            next_line = lines[index + 1].strip() if index + 1 < len(lines) else ""
+            if stripped.startswith("|") and self._is_table_separator(next_line):
+                continue
+            sentences.extend(
+                part.strip() for part in re.split(r"[。；]", stripped) if part.strip()
+            )
+        return sentences
+
+    def _is_table_separator(self, text: str) -> bool:
+        return bool(re.fullmatch(r"\|?[\s:|-]+\|?", text)) and "-" in text
+
+    def _is_structured_output(self, output: object) -> bool:
+        text = str(output).strip()
+        return (text.startswith("[") and text.endswith("]")) or (
+            text.startswith("{") and text.endswith("}")
+        )
+
+    def _structured_claim_supported(self, sentence: str, evidence: str) -> bool:
+        claims = re.findall(
+            r"[A-Za-z_][A-Za-z0-9_]*|\d+(?:\.\d+)?(?:-\d+)*",
+            sentence.lower(),
+        )
+        return bool(claims) and all(claim in evidence.lower() for claim in claims)
 
 
 class ComprehensiveVerifier:
@@ -189,7 +238,7 @@ class ComprehensiveVerifier:
             ),
             "consistency_verification": self.consistency_verifier.verify(answer, citations),
             "hallucination_detection": self.hallucination_detector.detect(
-                answer, retrieval_results
+                answer, retrieval_results, tool_calls
             ),
         }
         issues = [

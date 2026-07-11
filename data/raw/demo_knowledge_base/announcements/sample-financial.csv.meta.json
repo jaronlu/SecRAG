@@ -1,0 +1,6 @@
+{
+  "doc_type": "financial_data",
+  "retrieval_source": "sql_query",
+  "permission_level": "internal",
+  "allowed_roles": ["advisor", "institutional_sales", "compliance"]
+}

@@ -8,13 +8,11 @@ from src.schemas.typed_dicts import ComplianceResult
 
 INVESTMENT_ADVICE_PATTERNS: tuple[str, ...] = (
     "推荐" + "买" + "入",
+    "建议" + "买" + "入",
     "建议" + "卖" + "出",
+    "建议" + "增" + "持",
+    "建议" + "减" + "持",
     "目标" + "价",
-    "评级",
-    "买" + "入",
-    "卖" + "出",
-    "增" + "持",
-    "减" + "持",
 )
 SENSITIVE_KEYWORDS: tuple[str, ...] = ("内" + "幕" + "信息", "未" + "公开", "业绩" + "预测")
 HIGH_RISK_PRODUCTS: tuple[str, ...] = ("标的型" + "产品", "混合型" + "产品", "私" + "募" + "产品")

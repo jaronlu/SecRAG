@@ -369,17 +369,15 @@ def reason(state: AssistantState) -> AssistantState:
 
     results = state.get(STATE_RETRIEVAL_RESULTS, [])
     reason_attempts = state.get(STATE_REASON_ATTEMPTS, 0) + 1
-    if not results:
-        return _with_state_updates(state, {
-            STATE_FINAL_ANSWER: "未检索到足够相关的资料，无法基于当前知识库回答该问题。",
-            STATE_REASON_ATTEMPTS: reason_attempts,
-        })
 
     # 构建 context
     context = "\n\n".join([
         f"[来源{i + 1}] {r[RR_METADATA].get(META_TITLE, '未知')}\n{r[RR_CONTENT]}"
         for i, r in enumerate(results[:5])
-    ])
+    ]) or (
+        "当前轮没有可用文档检索结果；如问题可由授权工具回答，应调用工具并仅依据成功"
+        "工具输出作答。"
+    )
 
     # 角色化 prompt
     role_instructions = {
@@ -403,8 +401,10 @@ def reason(state: AssistantState) -> AssistantState:
 【用户角色】{role}
 
 如果需要计算或查询更多信息，可以使用工具。
-回答必须附引用标注 [来源1][来源2]。
+只有当前轮存在文档检索结果时，回答才允许并必须附对应的 [来源N]；纯工具回答不得编造文档引用。
 数字必须来自检索结果或成功的工具输出，禁止编造。
+纯工具回答只能复述成功工具输出中实际存在的字段和值。不得补充工具未返回的字段含义、
+数据来源、更新频率、覆盖范围、趋势判断或后续能力；优先直接使用字段名和值，保持简洁。
 {"投顾/销售角色：不得输出" + "买" + "入/" + "卖" + "出/" + "目标" + "价等业务建议，仅提供事实信息。" if role in (ROLE_ADVISOR, ROLE_INSTITUTIONAL_SALES) else ""}
 {"合规角色：引用必须精确到条款/条文号。" if role == ROLE_COMPLIANCE else ""}"""
 

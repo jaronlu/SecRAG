@@ -1,0 +1,6 @@
+{
+  "doc_type": "faq",
+  "retrieval_source": "faq_search",
+  "permission_level": "internal",
+  "allowed_roles": ["technical"]
+}

@@ -1,0 +1,12 @@
+{
+  "doc_type": "financial_data",
+  "retrieval_source": "sql_query",
+  "permission_level": "internal",
+  "allowed_roles": ["advisor", "institutional_sales", "compliance"],
+  "title": "AKShare 东方财富研报索引样本",
+  "date": "2026-07-07",
+  "stock_code": "",
+  "source": "akshare.stock_research_report_em",
+  "provider": "akshare/eastmoney",
+  "sha256": "8b87456b637ecbca02c5f03efaec3e777683e7ef939e1cbb6412f58dc1d91381"
+}

@@ -76,6 +76,7 @@ from src.schemas.constants import (
     STATE_RETRIEVAL_PLAN,
     STATE_RETRIEVAL_RESULTS,
     STATE_REWRITTEN_QUERY,
+    STATE_TOOL_CALLS,
     STATE_USER_ROLE,
     STATE_VERIFICATION,
 )
@@ -205,6 +206,83 @@ class TestVerify:
         result = verify(state)
         assert result[STATE_VERIFICATION].get("passed") is True
 
+    def test_tool_only_answer_uses_successful_tool_output_as_evidence(self):
+        state = _state(**{
+            STATE_FINAL_ANSWER: "平安银行研报由示例机构发布",
+            STATE_RETRIEVAL_RESULTS: [],
+            STATE_TOOL_CALLS: [
+                {
+                    "tool": "sql_query_tool",
+                    "output": "平安银行研报由示例机构发布",
+                    "success": True,
+                }
+            ],
+        })
+
+        result = verify(state)
+
+        assert result[STATE_VERIFICATION].get("passed") is True
+
+    def test_failed_tool_output_is_not_grounding_evidence(self):
+        state = _state(**{
+            STATE_FINAL_ANSWER: "平安银行研报由示例机构发布",
+            STATE_RETRIEVAL_RESULTS: [],
+            STATE_TOOL_CALLS: [
+                {
+                    "tool": "sql_query_tool",
+                    "output": "平安银行研报由示例机构发布",
+                    "success": False,
+                }
+            ],
+        })
+
+        result = verify(state)
+
+        assert result[STATE_VERIFICATION].get("passed") is False
+        assert any("成功工具输出" in issue for issue in result[STATE_VERIFICATION]["issues"])
+
+    def test_markdown_table_is_grounded_by_structured_tool_output(self):
+        state = _state(**{
+            STATE_FINAL_ANSWER: (
+                "### 样本\n"
+                "| stock_code | report_date | eps_2026 |\n"
+                "|---|---|---|\n"
+                "| 000001 | 2026-04-26 | 2.08 |"
+            ),
+            STATE_RETRIEVAL_RESULTS: [],
+            STATE_TOOL_CALLS: [
+                {
+                    "tool": "sql_query_tool",
+                    "output": (
+                        '[{"stock_code":"000001","report_date":"2026-04-26",'
+                        '"eps_2026":2.08}]'
+                    ),
+                    "success": True,
+                }
+            ],
+        })
+
+        result = verify(state)
+
+        assert result[STATE_VERIFICATION].get("passed") is True
+
+    def test_structured_tool_output_does_not_support_missing_value(self):
+        state = _state(**{
+            STATE_FINAL_ANSWER: "| stock_code | eps_2026 |\n|---|---|\n| 000001 | 9.99 |",
+            STATE_RETRIEVAL_RESULTS: [],
+            STATE_TOOL_CALLS: [
+                {
+                    "tool": "sql_query_tool",
+                    "output": '[{"stock_code":"000001","eps_2026":2.08}]',
+                    "success": True,
+                }
+            ],
+        })
+
+        result = verify(state)
+
+        assert result[STATE_VERIFICATION].get("passed") is False
+
     def test_numbers_not_in_results_fails(self):
         state = _state(**{
             STATE_FINAL_ANSWER: "净利润 888 亿元",
@@ -232,6 +310,18 @@ class TestVerify:
         })
         result = verify(state)
         assert any("业务建议" in i for i in result[STATE_VERIFICATION].get("issues", []))
+
+    def test_attributed_research_rating_is_not_system_advice(self):
+        answer = "东兴证券在2025-10-28发布的报告评级为买入"
+        state = _state(**{
+            STATE_USER_ROLE: ROLE_ADVISOR,
+            STATE_FINAL_ANSWER: answer,
+            STATE_RETRIEVAL_RESULTS: [_result(answer)],
+        })
+
+        result = verify(state)
+
+        assert result[STATE_VERIFICATION].get("passed") is True
 
     def test_no_advice_check_for_compliance(self):
         """合规角色不触发业务建议检查"""
@@ -455,6 +545,51 @@ class TestRoleAwareTools:
         assert SOURCE_REPORT in captured["tool_names"]
         assert result[STATE_FINAL_ANSWER] == "ok"
         assert result[STATE_REASON_ATTEMPTS] == 1
+
+    def test_reason_allows_tool_only_answer_when_retrieval_is_empty(self, monkeypatch):
+        from langchain_core.messages import AIMessage, ToolMessage
+
+        captured = {}
+
+        def fake_create_agent(model, tools, system_prompt):
+            captured["system_prompt"] = system_prompt
+
+            class FakeAgent:
+                def invoke(self, payload):
+                    return {
+                        STATE_MESSAGES: [
+                            ToolMessage(
+                                content="平安银行研报由示例机构发布",
+                                tool_call_id="call-1",
+                                name="sql_query_tool",
+                            ),
+                            AIMessage(content="平安银行研报由示例机构发布"),
+                        ]
+                    }
+
+            return FakeAgent()
+
+        monkeypatch.setattr("langchain.agents.create_agent", fake_create_agent)
+        state = _state(**{
+            STATE_USER_ROLE: ROLE_ADVISOR,
+            STATE_ORIGINAL_QUERY: "AKShare 东方财富研报索引样本",
+            STATE_DEPARTMENT: "wealth",
+            STATE_MESSAGES: [],
+            STATE_RETRIEVAL_RESULTS: [],
+        })
+
+        result = reason(state)
+
+        assert "没有可用文档检索结果" in captured["system_prompt"]
+        assert "纯工具回答不得编造文档引用" in captured["system_prompt"]
+        assert result[STATE_FINAL_ANSWER] == "平安银行研报由示例机构发布"
+        assert result[STATE_TOOL_CALLS] == [
+            {
+                "tool": "sql_query_tool",
+                "output": "平安银行研报由示例机构发布",
+                "success": True,
+            }
+        ]
 
 
 # ══════════════════════════════════════════════════════════════════════

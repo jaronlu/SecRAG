@@ -1,0 +1,14 @@
+{
+  "doc_type": "research_report",
+  "retrieval_source": "report_search",
+  "permission_level": "internal",
+  "allowed_roles": ["advisor", "institutional_sales", "compliance"],
+  "title": "贵州茅台2025年年报及2026年一季报点评：顺势出清舒缓压力巩固优势稳健前行",
+  "date": "2026-05-25",
+  "stock_code": "600519",
+  "source": "https://pdf.dfcfw.com/pdf/H3_AP202605251822844635_1.pdf",
+  "provider": "akshare/eastmoney",
+  "institution": "诚通证券",
+  "rating": "买入",
+  "sha256": "a16088a541a7db8f30c1955546f8aed52c45d632ba772164b8695a41fb8c66f1"
+}

@@ -1,0 +1,12 @@
+{
+  "doc_type": "financial_data",
+  "retrieval_source": "sql_query",
+  "permission_level": "internal",
+  "allowed_roles": ["advisor", "institutional_sales", "compliance"],
+  "title": "A 股股票基础信息样本",
+  "date": "2026",
+  "stock_code": "",
+  "source": "baostock.query_stock_basic",
+  "provider": "baostock",
+  "sha256": "88f502450e14a35724ed7aae1486902990082f1377795c5ca1d50a61969e5f53"
+}

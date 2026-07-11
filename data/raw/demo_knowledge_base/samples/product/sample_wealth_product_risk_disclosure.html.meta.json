@@ -1,0 +1,6 @@
+{
+  "doc_type": "product",
+  "retrieval_source": "product_search",
+  "permission_level": "internal",
+  "allowed_roles": ["advisor", "institutional_sales", "compliance", "operations"]
+}
