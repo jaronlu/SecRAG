@@ -1,9 +1,10 @@
 """Agent Graph 构建——节点编排、条件路由、Checkpointer"""
 
 import time
-from collections.abc import Callable
+from typing import Literal, Protocol
 
 from langgraph.graph import END, START, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 
 from src.agents.nodes import (
     audit_log,
@@ -33,18 +34,23 @@ from src.schemas.constants import (
     STATE_RETRIEVAL_RESULTS,
     STATE_VERIFICATION,
 )
+from src.schemas.typed_dicts import IntermediateStep
+
+
+class _AgentNode(Protocol):
+    def __call__(self, state: AssistantState) -> AssistantState: ...
 
 
 def _traced_node(
     name: str,
-    node: Callable[[AssistantState], AssistantState],
-) -> Callable[[AssistantState], AssistantState]:
+    node: _AgentNode,
+) -> _AgentNode:
     """Record the actual node path and elapsed time in state."""
 
     def wrapped(state: AssistantState) -> AssistantState:
         started = time.perf_counter()
         result = node(state)
-        step = {
+        step: IntermediateStep = {
             "step": name,
             "duration_ms": max((time.perf_counter() - started) * 1000, 0.0),
             "success": True,
@@ -62,7 +68,9 @@ def _traced_node(
 # ══════════════════════════════════════════════════════════════════════
 
 
-def should_retry_retrieval(state: AssistantState) -> str:
+def should_retry_retrieval(
+    state: AssistantState,
+) -> Literal["denied", "continue", "retrieve"]:
     """判断是否需要补充检索（最多 DEFAULT_MAX_HOPS 次，计数器由 retrieve 节点维护）"""
     attempts = state.get(STATE_RETRIEVAL_ATTEMPTS, 0)
     results = state.get(STATE_RETRIEVAL_RESULTS, [])
@@ -79,7 +87,7 @@ def should_retry_retrieval(state: AssistantState) -> str:
     return "continue"
 
 
-def should_reason_again(state: AssistantState) -> str:
+def should_reason_again(state: AssistantState) -> Literal["retry", "continue"]:
     """判断验证是否通过；失败重推受 MAX_REASON_ATTEMPTS 显式限制。"""
     verification = state.get(STATE_VERIFICATION, {})
     attempts = state.get(STATE_REASON_ATTEMPTS, 0)
@@ -88,7 +96,7 @@ def should_reason_again(state: AssistantState) -> str:
     return "continue"
 
 
-def is_compliant(state: AssistantState) -> str:
+def is_compliant(state: AssistantState) -> Literal["pass", "block"]:
     """判断是否通过合规检查"""
     compliance = state.get(STATE_COMPLIANCE, {})
     if compliance.get("passed", False):
@@ -101,7 +109,7 @@ def is_compliant(state: AssistantState) -> str:
 # ══════════════════════════════════════════════════════════════════════
 
 
-def build_agent_graph() -> StateGraph:
+def build_agent_graph() -> StateGraph[AssistantState]:
     """构建 fail-closed Agent Graph。
 
     流程：START → query_understand → planner → retrieve → grade_and_filter
@@ -194,7 +202,7 @@ def build_agent_graph() -> StateGraph:
 # ══════════════════════════════════════════════════════════════════════
 
 
-def build_agent_with_checkpoint():
+def build_agent_with_checkpoint() -> CompiledStateGraph[AssistantState]:
     """构建带 Checkpointer 的 Agent Graph"""
     from langgraph.checkpoint.memory import InMemorySaver
 

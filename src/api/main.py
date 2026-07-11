@@ -1,5 +1,6 @@
 import logging
 import uuid
+from typing import cast
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException
@@ -38,6 +39,7 @@ from src.schemas.constants import (
 from src.schemas.request_response import (
     AssistantQARequest,
     AssistantQAResponse,
+    ConversationMessageResponse,
     ConversationMessagesResponse,
     ConversationThreadCreate,
     ConversationThreadResponse,
@@ -171,6 +173,8 @@ async def create_assistant_thread(
         client_id=request.client_id,
         title=request.title,
     )
+    # create_thread 返回全量字段，收窄类型以消除 TypedDict(total=False) 的访问警告
+    assert "thread_id" in thread and "title" in thread and "created_at" in thread
     return ConversationThreadResponse(
         thread_id=thread["thread_id"],
         title=thread["title"],
@@ -190,7 +194,10 @@ async def get_assistant_thread_messages(
         )
     except Exception as exc:
         raise _conversation_http_error(exc) from exc
-    return ConversationMessagesResponse(thread_id=thread_id, messages=messages)
+    return ConversationMessagesResponse(
+        thread_id=thread_id,
+        messages=cast(list[ConversationMessageResponse], messages),
+    )
 
 
 @app.delete(API_ROUTE_ASSISTANT_THREAD, status_code=204)
@@ -236,7 +243,8 @@ async def assistant_qa(
         )
     except Exception as exc:
         raise _conversation_http_error(exc) from exc
-    thread_id = thread["thread_id"]
+    # ensure_thread_for_qa 返回的 thread 保证含 thread_id（查找键或新建时赋值）
+    thread_id = thread.get("thread_id", request.thread_id)
     turn_id = str(uuid.uuid4())
     initial_state = build_assistant_initial_state(
         request,
