@@ -8,7 +8,6 @@ import json
 import sqlite3
 import time
 import uuid
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
@@ -43,34 +42,15 @@ from src.schemas.constants import (
     STATE_USER_ROLE,
     STATE_VERIFICATION,
 )
+from src.schemas.models import AuditEntry
 from src.schemas.typed_dicts import (
     AuditQuery,
     AuditReasoning,
     AuditResponse,
     AuditRetrieval,
     AuditTrail,
-    ComplianceResult,
     RetrievalResult,
-    VerificationResult,
 )
-
-
-@dataclass
-class AuditEntry:
-    """审计日志条目 — 权威定义，字段对应 SCHEMA-REFERENCE §3.5"""
-
-    request_id: str
-    timestamp: str
-    user_id: str
-    user_role: str
-    department: str
-    query: AuditQuery
-    retrieval: AuditRetrieval
-    reasoning: AuditReasoning
-    verification: VerificationResult
-    compliance: ComplianceResult
-    response: AuditResponse
-
 
 def audit_entry_to_trail(entry: AuditEntry) -> AuditTrail:
     """Serialize an AuditEntry into the AssistantState audit_trail shape."""

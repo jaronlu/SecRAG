@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
-import re
 import sqlite3
 from pathlib import Path
 from typing import Any
 
 from langchain_core.tools import tool
+from sqlglot import exp, parse
+from sqlglot.errors import ParseError
 
 from src.schemas.constants import FINANCIAL_DB_PATH
 
@@ -53,69 +54,48 @@ ALLOWED_SQL_TABLES: dict[str, set[str]] = {
     },
 }
 
-_SQL_PATTERN = re.compile(
-    r"^SELECT\s+(?P<columns>\*|[A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*)"
-    r"\s+FROM\s+(?P<table>[A-Za-z_][A-Za-z0-9_]*)"
-    r"(?:\s+WHERE\s+(?P<where>.*?))?"
-    r"(?:\s+ORDER\s+BY\s+(?P<order>[A-Za-z_][A-Za-z0-9_]*)(?:\s+(?P<direction>ASC|DESC))?)?"
-    r"(?:\s+LIMIT\s+(?P<limit>\d+))?$",
-    re.IGNORECASE,
-)
-_WHERE_TERM_PATTERN = re.compile(
-    r"^(?P<column>[A-Za-z_][A-Za-z0-9_]*)\s*"
-    r"(?P<op>=|>=|<=|>|<|LIKE)\s*"
-    r"(?P<value>\?|[-+]?\d+(?:\.\d+)?|'[^']*')$",
-    re.IGNORECASE,
-)
-
-
 def normalize_select_sql(query: str, limit: int = MAX_SQL_ROWS) -> str | None:
-    """Validate a single-table allowlisted SELECT SQL and enforce LIMIT."""
-    normalized = query.strip()
-    if not normalized:
+    """Validate a single-table allowlisted SELECT AST and enforce LIMIT."""
+    if not query.strip() or any(token in query for token in ("--", "/*", "*/")):
         return None
-
-    if normalized.endswith(";"):
+    try:
+        statements = [statement for statement in parse(query, read="sqlite") if statement]
+    except ParseError:
         return None
-
-    if any(token in normalized for token in ("--", "/*", "*/")):
+    if len(statements) != 1:
         return None
-
-    match = _SQL_PATTERN.fullmatch(normalized)
-    if match is None:
+    statement = statements[0]
+    if not isinstance(statement, exp.Select):
         return None
-
-    table = match.group("table")
+    if any(statement.find(node_type) is not None for node_type in (
+        exp.Join,
+        exp.Subquery,
+        exp.Union,
+        exp.Intersect,
+        exp.Except,
+        exp.With,
+    )):
+        return None
+    tables = list(statement.find_all(exp.Table))
+    if len(tables) != 1:
+        return None
+    table = tables[0].name
     allowed_columns = ALLOWED_SQL_TABLES.get(table)
     if allowed_columns is None:
         return None
-
-    columns = match.group("columns")
-    if columns != "*":
-        selected = {column.strip() for column in columns.split(",")}
-        if not selected or not selected <= allowed_columns:
+    for column in statement.find_all(exp.Column):
+        if column.name not in allowed_columns:
             return None
-
-    where_clause = match.group("where")
-    if where_clause:
-        terms = re.split(r"\s+AND\s+", where_clause, flags=re.IGNORECASE)
-        for term in terms:
-            term_match = _WHERE_TERM_PATTERN.fullmatch(term.strip())
-            if term_match is None:
-                return None
-            if term_match.group("column") not in allowed_columns:
-                return None
-
-    order_column = match.group("order")
-    if order_column and order_column not in allowed_columns:
-        return None
-
-    limit_value = match.group("limit")
-    if limit_value is None:
-        normalized = f"{normalized} LIMIT {limit}"
-    elif int(limit_value) > limit:
-        return None
-    return normalized
+    limit_node = statement.args.get("limit")
+    if limit_node is None:
+        statement = statement.limit(limit)
+    else:
+        limit_expression = limit_node.expression
+        if not isinstance(limit_expression, exp.Literal) or not limit_expression.is_int:
+            return None
+        if int(limit_expression.this) > limit:
+            return None
+    return statement.sql(dialect="sqlite")
 
 
 def run_select_query(
