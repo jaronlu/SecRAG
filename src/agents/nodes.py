@@ -120,6 +120,26 @@ def _with_state_updates(state: AssistantState, updates: dict[str, Any]) -> Assis
     return cast(AssistantState, {**state, **updates})
 
 
+def _structure_answer(content: str) -> str:
+    """Normalize visible answer text into a stable Markdown structure."""
+    answer = content.strip()
+    for prefix in ("Answer:", "回答：", "回答:"):
+        if answer.startswith(prefix):
+            answer = answer[len(prefix):].lstrip()
+            break
+    for marker in ("\nCitations:", "\nAudit Trail:"):
+        if marker in answer:
+            answer = answer.split(marker, 1)[0].rstrip()
+    if not answer or answer.startswith("## 结论"):
+        return answer
+
+    conclusion, separator, details = answer.partition("\n\n")
+    structured = f"## 结论\n\n{conclusion.strip()}"
+    if separator and details.strip():
+        structured += f"\n\n## 关键结果\n\n{details.strip()}"
+    return structured
+
+
 def _normalize_plan_step(step: object, default_query: str = "") -> RetrievalPlanStep | None:
     if not isinstance(step, dict):
         return None
@@ -405,6 +425,13 @@ def reason(state: AssistantState) -> AssistantState:
 数字必须来自检索结果或成功的工具输出，禁止编造。
 纯工具回答只能复述成功工具输出中实际存在的字段和值。不得补充工具未返回的字段含义、
 数据来源、更新频率、覆盖范围、趋势判断或后续能力；优先直接使用字段名和值，保持简洁。
+回答正文必须使用结构化 Markdown：
+1. 以 `## 结论` 开头，用 1-2 句话直接回答问题；
+2. 有明细时增加 `## 关键结果`：记录型/对比型数据使用 Markdown 表格，操作流程使用有序列表，
+   概念解释使用 What / Why / How 要点；
+3. 只有存在限制、缺失字段或适用边界时才增加 `## 注意事项`；
+4. 不重复输出“字段列表 + 同字段完整表格”，除非用户明确询问字段结构；
+5. 不在正文输出 `Answer:`、`Citations:`、`Audit Trail:`、置信度或内部工具调用细节。
 {"投顾/销售角色：不得输出" + "买" + "入/" + "卖" + "出/" + "目标" + "价等业务建议，仅提供事实信息。" if role in (ROLE_ADVISOR, ROLE_INSTITUTIONAL_SALES) else ""}
 {"合规角色：引用必须精确到条款/条文号。" if role == ROLE_COMPLIANCE else ""}"""
 
@@ -417,6 +444,7 @@ def reason(state: AssistantState) -> AssistantState:
 
     final_msg = response[STATE_MESSAGES][-1]
     final_content = final_msg.content if isinstance(final_msg.content, str) else str(final_msg.content)
+    final_content = _structure_answer(final_content)
     tool_calls: list[ToolCallDict] = list(state.get(STATE_TOOL_CALLS, []))
     for message in response[STATE_MESSAGES]:
         if isinstance(message, ToolMessage):
@@ -499,7 +527,9 @@ def permission_denied_response(state: AssistantState) -> AssistantState:
     return _with_state_updates(
         state,
         {
-            STATE_FINAL_ANSWER: "当前角色无权限访问完成该请求所需的数据源。",
+            STATE_FINAL_ANSWER: _structure_answer(
+                "当前角色无权限访问完成该请求所需的数据源。"
+            ),
             STATE_CITATIONS: [],
             STATE_CONFIDENCE: CONFIDENCE_LOW,
             STATE_RISK_DISCLOSURE: "",
@@ -539,7 +569,7 @@ def compose(state: AssistantState) -> AssistantState:
     elif not compliance_passed:
         answer = "当前请求或生成内容未通过合规检查，已停止输出。"
         citations = []
-    final_answer = answer + suitability + risk
+    final_answer = _structure_answer(answer) + suitability + risk
 
     # 综合置信度
     verification_conf = state.get(STATE_VERIFICATION, {}).get("confidence", CONFIDENCE_MEDIUM)

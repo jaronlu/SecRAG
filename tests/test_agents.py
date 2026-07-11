@@ -16,6 +16,7 @@ from src.agents.graph import (
     should_retry_retrieval,
 )
 from src.agents.nodes import (
+    _structure_answer,
     audit_log,
     compliance_check,
     compose,
@@ -543,7 +544,7 @@ class TestRoleAwareTools:
 
         assert SOURCE_FAQ in captured["tool_names"]
         assert SOURCE_REPORT in captured["tool_names"]
-        assert result[STATE_FINAL_ANSWER] == "ok"
+        assert result[STATE_FINAL_ANSWER] == "## 结论\n\nok"
         assert result[STATE_REASON_ATTEMPTS] == 1
 
     def test_reason_allows_tool_only_answer_when_retrieval_is_empty(self, monkeypatch):
@@ -582,7 +583,7 @@ class TestRoleAwareTools:
 
         assert "没有可用文档检索结果" in captured["system_prompt"]
         assert "纯工具回答不得编造文档引用" in captured["system_prompt"]
-        assert result[STATE_FINAL_ANSWER] == "平安银行研报由示例机构发布"
+        assert result[STATE_FINAL_ANSWER] == "## 结论\n\n平安银行研报由示例机构发布"
         assert result[STATE_TOOL_CALLS] == [
             {
                 "tool": "sql_query_tool",
@@ -590,6 +591,36 @@ class TestRoleAwareTools:
                 "success": True,
             }
         ]
+
+
+class TestStructuredAnswer:
+    def test_structures_multi_section_answer_and_preserves_table(self):
+        answer = (
+            "Answer:\n以下是研报索引样本。\n\n"
+            "| stock_code | stock_name |\n"
+            "|---|---|\n"
+            "| 000001 | 平安银行 |\n\n"
+            "Citations:\n无引用\n\nAudit Trail:\n{}"
+        )
+
+        result = _structure_answer(answer)
+
+        assert result.startswith("## 结论\n\n以下是研报索引样本。")
+        assert "## 关键结果" in result
+        assert "| 000001 | 平安银行 |" in result
+        assert "Citations:" not in result
+        assert "Audit Trail:" not in result
+
+    def test_single_paragraph_does_not_invent_detail_section(self):
+        result = _structure_answer("未找到可验证资料。")
+
+        assert result == "## 结论\n\n未找到可验证资料。"
+        assert "## 关键结果" not in result
+
+    def test_existing_structured_answer_is_unchanged(self):
+        answer = "## 结论\n\n已完成。\n\n## 关键结果\n\n1. 第一项"
+
+        assert _structure_answer(answer) == answer
 
 
 # ══════════════════════════════════════════════════════════════════════
