@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from src.schemas.constants import (
     AUDIT_DB_PATH,
     CHROMA_DEFAULT_PERSIST_DIR,
+    CONVERSATION_DB_PATH,
     LLM_DEFAULT_TEMPERATURE,
     LLM_PROVIDER_OLLAMA,
     LLM_PROVIDER_OPENAI,
@@ -34,7 +35,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     # App
-    app_env: str = "dev"
+    app_env: str = "development"
     app_debug: bool = True
     app_host: str = "0.0.0.0"
     app_port: int = 8000
@@ -63,6 +64,7 @@ class Settings(BaseSettings):
 
     # Audit
     audit_db_path: str = AUDIT_DB_PATH
+    conversation_db_path: str = CONVERSATION_DB_PATH
 
     @model_validator(mode="after")
     def _check_openai_key(self):

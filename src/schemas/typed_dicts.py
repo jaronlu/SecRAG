@@ -96,6 +96,9 @@ class CitationDict(TypedDict, total=False):
     relevance_score: float
     permission_level: str
     page_number: int | None
+    retrieval_path: list[str]
+    timestamp: str
+    metadata: dict
 
 
 class ConversationThreadDict(TypedDict, total=False):

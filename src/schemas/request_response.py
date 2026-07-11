@@ -22,7 +22,6 @@ class QARequest(BaseModel):
     )
     top_k: int = Field(default=DEFAULT_TOP_K, ge=1, le=20, description="检索返回的条数")
     doc_type: Optional[str] = Field(default=None, description="文档类型过滤")
-    stream: bool = Field(default=False, description="是否流式返回")
 
 
 class QAResponse(BaseModel):
@@ -53,3 +52,32 @@ class AssistantQAResponse(BaseModel):
     confidence: str  # SCHEMA-REFERENCE §2.3
     compliance: ComplianceResult
     audit_trail: AuditTrail
+
+
+class ConversationThreadCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    client_id: Optional[str] = None
+    title: str = Field(default="新会话", min_length=1, max_length=100)
+
+
+class ConversationThreadResponse(BaseModel):
+    thread_id: str
+    title: str
+    created_at: str
+
+
+class ConversationMessageResponse(BaseModel):
+    message_id: str
+    thread_id: str
+    turn_id: str
+    role: str
+    content: str
+    sequence: int
+    created_at: str
+    request_id: Optional[str] = None
+
+
+class ConversationMessagesResponse(BaseModel):
+    thread_id: str
+    messages: list[ConversationMessageResponse]
