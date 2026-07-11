@@ -4,7 +4,8 @@
 
 机构内部投研知识平台 — Agentic RAG 系统。完整设计文档见 `docs/design/`。
 - `docs/design` 只是软连接
-- 文档真实路径: `llm-wiki/raw/10-AI/projects/agentic-rag-securities/`
+- 文档真实路径: `~/llm-wiki/workshop/agentic-rag-securities/raw/`
+- 项目级设计同步规则: `~/llm-wiki/workshop/agentic-rag-securities/AGENTS.md`
 ## 设计文档索引
 
 | 文档 | 路径 |
@@ -18,13 +19,15 @@
 | 05-业务工具 | `docs/design/implementation-05-financial-tools.md` |
 | 06-引用与验证 | `docs/design/implementation-06-citation-verification.md` |
 | 07-多轮会话与聊天持久化 | `docs/design/implementation-07-conversation-management.md` |
-| 08-RAG 文档合并策略 | `docs/design/implementation-08-rag-document-combine.md` |
+| 08-系统评估与准入 | `docs/design/implementation-08-evaluation.md` |
+| 参考-RAG 文档合并策略 | `docs/design/reference-rag-document-combine.md` |
 
 ## 核心规则
 
 0. **默认只答不操作**：默认只回答问题、给出建议；当用户明确要求修改、执行或 coding 时，可按设计驱动流程执行。所有高风险写/删/改/执行命令必须等用户明确确认后再动手。
 0.1 **禁止弃用 API**：代码和设计文档中**禁止使用任何被标记为 Deprecated / Sunset 的 API**。第三方库优先使用当前稳定版的官方最新入口；涉及 LangChain 生态时，不再使用 `langchain-community`、`langchain` 老 Agent/TextSplitter 入口等已知弃用路径，改走对应独立包或社区明确迁移方案。
 1. **文档先行**：当设计文档（Wiki）与代码不一致时，先更新 Wiki 设计文档，再改代码。设计驱动实现，不允许代码偏离后补文档。
+1.1 **1:1 对齐**：`docs/design/` 的语义变更必须同步实现、依赖、数据模型、API、测试、评估脚本和配置；完成前执行逐项差异审计，不得把 TODO、占位或 silent fallback 记为已实现。
 2. **源码优先查本地**：涉及第三方库（LangChain, LangGraph, ChromaDB, FastAPI 等）的 API 签名、实现细节、版本差异时，先查 `~/llm-wiki/summaries/local-source-repos.md` 找到对应本地源码路径，再从本地源码中确认，不依赖记忆或网络搜索。
 3. **代码自解释**：API 签名、docstring、测试即文档，不维护两份冗余内容。
 4. **偏差记录**：实现中如果发现设计有问题，先在 Wiki 文档中修正设计，再回头改代码。同时在 `DESIGN.md` 中记录变更原因。
