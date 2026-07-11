@@ -70,6 +70,13 @@
       cursor: not-allowed;
       opacity: 0.6;
     }
+    .secondary-button {
+      background: #e5e7eb;
+      color: #111827;
+    }
+    .danger-button {
+      background: #b42318;
+    }
     pre {
       white-space: pre-wrap;
       word-break: break-word;
@@ -192,7 +199,11 @@
         </div>
       </div>
       <div class="toolbar">
-        <button id="submit" type="button">提交查询</button>
+        <div class="copy-tools">
+          <button id="submit" type="button">提交查询</button>
+          <button id="newThread" class="secondary-button" type="button">新会话</button>
+          <button id="deleteThread" class="danger-button" type="button">删除会话</button>
+        </div>
         <span id="status" class="status">Ready</span>
       </div>
     </section>
@@ -210,6 +221,10 @@
     </div>
     <section id="emptyResult" class="output-section">等待查询...</section>
     <div id="resultSections" class="result-sections" hidden>
+      <section class="output-section">
+        <h3>Messages</h3>
+        <ol id="messageList" class="citation-list"></ol>
+      </section>
       <section class="output-section">
         <h3>Answer</h3>
         <div id="answerText" class="answer-text"></div>
@@ -235,6 +250,8 @@
   <script>
     const submit = document.getElementById("submit");
     const copyResult = document.getElementById("copyResult");
+    const newThread = document.getElementById("newThread");
+    const deleteThread = document.getElementById("deleteThread");
     const tokenSelect = document.getElementById("token");
     const roleBinding = document.getElementById("roleBinding");
     const statusEl = document.getElementById("status");
@@ -245,6 +262,7 @@
     const confidenceText = document.getElementById("confidenceText");
     const complianceText = document.getElementById("complianceText");
     const citationList = document.getElementById("citationList");
+    const messageList = document.getElementById("messageList");
     const auditText = document.getElementById("auditText");
     const rawJson = document.getElementById("rawJson");
     let lastResultText = "";
@@ -265,6 +283,7 @@
       const citations = Array.isArray(data.citations) ? data.citations : [];
       const audit = data.audit_trail || {};
       const compliance = data.compliance || {};
+      if (data.thread_id) document.getElementById("threadId").value = data.thread_id;
 
       answerText.textContent = answer || "无回答内容";
       confidenceText.textContent = `confidence: ${data.confidence || "n/a"}`;
@@ -293,6 +312,25 @@
         `Citations:\n${citations.map((c, i) => `${i + 1}. ${c.doc_title || "未知文档"} — ${c.source || ""}`).join("\n") || "无引用"}`,
         `Audit Trail:\n${JSON.stringify(audit, null, 2)}`
       ].join("\n\n");
+    }
+
+    async function loadMessages() {
+      const threadId = document.getElementById("threadId").value.trim();
+      if (!threadId) {
+        messageList.replaceChildren();
+        return;
+      }
+      const response = await fetch(`__THREADS_PATH__/${encodeURIComponent(threadId)}/messages`, {
+        headers: {"Authorization": `Bearer ${tokenSelect.value}`}
+      });
+      if (!response.ok) return;
+      const payload = await response.json();
+      messageList.replaceChildren();
+      for (const message of payload.messages || []) {
+        const item = document.createElement("li");
+        item.textContent = `${message.role}: ${message.content}`;
+        messageList.appendChild(item);
+      }
     }
 
     submit.addEventListener("click", async () => {
@@ -334,12 +372,41 @@
           data = { raw: text };
         }
         renderResult(data);
+        if (response.ok) await loadMessages();
         statusEl.textContent = response.ok ? "完成" : `请求失败：${response.status}`;
       } catch (error) {
         renderResult({ raw: String(error) });
         statusEl.textContent = "请求失败";
       } finally {
         submit.disabled = false;
+      }
+    });
+
+    newThread.addEventListener("click", () => {
+      document.getElementById("threadId").value = "";
+      document.getElementById("query").value = "";
+      messageList.replaceChildren();
+      resultSections.hidden = true;
+      emptyResult.hidden = false;
+      emptyResult.textContent = "等待查询...";
+      statusEl.textContent = "已开始新会话";
+    });
+
+    deleteThread.addEventListener("click", async () => {
+      const threadId = document.getElementById("threadId").value.trim();
+      if (!threadId) {
+        statusEl.textContent = "当前没有可删除的会话";
+        return;
+      }
+      const response = await fetch(`__THREADS_PATH__/${encodeURIComponent(threadId)}`, {
+        method: "DELETE",
+        headers: {"Authorization": `Bearer ${tokenSelect.value}`}
+      });
+      if (response.ok) {
+        newThread.click();
+        statusEl.textContent = "会话已删除";
+      } else {
+        statusEl.textContent = `删除失败：${response.status}`;
       }
     });
 

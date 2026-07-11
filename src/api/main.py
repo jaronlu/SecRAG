@@ -19,7 +19,11 @@ from src.rag.chain import build_rag_chain, format_docs
 from src.rag.formatter import estimate_confidence, format_citations
 from src.retrieval.vector_retriever import ChromaVectorRetriever
 from src.schemas.constants import (
+    AGENT_RECURSION_LIMIT,
     API_ROUTE_ASSISTANT_QA,
+    API_ROUTE_ASSISTANT_THREAD,
+    API_ROUTE_ASSISTANT_THREAD_MESSAGES,
+    API_ROUTE_ASSISTANT_THREADS,
     API_ROUTE_QA,
     META_SOURCE,
     RR_METADATA,
@@ -34,6 +38,9 @@ from src.schemas.constants import (
 from src.schemas.request_response import (
     AssistantQARequest,
     AssistantQAResponse,
+    ConversationMessagesResponse,
+    ConversationThreadCreate,
+    ConversationThreadResponse,
     QARequest,
     QAResponse,
 )
@@ -76,6 +83,8 @@ audit_logger = logging.getLogger("secrag.audit")
 
 @app.post(API_ROUTE_QA, response_model=QAResponse)
 async def qa(request: QARequest):
+    if config.app_env != "development":
+        raise HTTPException(status_code=404, detail="Not Found")
     request_id = str(uuid.uuid4())
 
     try:
@@ -132,6 +141,73 @@ def _get_agent_app():
     return agent_app
 
 
+def _get_conversation_store():
+    from src.utils.conversation import SQLiteConversationStore
+
+    return SQLiteConversationStore(config.conversation_db_path)
+
+
+def _conversation_http_error(exc: Exception) -> HTTPException:
+    from src.utils.conversation import (
+        ConversationContextMismatchError,
+        ConversationNotFoundError,
+    )
+
+    if isinstance(exc, ConversationNotFoundError):
+        return HTTPException(status_code=404, detail="会话不存在或不可访问")
+    if isinstance(exc, ConversationContextMismatchError):
+        return HTTPException(status_code=409, detail=str(exc))
+    raise exc
+
+
+@app.post(API_ROUTE_ASSISTANT_THREADS, response_model=ConversationThreadResponse)
+async def create_assistant_thread(
+    request: ConversationThreadCreate,
+    user: AuthenticatedUser = Depends(authenticate_user),
+):
+    thread = _get_conversation_store().create_thread(
+        user_id=user.user_id,
+        user_role=user.role,
+        client_id=request.client_id,
+        title=request.title,
+    )
+    return ConversationThreadResponse(
+        thread_id=thread["thread_id"],
+        title=thread["title"],
+        created_at=thread["created_at"],
+    )
+
+
+@app.get(API_ROUTE_ASSISTANT_THREAD_MESSAGES, response_model=ConversationMessagesResponse)
+async def get_assistant_thread_messages(
+    thread_id: str,
+    user: AuthenticatedUser = Depends(authenticate_user),
+):
+    try:
+        messages = _get_conversation_store().list_messages(
+            thread_id=thread_id,
+            user_id=user.user_id,
+        )
+    except Exception as exc:
+        raise _conversation_http_error(exc) from exc
+    return ConversationMessagesResponse(thread_id=thread_id, messages=messages)
+
+
+@app.delete(API_ROUTE_ASSISTANT_THREAD, status_code=204)
+async def delete_assistant_thread(
+    thread_id: str,
+    user: AuthenticatedUser = Depends(authenticate_user),
+):
+    try:
+        _get_conversation_store().soft_delete_thread(
+            thread_id=thread_id,
+            user_id=user.user_id,
+        )
+    except Exception as exc:
+        raise _conversation_http_error(exc) from exc
+    return Response(status_code=204)
+
+
 def _is_provider_unavailable(exc: Exception) -> bool:
     if isinstance(exc, (httpx.TimeoutException, httpx.TransportError)):
         return True
@@ -150,12 +226,31 @@ async def assistant_qa(
     request: AssistantQARequest,
     user: AuthenticatedUser = Depends(authenticate_user),
 ):
-    thread_id = request.thread_id or str(uuid.uuid4())
+    try:
+        thread = _get_conversation_store().ensure_thread_for_qa(
+            thread_id=request.thread_id,
+            user_id=user.user_id,
+            user_role=user.role,
+            client_id=request.client_id,
+            title=request.query[:100],
+        )
+    except Exception as exc:
+        raise _conversation_http_error(exc) from exc
+    thread_id = thread["thread_id"]
     turn_id = str(uuid.uuid4())
-    initial_state = build_assistant_initial_state(request, user, thread_id=thread_id, turn_id=turn_id)
+    initial_state = build_assistant_initial_state(
+        request,
+        user,
+        thread_id=thread_id,
+        turn_id=turn_id,
+        turn_index=thread.get("turn_count", 0),
+    )
 
     app = _get_agent_app()
-    config: RunnableConfig = {"configurable": {"thread_id": thread_id}, "recursion_limit": 20}
+    config: RunnableConfig = {
+        "configurable": {"thread_id": thread_id},
+        "recursion_limit": AGENT_RECURSION_LIMIT,
+    }
     try:
         result = app.invoke(initial_state, config=config)
     except Exception as exc:
