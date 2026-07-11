@@ -15,6 +15,7 @@ from src.schemas.constants import (
     META_DATE,
     META_DOC_ID,
     META_DOC_TYPE,
+    META_ALLOWED_ROLES,
     META_PERMISSION_LEVEL,
     META_SOURCE,
     META_STOCK_CODE,
@@ -71,6 +72,16 @@ def load_html(file_path: Path) -> List[Document]:
 def load_financial_csv(file_path: Path) -> List[Document]:
     """加载财务数据 CSV，每行生成一个 Document"""
     df = pd.read_csv(file_path)
+    return _load_financial_frame(file_path, df)
+
+
+def load_financial_excel(file_path: Path) -> List[Document]:
+    """加载财务数据 Excel，与 CSV loader 输出相同 metadata 契约。"""
+    df = pd.read_excel(file_path)
+    return _load_financial_frame(file_path, df)
+
+
+def _load_financial_frame(file_path: Path, df: pd.DataFrame) -> List[Document]:
     documents = []
     source = str(file_path)
     doc_id = hashlib.sha1(source.encode("utf-8")).hexdigest()[:16]
@@ -88,6 +99,7 @@ def load_financial_csv(file_path: Path) -> List[Document]:
                     META_DATE: str(row.get("year", "")),
                     META_STOCK_CODE: str(row.get("code", "")),
                     META_PERMISSION_LEVEL: PERMISSION_INTERNAL,
+                    META_ALLOWED_ROLES: "institutional_sales,compliance,technical",
                 },
             )
         )

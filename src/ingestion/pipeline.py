@@ -23,6 +23,7 @@ from src.ingestion.identity import (
     hash_metadata,
     load_documents,
     load_sample_metadata,
+    normalize_manifest_metadata,
     normalize_chunks,
     normalize_parsed_text,
     relative_path,
@@ -115,6 +116,9 @@ def ingest_document(
         documents = load_documents(file_path)
         if not documents:
             raise RuntimeError("文档解析结果为空")
+        manifest_metadata = normalize_manifest_metadata(sample_metadata)
+        for document in documents:
+            document.metadata.update(manifest_metadata)
         parse_hash = sha256_text(normalize_parsed_text(documents))
         chunks = chunk_documents(documents=documents, doc_type=effective_doc_type)
         if not chunks:

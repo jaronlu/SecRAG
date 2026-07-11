@@ -32,11 +32,17 @@ from src.schemas.constants import (
     META_SOURCE,
     META_STOCK_CODE,
     META_TITLE,
+    PERMISSION_CONFIDENTIAL,
     PERMISSION_INTERNAL,
-    SAMPLE_METADATA_FILENAME,
+    PERMISSION_PUBLIC,
+    ROLE_ADVISOR,
+    ROLE_COMPLIANCE,
+    ROLE_INSTITUTIONAL_SALES,
+    ROLE_OPERATIONS,
+    ROLE_TECHNICAL,
 )
 
-SUPPORTED_SUFFIXES = {".pdf", ".docx", ".doc", ".html", ".htm", ".csv"}
+SUPPORTED_SUFFIXES = {".pdf", ".docx", ".doc", ".html", ".htm", ".csv", ".xlsx", ".xls"}
 PARSER_VERSION = "secrag-loader-v1"
 CHUNKER_VERSION = "secrag-chunker-v1"
 URL_HASH_PREFIX_LEN = 16
@@ -65,17 +71,37 @@ def sanitize_metadata(meta: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_sample_metadata(file_path: Path) -> dict[str, Any]:
-    for parent in (file_path.parent, *file_path.parents):
-        manifest = parent / SAMPLE_METADATA_FILENAME
-        if not manifest.exists():
-            continue
-        metadata = json.loads(manifest.read_text(encoding="utf-8"))
-        try:
-            key = str(file_path.relative_to(parent))
-        except ValueError:
-            continue
-        return metadata.get(key, {})
-    return {}
+    """Load and validate the required sibling `<filename>.meta.json` manifest."""
+    manifest = file_path.with_name(file_path.name + ".meta.json")
+    if not manifest.exists():
+        raise ValueError(f"缺少权限清单: {manifest}")
+    metadata = json.loads(manifest.read_text(encoding="utf-8"))
+    if not isinstance(metadata, dict):
+        raise ValueError(f"权限清单必须是 JSON 对象: {manifest}")
+
+    permission = metadata.get(META_PERMISSION_LEVEL)
+    valid_permissions = {PERMISSION_PUBLIC, PERMISSION_INTERNAL, PERMISSION_CONFIDENTIAL}
+    if permission not in valid_permissions:
+        raise ValueError(f"非法 permission_level: {permission}")
+
+    allowed_roles = metadata.get(META_ALLOWED_ROLES, [])
+    if not isinstance(allowed_roles, list) or not all(
+        isinstance(role, str) for role in allowed_roles
+    ):
+        raise ValueError("allowed_roles 必须是角色字符串列表")
+    valid_roles = {
+        ROLE_ADVISOR,
+        ROLE_INSTITUTIONAL_SALES,
+        ROLE_COMPLIANCE,
+        ROLE_OPERATIONS,
+        ROLE_TECHNICAL,
+    }
+    unknown_roles = set(allowed_roles) - valid_roles
+    if unknown_roles:
+        raise ValueError(f"非法 allowed_roles: {sorted(unknown_roles)}")
+    if permission != PERMISSION_PUBLIC and not allowed_roles:
+        raise ValueError("internal/confidential 文档必须声明 allowed_roles")
+    return metadata
 
 
 def normalize_manifest_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
@@ -192,7 +218,7 @@ def derive_doc_id(
 
         return _url_hash_id(source)
 
-    if file_path.suffix.lower() == ".csv":
+    if file_path.suffix.lower() in {".csv", ".xlsx", ".xls"}:
         dataset_doc_id = _dataset_doc_id(file_path, metadata)
         if dataset_doc_id:
             return dataset_doc_id
@@ -219,6 +245,10 @@ def load_documents(file_path: Path):
         from src.ingestion.loaders import load_financial_csv
 
         return load_financial_csv(file_path)
+    if suffix in {".xlsx", ".xls"}:
+        from src.ingestion.loaders import load_financial_excel
+
+        return load_financial_excel(file_path)
     raise ValueError(f"不支持的文件格式: {suffix}")
 
 
