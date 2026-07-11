@@ -42,3 +42,4 @@ class AuditEntry:
     verification: VerificationResult
     compliance: ComplianceResult
     response: AuditResponse
+    total_duration_ms: float

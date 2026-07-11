@@ -1,8 +1,8 @@
 {
   "doc_type": "research_report",
   "retrieval_source": "report_search",
-  "permission_level": "internal",
-  "allowed_roles": ["advisor", "institutional_sales", "compliance"],
+  "permission_level": "public",
+  "allowed_roles": ["advisor", "institutional_sales", "compliance", "operations", "technical"],
   "title": "平安银行2025年报及2026一季报点评：收入利润增速均回正",
   "date": "2026-04-26",
   "stock_code": "000001",

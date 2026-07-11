@@ -114,8 +114,28 @@ def test_loads_real_securities_data_metadata_manifest():
 
     assert metadata[META_DOC_TYPE] == DOC_TYPE_RESEARCH_REPORT
     assert metadata[META_RETRIEVAL_SOURCE] == SOURCE_REPORT
-    assert metadata[META_PERMISSION_LEVEL] == "internal"
-    assert metadata[META_ALLOWED_ROLES] == ["advisor", "institutional_sales", "compliance"]
+    assert metadata[META_PERMISSION_LEVEL] == "public"
+    assert metadata[META_ALLOWED_ROLES] == [
+        "advisor",
+        "institutional_sales",
+        "compliance",
+        "operations",
+        "technical",
+    ]
+
+
+def test_all_real_public_research_reports_match_role_matrix():
+    for pdf_path in Path("data/raw/real_securities_data/reports").glob("*.pdf"):
+        metadata = load_sample_metadata(pdf_path)
+
+        assert metadata[META_PERMISSION_LEVEL] == "public"
+        assert set(metadata[META_ALLOWED_ROLES]) == {
+            ROLE_ADVISOR,
+            ROLE_INSTITUTIONAL_SALES,
+            ROLE_COMPLIANCE,
+            ROLE_OPERATIONS,
+            ROLE_TECHNICAL,
+        }
 
 
 def test_real_securities_data_files_exist():

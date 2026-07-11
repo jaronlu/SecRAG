@@ -27,6 +27,11 @@ import httpx
 from src.schemas.constants import API_ROUTE_ASSISTANT_QA, API_ROUTE_QA
 
 _SEP = "=" * 70
+DEFAULT_READ_TIMEOUT = 180.0
+
+
+def build_client_timeout(read_timeout: float) -> httpx.Timeout:
+    return httpx.Timeout(connect=5.0, read=read_timeout, write=30.0, pool=5.0)
 
 
 def _print_section(title: str) -> None:
@@ -94,15 +99,22 @@ def demo_agent_qa_denied(client: httpx.Client) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
+    parser.add_argument("--read-timeout", type=float, default=DEFAULT_READ_TIMEOUT)
     args = parser.parse_args()
 
-    with httpx.Client(base_url=args.base_url, timeout=60.0) as client:
+    with httpx.Client(
+        base_url=args.base_url,
+        timeout=build_client_timeout(args.read_timeout),
+    ) as client:
         try:
             demo_simple_qa(client)
             demo_agent_qa_allowed(client)
             demo_agent_qa_denied(client)
         except httpx.ConnectError:
             print(f"无法连接 {args.base_url}，请先启动服务：uv run uvicorn src.api.main:app --port 8000")
+            sys.exit(1)
+        except httpx.TimeoutException:
+            print(f"请求在读取响应时超过 {args.read_timeout:.1f} 秒，请检查服务端链路耗时")
             sys.exit(1)
         except httpx.HTTPStatusError as exc:
             print(f"请求失败: {exc.response.status_code} {exc.response.text}")

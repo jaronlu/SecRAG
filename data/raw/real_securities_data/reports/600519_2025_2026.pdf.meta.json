@@ -1,8 +1,8 @@
 {
   "doc_type": "research_report",
   "retrieval_source": "report_search",
-  "permission_level": "internal",
-  "allowed_roles": ["advisor", "institutional_sales", "compliance"],
+  "permission_level": "public",
+  "allowed_roles": ["advisor", "institutional_sales", "compliance", "operations", "technical"],
   "title": "贵州茅台2025年年报及2026年一季报点评：顺势出清舒缓压力巩固优势稳健前行",
   "date": "2026-05-25",
   "stock_code": "600519",

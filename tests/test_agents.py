@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, cast
@@ -10,6 +11,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from src.agents.graph import (
+    _traced_node,
     build_agent_graph,
     is_compliant,
     should_reason_again,
@@ -22,6 +24,7 @@ from src.agents.nodes import (
     compose,
     extract_citations,
     grade_and_filter,
+    planner,
     reason,
     retrieve,
     verify,
@@ -32,7 +35,6 @@ from src.schemas.constants import (
     AUDIT_QUERY,
     AUDIT_QUERY_ORIGINAL,
     AUDIT_REASONING,
-    AUDIT_REASONING_DURATION_MS,
     AUDIT_REQUEST_ID,
     AUDIT_RESPONSE,
     AUDIT_RESPONSE_CONFIDENCE,
@@ -69,19 +71,26 @@ from src.schemas.constants import (
     STATE_COMPLIANCE,
     STATE_CONFIDENCE,
     STATE_DEPARTMENT,
+    STATE_ENTITIES,
     STATE_FINAL_ANSWER,
+    STATE_INTENT,
     STATE_MESSAGES,
+    STATE_INTERMEDIATE_STEPS,
     STATE_ORIGINAL_QUERY,
+    STATE_QUERY_TYPE,
     STATE_REASON_ATTEMPTS,
     STATE_RETRIEVAL_ATTEMPTS,
+    STATE_RETRIEVAL_FILTERED_CHUNKS,
     STATE_RETRIEVAL_PLAN,
     STATE_RETRIEVAL_RESULTS,
+    STATE_RETRIEVAL_TOTAL_CHUNKS,
     STATE_REWRITTEN_QUERY,
     STATE_TOOL_CALLS,
     STATE_USER_ROLE,
     STATE_VERIFICATION,
 )
 from src.utils.audit import SQLiteAuditStore
+from src.utils.verifier import CitationExtractor, SourceVerifier
 
 
 def _result(content: str, score: float = 0.9, meta: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -160,10 +169,44 @@ class TestGradeAndFilter:
 
         assert len(result[STATE_RETRIEVAL_RESULTS]) == 1
 
+    def test_records_filtered_chunk_count(self):
+        state = _state(**{
+            STATE_RETRIEVAL_RESULTS: [_result("weak", score=0.4), _result("strong", score=0.8)]
+        })
+
+        result = grade_and_filter(state)
+
+        assert result[STATE_RETRIEVAL_FILTERED_CHUNKS] == 1
+
     def test_preserves_other_state_fields(self):
         state = _state(**{STATE_FINAL_ANSWER: "unchanged"})
         result = grade_and_filter(state)
         assert result[STATE_FINAL_ANSWER] == "unchanged"
+
+
+def test_planner_injects_stock_code_filter_for_report_search(monkeypatch):
+    response = MagicMock()
+    response.content = json.dumps([
+        {PLAN_SOURCE: SOURCE_REPORT, PLAN_QUERY: "贵州茅台研报", PLAN_TOP_K: 5}
+    ])
+
+    class FakeLLM:
+        def invoke(self, messages):
+            return response
+
+    monkeypatch.setattr("src.agents.nodes.llm", FakeLLM())
+    state = _state(**{
+        STATE_USER_ROLE: ROLE_ADVISOR,
+        STATE_ORIGINAL_QUERY: "贵州茅台评级",
+        STATE_REWRITTEN_QUERY: "贵州茅台600519研报评级",
+        STATE_INTENT: "研报观点",
+        STATE_QUERY_TYPE: "report_inquiry",
+        STATE_ENTITIES: {"stock_code": "600519.SH"},
+    })
+
+    result = planner(state)
+
+    assert result[STATE_RETRIEVAL_PLAN][0][PLAN_FILTERS] == {"stock_code": "600519"}
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -172,6 +215,83 @@ class TestGradeAndFilter:
 
 
 class TestVerify:
+    def test_citation_quote_contains_structured_metadata_and_deduplicates_headers(self):
+        extractor = CitationExtractor()
+        metadata = {
+            META_TITLE: "贵州茅台研报",
+            META_SOURCE: "report.pdf",
+            "institution": "诚通证券",
+            "rating": "买入",
+            "date": "2026-05-25",
+            "stock_code": "600519",
+        }
+
+        citations = extractor.extract(
+            [
+                _result("2026 年 05 月 20 日贵州茅台", meta={**metadata, META_CHUNK_ID: "a"}),
+                _result("2026 年 05 月 20 日贵州茅台", meta={**metadata, META_CHUNK_ID: "b"}),
+            ],
+            query="贵州茅台的评级和机构",
+        )
+
+        assert len(citations) == 1
+        assert "机构=诚通证券" in citations[0]["quote"]
+        assert "评级=买入" in citations[0]["quote"]
+        assert "来源日期=2026-05-25" in citations[0]["quote"]
+
+    def test_source_verifier_rejects_visible_citation_that_omits_structured_claim(self):
+        verifier = SourceVerifier()
+        result = verifier.verify(
+            answer="研报评级为买入，机构为诚通证券。",
+            citations=[{
+                "source": "report.pdf",
+                "chunk_id": "chunk-1",
+                "quote": "贵州茅台研报",
+                "metadata": {"rating": "买入", "institution": "诚通证券"},
+            }],
+            retrieval_results=[
+                _result(
+                    "贵州茅台研报",
+                    meta={META_SOURCE: "report.pdf", META_CHUNK_ID: "chunk-1"},
+                )
+            ],
+        )
+
+        assert result["passed"] is False
+        assert any("可见引用未包含" in issue for issue in result["issues"])
+
+    def test_verification_accepts_whitelisted_metadata_as_grounding_evidence(self):
+        retrieval_results = [
+            _result(
+                "贵州茅台研报",
+                meta={
+                    META_TITLE: "贵州茅台2025年年报及2026年一季报点评",
+                    META_SOURCE: "report.pdf",
+                    META_CHUNK_ID: "chunk-1",
+                    "institution": "诚通证券",
+                    "rating": "买入",
+                    "date": "2026-05-25",
+                    "stock_code": "600519",
+                },
+            )
+        ]
+        citations = CitationExtractor().extract(
+            retrieval_results,
+            query="贵州茅台研报评级和机构",
+        )
+        state = _state(**{
+            STATE_FINAL_ANSWER: (
+                "贵州茅台2025年年报及2026年一季报点评由诚通证券发布，"
+                "评级为买入，来源日期为2026-05-25，股票代码600519。"
+            ),
+            STATE_RETRIEVAL_RESULTS: retrieval_results,
+            STATE_CITATIONS: citations,
+        })
+
+        result = verify(state)
+
+        assert result[STATE_VERIFICATION]["passed"] is True
+
     def test_extract_citations_runs_before_verification(self):
         state = _state(**{
             STATE_ORIGINAL_QUERY: "净利润",
@@ -547,6 +667,51 @@ class TestRoleAwareTools:
         assert result[STATE_FINAL_ANSWER] == "## 结论\n\nok"
         assert result[STATE_REASON_ATTEMPTS] == 1
 
+    def test_reason_uses_metadata_context_and_excludes_already_retrieved_source(self, monkeypatch):
+        from langchain_core.messages import AIMessage
+
+        captured = {}
+
+        def fake_create_agent(model, tools, system_prompt):
+            captured["tool_names"] = {tool.name for tool in tools}
+            captured["system_prompt"] = system_prompt
+
+            class FakeAgent:
+                def invoke(self, payload):
+                    return {STATE_MESSAGES: [AIMessage(content="评级为买入，机构为诚通证券")]}
+
+            return FakeAgent()
+
+        monkeypatch.setattr("langchain.agents.create_agent", fake_create_agent)
+        state = _state(**{
+            STATE_USER_ROLE: ROLE_ADVISOR,
+            STATE_ORIGINAL_QUERY: "贵州茅台的评级和机构",
+            STATE_DEPARTMENT: "wealth",
+            STATE_MESSAGES: [],
+            STATE_RETRIEVAL_PLAN: [{PLAN_SOURCE: SOURCE_REPORT, PLAN_QUERY: "贵州茅台"}],
+            STATE_RETRIEVAL_RESULTS: [
+                _result(
+                    "贵州茅台研报",
+                    meta={
+                        META_TITLE: "贵州茅台研报",
+                        META_SOURCE: "report.pdf",
+                        "institution": "诚通证券",
+                        "rating": "买入",
+                        "date": "2026-05-25",
+                    },
+                )
+            ],
+        })
+
+        reason(state)
+
+        assert SOURCE_REPORT not in captured["tool_names"]
+        assert "机构=诚通证券" in captured["system_prompt"]
+        assert "评级=买入" in captured["system_prompt"]
+        assert "来源日期=2026-05-25" in captured["system_prompt"]
+        assert "只回答用户询问的字段" in captured["system_prompt"]
+        assert "不得改写为报告日期或发布日期" in captured["system_prompt"]
+
     def test_reason_allows_tool_only_answer_when_retrieval_is_empty(self, monkeypatch):
         from langchain_core.messages import AIMessage, ToolMessage
 
@@ -777,7 +942,37 @@ class TestAuditLog:
         assert audit_trail.get(AUDIT_REQUEST_ID) == "request-123"
         assert audit_trail.get(AUDIT_TIMESTAMP) == timestamp
         assert AUDIT_STARTED_PERF_COUNTER not in audit_trail
-        assert audit_trail.get(AUDIT_REASONING, {}).get(AUDIT_REASONING_DURATION_MS, 0) > 0
+        assert audit_trail.get("total_duration_ms", 0) > 0
+
+    def test_uses_real_execution_path_node_duration_and_retrieval_counts(self):
+        state = _state(**{
+            STATE_RETRIEVAL_RESULTS: [_result("kept")],
+            STATE_RETRIEVAL_TOTAL_CHUNKS: 7,
+            STATE_RETRIEVAL_FILTERED_CHUNKS: 1,
+            STATE_INTERMEDIATE_STEPS: [
+                {"step": "retrieve", "duration_ms": 12.0, "success": True},
+                {"step": "reason", "duration_ms": 34.5, "success": True},
+            ],
+        })
+
+        result = audit_log(state)
+        audit = result[STATE_AUDIT_TRAIL]
+
+        assert audit[AUDIT_RETRIEVAL]["total_chunks"] == 7
+        assert audit[AUDIT_RETRIEVAL]["filtered_chunks"] == 1
+        assert audit[AUDIT_REASONING]["duration_ms"] == 34.5
+        assert audit[AUDIT_REASONING]["iterations"] == 1
+        assert audit[AUDIT_REASONING]["execution_path"] == ["retrieve", "reason", "audit_log"]
+
+    def test_traced_node_records_name_duration_and_success(self):
+        wrapped = _traced_node("sample", lambda state: {**state, STATE_FINAL_ANSWER: "ok"})
+
+        result = wrapped(_state(**{STATE_INTERMEDIATE_STEPS: []}))
+
+        step = result[STATE_INTERMEDIATE_STEPS][-1]
+        assert step["step"] == "sample"
+        assert step["duration_ms"] >= 0
+        assert step["success"] is True
 
     def test_persists_audit_entry_for_lookup(self):
         timestamp = datetime.now(timezone.utc).isoformat()
@@ -814,6 +1009,18 @@ class TestShouldRetryRetrieval:
     def test_low_score(self):
         state = _state(**{STATE_RETRIEVAL_RESULTS: [_result("x", score=0.3)]})
         assert should_retry_retrieval(state) == "retrieve"
+
+    def test_enough_medium_score_results_continue_without_replanning(self):
+        state = _state(**{
+            STATE_RETRIEVAL_RESULTS: [
+                _result("a", score=0.74),
+                _result("b", score=0.70),
+                _result("c", score=0.65),
+            ],
+            STATE_RETRIEVAL_ATTEMPTS: 1,
+        })
+
+        assert should_retry_retrieval(state) == "continue"
 
     def test_high_score(self):
         state = _state(**{

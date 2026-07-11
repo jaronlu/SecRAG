@@ -51,6 +51,8 @@ class AssistantState(TypedDict):
 
     # 检索结果 — STATE_RETRIEVAL_RESULTS（reducer: concatenate）
     retrieval_results: Annotated[list[RetrievalResult], "concatenate"]
+    retrieval_total_chunks: int
+    retrieval_filtered_chunks: int
 
     # 推理过程 — STATE_MESSAGES / STATE_TOOL_CALLS / STATE_INTERMEDIATE_STEPS / STATE_REASON_ATTEMPTS
     messages: Annotated[Sequence[BaseMessage], add_messages]

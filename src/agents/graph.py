@@ -1,5 +1,8 @@
 """Agent Graph 构建——节点编排、条件路由、Checkpointer"""
 
+import time
+from collections.abc import Callable
+
 from langgraph.graph import END, START, StateGraph
 
 from src.agents.nodes import (
@@ -22,15 +25,36 @@ from src.agents.state import AssistantState
 from src.schemas.constants import (
     DEFAULT_MAX_HOPS,
     CONFIDENCE_HIGH_MIN_RESULTS,
-    CONFIDENCE_HIGH_THRESHOLD,
     MAX_REASON_ATTEMPTS,
-    RR_SCORE,
     STATE_COMPLIANCE,
+    STATE_INTERMEDIATE_STEPS,
     STATE_REASON_ATTEMPTS,
     STATE_RETRIEVAL_ATTEMPTS,
     STATE_RETRIEVAL_RESULTS,
     STATE_VERIFICATION,
 )
+
+
+def _traced_node(
+    name: str,
+    node: Callable[[AssistantState], AssistantState],
+) -> Callable[[AssistantState], AssistantState]:
+    """Record the actual node path and elapsed time in state."""
+
+    def wrapped(state: AssistantState) -> AssistantState:
+        started = time.perf_counter()
+        result = node(state)
+        step = {
+            "step": name,
+            "duration_ms": max((time.perf_counter() - started) * 1000, 0.0),
+            "success": True,
+        }
+        return {
+            **result,
+            STATE_INTERMEDIATE_STEPS: result.get(STATE_INTERMEDIATE_STEPS, []) + [step],
+        }
+
+    return wrapped
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -51,8 +75,6 @@ def should_retry_retrieval(state: AssistantState) -> str:
     if not results:
         return "retrieve"
     if len(usable) < CONFIDENCE_HIGH_MIN_RESULTS:
-        return "retrieve"
-    if usable[0].get(RR_SCORE, 0) < CONFIDENCE_HIGH_THRESHOLD:
         return "retrieve"
     return "continue"
 
@@ -89,19 +111,31 @@ def build_agent_graph() -> StateGraph:
     graph = StateGraph(AssistantState)
 
     # 添加节点
-    graph.add_node("load_conversation_context", load_conversation_context)
-    graph.add_node("resolve_followup_query", resolve_followup_query)
-    graph.add_node("query_understand", query_understand)
-    graph.add_node("planner", planner)
-    graph.add_node("retrieve", retrieve)
-    graph.add_node("grade_and_filter", grade_and_filter)
-    graph.add_node("permission_denied_response", permission_denied_response)
-    graph.add_node("reason", reason)
-    graph.add_node("extract_citations", extract_citations)
-    graph.add_node("verify", verify)
-    graph.add_node("compliance_check", compliance_check)
-    graph.add_node("compose", compose)
-    graph.add_node("persist_conversation_turn", persist_conversation_turn)
+    graph.add_node(
+        "load_conversation_context",
+        _traced_node("load_conversation_context", load_conversation_context),
+    )
+    graph.add_node(
+        "resolve_followup_query",
+        _traced_node("resolve_followup_query", resolve_followup_query),
+    )
+    graph.add_node("query_understand", _traced_node("query_understand", query_understand))
+    graph.add_node("planner", _traced_node("planner", planner))
+    graph.add_node("retrieve", _traced_node("retrieve", retrieve))
+    graph.add_node("grade_and_filter", _traced_node("grade_and_filter", grade_and_filter))
+    graph.add_node(
+        "permission_denied_response",
+        _traced_node("permission_denied_response", permission_denied_response),
+    )
+    graph.add_node("reason", _traced_node("reason", reason))
+    graph.add_node("extract_citations", _traced_node("extract_citations", extract_citations))
+    graph.add_node("verify", _traced_node("verify", verify))
+    graph.add_node("compliance_check", _traced_node("compliance_check", compliance_check))
+    graph.add_node("compose", _traced_node("compose", compose))
+    graph.add_node(
+        "persist_conversation_turn",
+        _traced_node("persist_conversation_turn", persist_conversation_turn),
+    )
     graph.add_node("audit_log", audit_log)
 
     # Phase 1：auth_check 由 API Gateway / FastAPI Middleware 承担；

@@ -47,6 +47,8 @@ class IntermediateStep(TypedDict, total=False):
     input: dict
     output: str
     metadata: dict
+    duration_ms: float
+    success: bool
 
 
 class QueryEntities(TypedDict, total=False):
@@ -163,6 +165,8 @@ class AuditReasoning(TypedDict, total=False):
     tool_calls: list[ToolCallDict]
     iterations: int
     duration_ms: float
+    execution_path: list[str]
+    node_timings: list[IntermediateStep]
 
 
 class AuditResponse(TypedDict, total=False):
@@ -190,3 +194,4 @@ class AuditTrail(TypedDict, total=False):
     verification: VerificationResult
     compliance: ComplianceResult
     response: AuditResponse
+    total_duration_ms: float

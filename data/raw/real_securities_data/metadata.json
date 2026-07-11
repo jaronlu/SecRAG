@@ -34,11 +34,13 @@
   "reports/000001_2025_2026.pdf": {
     "doc_type": "research_report",
     "retrieval_source": "report_search",
-    "permission_level": "internal",
+    "permission_level": "public",
     "allowed_roles": [
       "advisor",
       "institutional_sales",
-      "compliance"
+      "compliance",
+      "operations",
+      "technical"
     ],
     "title": "平安银行2025年报及2026一季报点评：收入利润增速均回正",
     "date": "2026-04-26",
@@ -52,11 +54,13 @@
   "reports/600519_2025_2026.pdf": {
     "doc_type": "research_report",
     "retrieval_source": "report_search",
-    "permission_level": "internal",
+    "permission_level": "public",
     "allowed_roles": [
       "advisor",
       "institutional_sales",
-      "compliance"
+      "compliance",
+      "operations",
+      "technical"
     ],
     "title": "贵州茅台2025年年报及2026年一季报点评：顺势出清舒缓压力巩固优势稳健前行",
     "date": "2026-05-25",

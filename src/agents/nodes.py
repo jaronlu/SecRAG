@@ -19,7 +19,9 @@ from src.schemas.constants import (
     GRADE_TOP_K,
     LLM_PROVIDER_OPENAI,
     META_CHUNK_ID,
+    META_DATE,
     META_SOURCE,
+    META_STOCK_CODE,
     META_TITLE,
     PERMISSION_PUBLIC,
     PLAN_FILTERS,
@@ -37,6 +39,7 @@ from src.schemas.constants import (
     RR_DENIED,
     RR_METADATA,
     RR_SCORE,
+    SOURCE_REPORT,
     STATE_AMBIGUITY,
     STATE_AUDIT_TRAIL,
     STATE_CITATIONS,
@@ -56,8 +59,10 @@ from src.schemas.constants import (
     STATE_RESOLVED_QUERY,
     STATE_REASON_ATTEMPTS,
     STATE_RETRIEVAL_ATTEMPTS,
+    STATE_RETRIEVAL_FILTERED_CHUNKS,
     STATE_RETRIEVAL_PLAN,
     STATE_RETRIEVAL_RESULTS,
+    STATE_RETRIEVAL_TOTAL_CHUNKS,
     STATE_REWRITTEN_QUERY,
     STATE_RISK_DISCLOSURE,
     STATE_THREAD_ID,
@@ -118,6 +123,18 @@ _VERIFIER = ComprehensiveVerifier()
 
 def _with_state_updates(state: AssistantState, updates: dict[str, Any]) -> AssistantState:
     return cast(AssistantState, {**state, **updates})
+
+
+def _format_evidence_metadata(metadata: dict[str, Any]) -> str:
+    fields = (
+        ("institution", "机构"),
+        ("rating", "评级"),
+        (META_DATE, "来源日期"),
+        (META_STOCK_CODE, "股票代码"),
+        (META_SOURCE, "来源"),
+    )
+    values = [f"{label}={metadata[key]}" for key, label in fields if metadata.get(key)]
+    return f"结构化证据：{'；'.join(values)}" if values else ""
 
 
 def _structure_answer(content: str) -> str:
@@ -296,6 +313,12 @@ def planner(state: AssistantState) -> AssistantState:
     for raw_step in raw_steps:
         step = _normalize_plan_step(raw_step, state[STATE_REWRITTEN_QUERY])
         if step is not None and step.get(PLAN_SOURCE) in allowed_sources:
+            if step.get(PLAN_SOURCE) == SOURCE_REPORT:
+                stock_code = str(state.get(STATE_ENTITIES, {}).get(META_STOCK_CODE, ""))
+                if stock_code:
+                    filters = dict(step.get(PLAN_FILTERS) or {})
+                    filters[META_STOCK_CODE] = stock_code.split(".", maxsplit=1)[0]
+                    step[PLAN_FILTERS] = filters
             filtered_plan.append(step)
 
     return _with_state_updates(state, {
@@ -327,9 +350,12 @@ def retrieve(state: AssistantState) -> AssistantState:
     )
     results = retriever.retrieve(plan=normalized_plan)
 
+    accumulated = state.get(STATE_RETRIEVAL_RESULTS, []) + results
     return _with_state_updates(state, {
-        STATE_RETRIEVAL_RESULTS: state.get(STATE_RETRIEVAL_RESULTS, []) + results,
+        STATE_RETRIEVAL_RESULTS: accumulated,
         STATE_RETRIEVAL_ATTEMPTS: state.get(STATE_RETRIEVAL_ATTEMPTS, 0) + 1,
+        STATE_RETRIEVAL_TOTAL_CHUNKS: state.get(STATE_RETRIEVAL_TOTAL_CHUNKS, 0)
+        + len(results),
     })
 
 
@@ -364,6 +390,7 @@ def grade_and_filter(state: AssistantState) -> AssistantState:
 
     return _with_state_updates(state, {
         STATE_RETRIEVAL_RESULTS: filtered + denied,
+        STATE_RETRIEVAL_FILTERED_CHUNKS: len(filtered),
     })
 
 
@@ -391,10 +418,15 @@ def reason(state: AssistantState) -> AssistantState:
     reason_attempts = state.get(STATE_REASON_ATTEMPTS, 0) + 1
 
     # 构建 context
-    context = "\n\n".join([
-        f"[来源{i + 1}] {r[RR_METADATA].get(META_TITLE, '未知')}\n{r[RR_CONTENT]}"
-        for i, r in enumerate(results[:5])
-    ]) or (
+    context_parts = []
+    for index, result in enumerate(results[:5]):
+        metadata = result[RR_METADATA]
+        metadata_evidence = _format_evidence_metadata(metadata)
+        context_part = f"[来源{index + 1}] {metadata.get(META_TITLE, '未知')}\n{result[RR_CONTENT]}"
+        if metadata_evidence:
+            context_part += f"\n{metadata_evidence}"
+        context_parts.append(context_part)
+    context = "\n\n".join(context_parts) or (
         "当前轮没有可用文档检索结果；如问题可由授权工具回答，应调用工具并仅依据成功"
         "工具输出作答。"
     )
@@ -432,10 +464,19 @@ def reason(state: AssistantState) -> AssistantState:
 3. 只有存在限制、缺失字段或适用边界时才增加 `## 注意事项`；
 4. 不重复输出“字段列表 + 同字段完整表格”，除非用户明确询问字段结构；
 5. 不在正文输出 `Answer:`、`Citations:`、`Audit Trail:`、置信度或内部工具调用细节。
+6. 只回答用户询问的字段，不主动扩展日期等未询问 metadata；`来源日期` 不得改写为报告日期或发布日期。
 {"投顾/销售角色：不得输出" + "买" + "入/" + "卖" + "出/" + "目标" + "价等业务建议，仅提供事实信息。" if role in (ROLE_ADVISOR, ROLE_INSTITUTIONAL_SALES) else ""}
 {"合规角色：引用必须精确到条款/条文号。" if role == ROLE_COMPLIANCE else ""}"""
 
-    agent = create_agent(model=llm, tools=get_tools_for_role(role), system_prompt=system_prompt)
+    planned_sources = {
+        step.get(PLAN_SOURCE, "") for step in state.get(STATE_RETRIEVAL_PLAN, [])
+    }
+    excluded_sources = planned_sources if results else set()
+    agent = create_agent(
+        model=llm,
+        tools=get_tools_for_role(role, excluded_retrieval_sources=excluded_sources),
+        system_prompt=system_prompt,
+    )
     response = agent.invoke({
         "messages": [
             HumanMessage(content=state.get(STATE_RESOLVED_QUERY) or state[STATE_ORIGINAL_QUERY])

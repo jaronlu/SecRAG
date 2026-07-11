@@ -11,10 +11,12 @@ from src.schemas.constants import (
     CONFIDENCE_LOW,
     CONFIDENCE_MEDIUM,
     META_CHUNK_ID,
+    META_DATE,
     META_DOC_TYPE,
     META_PAGE_NUMBER,
     META_PERMISSION_LEVEL,
     META_SOURCE,
+    META_STOCK_CODE,
     META_TITLE,
     PERMISSION_PUBLIC,
     RR_CONTENT,
@@ -26,6 +28,23 @@ from src.schemas.models import Citation
 from src.schemas.typed_dicts import CitationDict, RetrievalResult, ToolCallDict
 
 
+_STRUCTURED_METADATA_FIELDS = (
+    (META_TITLE, "标题"),
+    ("institution", "机构"),
+    ("rating", "评级"),
+    (META_DATE, "来源日期"),
+    (META_STOCK_CODE, "股票代码"),
+)
+
+
+def _structured_metadata_evidence(metadata: dict) -> str:
+    return "；".join(
+        f"{label}={metadata[key]}"
+        for key, label in _STRUCTURED_METADATA_FIELDS
+        if metadata.get(key)
+    )
+
+
 class CitationExtractor:
     def extract(self, retrieval_results: list[RetrievalResult], query: str) -> list[CitationDict]:
         citations: list[CitationDict] = []
@@ -33,10 +52,11 @@ class CitationExtractor:
         seen_evidence = set()
         for result in eligible:
             metadata = result.get(RR_METADATA, {})
-            evidence_key = (
-                metadata.get(META_SOURCE),
-                metadata.get(META_CHUNK_ID) or result.get(RR_CONTENT, ""),
-            )
+            quote = self._extract_quote(result.get(RR_CONTENT, ""), query)
+            structured_evidence = self._structured_evidence(metadata)
+            if structured_evidence:
+                quote = f"{quote}\n结构化证据：{structured_evidence}"
+            evidence_key = (metadata.get(META_SOURCE), self._normalize_evidence(quote))
             if evidence_key in seen_evidence:
                 continue
             seen_evidence.add(evidence_key)
@@ -47,7 +67,7 @@ class CitationExtractor:
                 source=str(metadata.get(META_SOURCE, "")),
                 doc_type=str(metadata.get(META_DOC_TYPE, "")),
                 chunk_id=str(metadata.get(META_CHUNK_ID, "")),
-                quote=self._extract_quote(result.get(RR_CONTENT, ""), query),
+                quote=quote,
                 relevance_score=round(float(result.get(RR_SCORE, 0.0)), 4),
                 permission_level=str(metadata.get(META_PERMISSION_LEVEL, PERMISSION_PUBLIC)),
                 page_number=metadata.get(META_PAGE_NUMBER),
@@ -59,6 +79,12 @@ class CitationExtractor:
             if len(citations) >= 5:
                 break
         return citations
+
+    def _structured_evidence(self, metadata: dict) -> str:
+        return _structured_metadata_evidence(metadata)
+
+    def _normalize_evidence(self, evidence: str) -> str:
+        return re.sub(r"\s+", "", evidence).lower()
 
     def _extract_quote(self, content: str, query: str) -> str:
         sentences = [part.strip() for part in re.split(r"[。；\n]", content) if part.strip()]
@@ -97,6 +123,12 @@ class SourceVerifier:
             key = (citation.get("source"), citation.get("chunk_id"))
             if key not in evidence_keys:
                 issues.append(f"引用不属于当前轮检索结果: {key}")
+            quote = str(citation.get("quote", ""))
+            metadata = citation.get("metadata", {})
+            for field in ("institution", "rating", META_DATE, META_STOCK_CODE):
+                value = str(metadata.get(field, ""))
+                if value and value in answer and value not in quote:
+                    issues.append(f"可见引用未包含答案使用的结构化事实: {field}={value}")
         return {"passed": not issues, "issues": issues}
 
 
@@ -108,7 +140,18 @@ class NumberVerifier:
         tool_calls: list[ToolCallDict],
     ) -> dict:
         numbers = re.findall(r"\d+\.?\d*%?", answer)
-        evidence = [result.get(RR_CONTENT, "") for result in retrieval_results]
+        evidence = [
+            "\n".join(
+                filter(
+                    None,
+                    (
+                        result.get(RR_CONTENT, ""),
+                        _structured_metadata_evidence(result.get(RR_METADATA, {})),
+                    ),
+                )
+            )
+            for result in retrieval_results
+        ]
         evidence.extend(
             str(call.get("output", "")) for call in tool_calls if call.get("success", False)
         )
@@ -144,7 +187,18 @@ class HallucinationDetector:
         tool_calls: list[ToolCallDict],
     ) -> dict:
         usable = [result for result in retrieval_results if not result.get(RR_DENIED)]
-        evidence = [result.get(RR_CONTENT, "") for result in usable]
+        evidence = [
+            "\n".join(
+                filter(
+                    None,
+                    (
+                        result.get(RR_CONTENT, ""),
+                        _structured_metadata_evidence(result.get(RR_METADATA, {})),
+                    ),
+                )
+            )
+            for result in usable
+        ]
         evidence.extend(
             str(call.get("output", "")) for call in tool_calls if call.get("success", False)
         )

@@ -33,8 +33,10 @@ from src.schemas.constants import (
     STATE_INTERMEDIATE_STEPS,
     STATE_ORIGINAL_QUERY,
     STATE_QUERY_TYPE,
+    STATE_RETRIEVAL_FILTERED_CHUNKS,
     STATE_RETRIEVAL_PLAN,
     STATE_RETRIEVAL_RESULTS,
+    STATE_RETRIEVAL_TOTAL_CHUNKS,
     STATE_REWRITTEN_QUERY,
     STATE_RISK_DISCLOSURE,
     STATE_TOOL_CALLS,
@@ -66,6 +68,7 @@ def audit_entry_to_trail(entry: AuditEntry) -> AuditTrail:
         verification=entry.verification,
         compliance=entry.compliance,
         response=entry.response,
+        total_duration_ms=entry.total_duration_ms,
     )
 
 
@@ -90,6 +93,8 @@ class AuditLogger:
         request_id = audit_trail.get(AUDIT_REQUEST_ID) or str(uuid.uuid4())
         timestamp = audit_trail.get(AUDIT_TIMESTAMP) or datetime.now(timezone.utc).isoformat()
         started_perf_counter = audit_trail.get(AUDIT_STARTED_PERF_COUNTER)
+        node_timings = state.get(STATE_INTERMEDIATE_STEPS, [])
+        reason_timings = [step for step in node_timings if step.get("step") == "reason"]
 
         return AuditEntry(
             request_id=request_id,
@@ -107,16 +112,22 @@ class AuditLogger:
             retrieval=AuditRetrieval(
                 plan=state.get(STATE_RETRIEVAL_PLAN, []),
                 sources=_unique_sources(state.get(STATE_RETRIEVAL_RESULTS, [])),
-                total_chunks=len(state.get(STATE_RETRIEVAL_RESULTS, [])),
-                filtered_chunks=len(state.get(STATE_RETRIEVAL_RESULTS, [])),
+                total_chunks=state.get(
+                    STATE_RETRIEVAL_TOTAL_CHUNKS,
+                    len(state.get(STATE_RETRIEVAL_RESULTS, [])),
+                ),
+                filtered_chunks=state.get(
+                    STATE_RETRIEVAL_FILTERED_CHUNKS,
+                    len(state.get(STATE_RETRIEVAL_RESULTS, [])),
+                ),
             ),
             reasoning=AuditReasoning(
                 tool_calls=state.get(STATE_TOOL_CALLS, []),
-                iterations=len(state.get(STATE_INTERMEDIATE_STEPS, [])),
-                duration_ms=self._calculate_duration_ms(
-                    timestamp,
-                    started_perf_counter,
-                ),
+                iterations=len(reason_timings),
+                duration_ms=sum(float(step.get("duration_ms", 0.0)) for step in reason_timings),
+                execution_path=[str(step.get("step", "")) for step in node_timings]
+                + ["audit_log"],
+                node_timings=node_timings,
             ),
             verification=state.get(STATE_VERIFICATION, {}),
             compliance=state.get(STATE_COMPLIANCE, {}),
@@ -125,6 +136,7 @@ class AuditLogger:
                 confidence=state.get(STATE_CONFIDENCE, CONFIDENCE_LOW),
                 risk_disclosure=state.get(STATE_RISK_DISCLOSURE, ""),
             ),
+            total_duration_ms=self._calculate_duration_ms(timestamp, started_perf_counter),
         )
 
     def _calculate_duration_ms(

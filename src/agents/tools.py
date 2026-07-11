@@ -117,12 +117,19 @@ _RETRIEVAL_TOOL_SOURCES = {
 }
 
 
-def get_tools_for_role(user_role: str):
+def get_tools_for_role(
+    user_role: str,
+    excluded_retrieval_sources: set[str] | None = None,
+):
     """Return tools visible to the ReAct agent for the given role."""
     allowed_sources = set(ROLE_ALLOWED_SOURCES.get(user_role, [SOURCE_FAQ]))
+    excluded_sources = excluded_retrieval_sources or set()
     return [
         tool_item
         for tool_item in tools
-        if _RETRIEVAL_TOOL_SOURCES.get(tool_item.name) in allowed_sources
+        if (
+            _RETRIEVAL_TOOL_SOURCES.get(tool_item.name) in allowed_sources
+            and _RETRIEVAL_TOOL_SOURCES.get(tool_item.name) not in excluded_sources
+        )
         or tool_item.name not in _RETRIEVAL_TOOL_SOURCES
     ]
