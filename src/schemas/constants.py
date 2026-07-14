@@ -229,6 +229,26 @@ API_ROUTE_ASSISTANT_QA = "/v1/assistant/qa"
 API_ROUTE_ASSISTANT_THREADS = "/v1/assistant/threads"
 API_ROUTE_ASSISTANT_THREAD = "/v1/assistant/threads/{thread_id}"
 API_ROUTE_ASSISTANT_THREAD_MESSAGES = "/v1/assistant/threads/{thread_id}/messages"
+DATA_RAW_ROOT = "data/raw"
+MAX_CONCURRENT_INGEST_RUNS = 1
+INGEST_WORKER_HEARTBEAT_SECONDS = 15
+INGEST_WORKER_LEASE_SECONDS = 120
+API_ROUTE_INGESTION_CATEGORIES = "/v1/admin/ingestion/categories"
+API_ROUTE_INGESTION_CATEGORY_FILES = "/v1/admin/ingestion/categories/{category_id}/files"
+API_ROUTE_INGESTION_RUNS = "/v1/admin/ingestion/runs"
+API_ROUTE_INGESTION_RUN = "/v1/admin/ingestion/runs/{run_id}"
+API_ROUTE_INGESTION_RUN_ITEMS = "/v1/admin/ingestion/runs/{run_id}/items"
+
+# 入库任务状态与错误码（SCHEMA-REFERENCE §2.8）
+INGEST_RUN_STATUS_QUEUED: Final = "queued"
+INGEST_RUN_STATUS_RUNNING: Final = "running"
+INGEST_RUN_STATUS_SUCCESS: Final = "success"
+INGEST_RUN_STATUS_FAILED: Final = "failed"
+INGEST_ERROR_EMBEDDING_UNAVAILABLE: Final = "embedding_unavailable"
+INGEST_ERROR_WORKER_LEASE_EXPIRED: Final = "worker_lease_expired"
+INGEST_ERROR_SOURCE_CHANGED_AFTER_ENQUEUE: Final = "source_changed_after_enqueue"
+INGEST_ERROR_UNSAFE_SOURCE_PATH: Final = "unsafe_source_path"
+INGEST_ERROR_DOCUMENT_PROCESSING_FAILED: Final = "document_processing_failed"
 
 # ══════════════════════════════════════════════════════════════════════
 # 角色 → 可用的检索源映射  (SCHEMA-REFERENCE §5.1)

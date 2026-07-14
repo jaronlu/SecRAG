@@ -14,6 +14,7 @@ from src.api.auth import (
     authenticate_user,
     build_assistant_initial_state,
 )
+from src.api.ingestion import router as ingestion_router
 from src.api.ui import render_ui_html
 from src.config import config
 from src.rag.chain import build_rag_chain, format_docs
@@ -48,6 +49,7 @@ from src.schemas.request_response import (
 )
 
 app = FastAPI(title="机构内部投研知识平台", version="0.1.0")
+app.include_router(ingestion_router)
 
 app.add_middleware(
     CORSMiddleware,

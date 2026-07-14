@@ -195,3 +195,69 @@ class AuditTrail(TypedDict, total=False):
     compliance: ComplianceResult
     response: AuditResponse
     total_duration_ms: float
+
+
+class IngestionCategoryConfig(TypedDict):
+    category_id: str
+    label: str
+    group: str
+    relative_path: str
+    default_doc_type: str
+    allowed_doc_types: list[str]
+
+
+class IngestionCategorySummary(IngestionCategoryConfig):
+    file_count: int
+    manifest_count: int
+    invalid_manifest_count: int
+    ready: bool
+    error_code: str
+    error: str
+
+
+class IngestionFile(TypedDict):
+    relative_path: str
+    extension: str
+    doc_type: str
+    permission_level: str
+    allowed_roles: list[str]
+    manifest_status: str
+    error: str
+
+
+class IngestionRunFile(TypedDict):
+    run_id: str
+    sequence: int
+    relative_path: str
+    file_hash: str
+    metadata_hash: str
+    doc_type: str
+
+
+class IngestionRunSummary(TypedDict):
+    run_id: str
+    category_id: str
+    status: str
+    queued_at: str
+    started_at: str | None
+    finished_at: str | None
+    total_files: int
+    processed_files: int
+    created: int
+    replaced: int
+    skipped: int
+    archived: int
+    failed: int
+    error_code: str
+    error: str
+
+
+class IngestionRunItemView(TypedDict):
+    doc_id: str
+    sequence: int
+    relative_path: str
+    action: str
+    chunk_count: int
+    processed_at: str
+    error_code: str
+    error: str

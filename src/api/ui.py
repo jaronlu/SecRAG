@@ -5,6 +5,8 @@ from src.api.auth import TOKEN_USER_BINDINGS
 from src.schemas.constants import (
     API_ROUTE_ASSISTANT_QA,
     API_ROUTE_ASSISTANT_THREADS,
+    API_ROUTE_INGESTION_CATEGORIES,
+    API_ROUTE_INGESTION_RUNS,
     ROLE_ADVISOR,
     ROLE_COMPLIANCE,
     ROLE_INSTITUTIONAL_SALES,
@@ -63,4 +65,10 @@ def render_ui_html() -> str:
     ).replace(
         "__THREADS_PATH__",
         API_ROUTE_ASSISTANT_THREADS,
+    ).replace(
+        "__INGESTION_CATEGORIES_PATH__",
+        API_ROUTE_INGESTION_CATEGORIES,
+    ).replace(
+        "__INGESTION_RUNS_PATH__",
+        API_ROUTE_INGESTION_RUNS,
     )

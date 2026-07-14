@@ -81,3 +81,89 @@ class ConversationMessageResponse(BaseModel):
 class ConversationMessagesResponse(BaseModel):
     thread_id: str
     messages: list[ConversationMessageResponse]
+
+
+class IngestionRunCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    category_id: str = Field(..., min_length=1, max_length=100)
+
+
+class IngestionRunCreateResponse(BaseModel):
+    run_id: str
+    category_id: str
+    status: str
+    queued_at: str
+
+
+class IngestionCategoryResponse(BaseModel):
+    category_id: str
+    label: str
+    group: str
+    relative_path: str
+    default_doc_type: str
+    allowed_doc_types: list[str]
+    file_count: int
+    manifest_count: int
+    invalid_manifest_count: int
+    ready: bool
+    error_code: str
+    error: str
+
+
+class IngestionCategoriesResponse(BaseModel):
+    categories: list[IngestionCategoryResponse]
+    active_run_id: Optional[str] = None
+
+
+class IngestionFileResponse(BaseModel):
+    relative_path: str
+    extension: str
+    doc_type: str
+    permission_level: str
+    allowed_roles: list[str]
+    manifest_status: str
+    error: str
+
+
+class IngestionFilesResponse(BaseModel):
+    category_id: str
+    files: list[IngestionFileResponse]
+
+
+class IngestionRunResponse(BaseModel):
+    run_id: str
+    category_id: str
+    status: str
+    queued_at: str
+    started_at: Optional[str] = None
+    finished_at: Optional[str] = None
+    total_files: int
+    processed_files: int
+    created: int
+    replaced: int
+    skipped: int
+    archived: int
+    failed: int
+    error_code: str
+    error: str
+
+
+class IngestionRunItemResponse(BaseModel):
+    doc_id: str
+    sequence: int
+    relative_path: str
+    action: str
+    chunk_count: int
+    processed_at: str
+    error_code: str
+    error: str
+
+
+class IngestionRunItemsResponse(BaseModel):
+    run_id: str
+    items: list[IngestionRunItemResponse]
+
+
+class IngestionRunsResponse(BaseModel):
+    runs: list[IngestionRunResponse]

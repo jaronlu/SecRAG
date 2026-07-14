@@ -91,7 +91,7 @@ def authenticate_user(
     user = TOKEN_USER_BINDINGS.get(token)
     if user is None:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="unknown demo token",
         )
     return user
