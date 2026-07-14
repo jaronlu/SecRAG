@@ -27,7 +27,6 @@ from src.schemas.constants import (
 from src.schemas.models import Citation
 from src.schemas.typed_dicts import CitationDict, RetrievalResult, ToolCallDict
 
-
 _STRUCTURED_METADATA_FIELDS = (
     (META_TITLE, "标题"),
     ("institution", "机构"),
@@ -247,9 +246,7 @@ class HallucinationDetector:
             next_line = lines[index + 1].strip() if index + 1 < len(lines) else ""
             if stripped.startswith("|") and self._is_table_separator(next_line):
                 continue
-            sentences.extend(
-                part.strip() for part in re.split(r"[。；]", stripped) if part.strip()
-            )
+            sentences.extend(part.strip() for part in re.split(r"[。；]", stripped) if part.strip())
         return sentences
 
     def _is_table_separator(self, text: str) -> bool:
@@ -303,11 +300,7 @@ class ComprehensiveVerifier:
         passed = all(result.get("passed", False) for result in checks.values())
         score = checks["hallucination_detection"].get("hallucination_score", 1.0)
         confidence = (
-            CONFIDENCE_LOW
-            if not passed
-            else CONFIDENCE_MEDIUM
-            if score > 0.1
-            else CONFIDENCE_HIGH
+            CONFIDENCE_LOW if not passed else CONFIDENCE_MEDIUM if score > 0.1 else CONFIDENCE_HIGH
         )
         return {
             "passed": passed,

@@ -236,9 +236,8 @@ class SQLiteConversationStore:
             ).fetchone()
             if thread is None:
                 raise ConversationNotFoundError("会话不存在或不可访问")
-            if (
-                thread["user_role"] != state[STATE_USER_ROLE]
-                or thread["client_id"] != state.get(STATE_CLIENT_ID)
+            if thread["user_role"] != state[STATE_USER_ROLE] or thread["client_id"] != state.get(
+                STATE_CLIENT_ID
             ):
                 raise ConversationContextMismatchError("会话角色或客户上下文发生变化")
             if conn.execute(
@@ -253,9 +252,7 @@ class SQLiteConversationStore:
             user_query = state.get(STATE_ORIGINAL_QUERY, "")
             answer = state.get(STATE_FINAL_ANSWER, "")
             resolved_query = (
-                state.get(STATE_RESOLVED_QUERY)
-                or state.get(STATE_REWRITTEN_QUERY)
-                or user_query
+                state.get(STATE_RESOLVED_QUERY) or state.get(STATE_REWRITTEN_QUERY) or user_query
             )
             conn.executemany(
                 """
