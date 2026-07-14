@@ -54,6 +54,7 @@ from src.schemas.typed_dicts import (
     RetrievalResult,
 )
 
+
 def audit_entry_to_trail(entry: AuditEntry) -> AuditTrail:
     """Serialize an AuditEntry into the AssistantState audit_trail shape."""
     return AuditTrail(
@@ -125,8 +126,7 @@ class AuditLogger:
                 tool_calls=state.get(STATE_TOOL_CALLS, []),
                 iterations=len(reason_timings),
                 duration_ms=sum(float(step.get("duration_ms", 0.0)) for step in reason_timings),
-                execution_path=[str(step.get("step", "")) for step in node_timings]
-                + ["audit_log"],
+                execution_path=[str(step.get("step", "")) for step in node_timings] + ["audit_log"],
                 node_timings=node_timings,
             ),
             verification=state.get(STATE_VERIFICATION, {}),
