@@ -1,4 +1,3 @@
-import platform
 import warnings
 
 from langchain_chroma import Chroma
@@ -18,17 +17,15 @@ from src.schemas.constants import (
 
 def _detect_device() -> str:
     """自动检测可用的 embedding 推理设备"""
-    system = platform.system()
-    if system == "Darwin":
+    try:
+        import torch
+    except ImportError:
+        return "cpu"
+    if torch.cuda.is_available():
+        return "cuda"
+    mps = getattr(torch.backends, "mps", None)
+    if mps is not None and mps.is_built() and mps.is_available():
         return "mps"
-    if system == "Linux":
-        try:
-            import torch  # noqa: F811
-
-            if torch.cuda.is_available():
-                return "cuda"
-        except ImportError:
-            pass
     return "cpu"
 
 

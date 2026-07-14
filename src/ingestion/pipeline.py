@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -19,33 +20,32 @@ from src.ingestion.identity import (
     PARSER_VERSION,
     SUPPORTED_SUFFIXES,
     derive_doc_id,
-    file_uri_in_directory,
     hash_metadata,
     load_documents,
     load_sample_metadata,
-    normalize_manifest_metadata,
     normalize_chunks,
+    normalize_manifest_metadata,
     normalize_parsed_text,
     relative_path,
     sha256_file,
     sha256_text,
 )
 from src.ingestion.registry import (
-    INGEST_ACTION_ARCHIVED,
     INGEST_ACTION_CREATED,
     INGEST_ACTION_FAILED,
     INGEST_ACTION_REPLACED,
     INGEST_ACTION_SKIPPED,
-    INGEST_RUN_STATUS_FAILED,
-    INGEST_RUN_STATUS_SUCCESS,
     REGISTRY_STATUS_ACTIVE,
     DocumentRegistryStore,
     DocumentRegistryUpdate,
+    IngestWorkerLeaseLostError,
     create_run_id,
     utc_now,
 )
 from src.schemas.constants import (
     CHROMA_DEFAULT_PERSIST_DIR,
+    DATA_RAW_ROOT,
+    INGEST_ERROR_DOCUMENT_PROCESSING_FAILED,
     INGEST_REGISTRY_DB_PATH,
     META_DATE,
     META_DOC_TYPE,
@@ -75,6 +75,9 @@ def ingest_document(
     root_dir: Path | None = None,
     embedding_model: HuggingFaceEmbeddings | None = None,
     persist_directory: str = CHROMA_DEFAULT_PERSIST_DIR,
+    sequence: int = 0,
+    relative_path_override: str | None = None,
+    ownership_check: Callable[[], None] | None = None,
 ) -> str:
     print(f"处理: {file_path}")
     registry_store = registry_store or DocumentRegistryStore(INGEST_REGISTRY_DB_PATH)
@@ -85,7 +88,7 @@ def ingest_document(
     effective_doc_type = sample_metadata.get(META_DOC_TYPE, doc_type)
     doc_id = derive_doc_id(file_path, effective_doc_type, sample_metadata)
     source_uri = file_path.resolve().as_uri()
-    relative = relative_path(file_path, root_dir)
+    relative = relative_path_override or relative_path(file_path, root_dir)
     file_hash = sha256_file(file_path)
     metadata_hash = hash_metadata(sample_metadata)
     seen_at = utc_now()
@@ -104,6 +107,9 @@ def ingest_document(
             previous_hash=existing.file_hash if existing else "",
             new_hash=file_hash,
             chunk_count=existing.chunk_count if existing else 0,
+            sequence=sequence,
+            relative_path=relative,
+            processed_at=seen_at,
         )
         print(f"  跳过未变化文档: {doc_id}")
         return INGEST_ACTION_SKIPPED
@@ -141,6 +147,8 @@ def ingest_document(
         )
         print(f"  分块数: {len(chunks)}")
 
+        if ownership_check is not None:
+            ownership_check()
         existing_ids = set(
             list_chunk_ids_by_doc_id(
                 doc_id=doc_id,
@@ -149,11 +157,15 @@ def ingest_document(
             )
         )
         new_ids = {str(chunk.id) for chunk in chunks}
+        if ownership_check is not None:
+            ownership_check()
         upsert_chunks(
             chunks=chunks,
             persist_directory=persist_directory,
             embedding_model=resolved_embedding_model,
         )
+        if ownership_check is not None:
+            ownership_check()
         delete_chunk_ids(
             chunk_ids=existing_ids - new_ids,
             persist_directory=persist_directory,
@@ -188,9 +200,14 @@ def ingest_document(
             previous_hash=previous_hash,
             new_hash=file_hash,
             chunk_count=len(chunks),
+            sequence=sequence,
+            relative_path=relative,
+            processed_at=ingested_at,
         )
         print(f"  入库完成: {len(chunks)} chunks, action={action}, doc_id={doc_id}")
         return action
+    except IngestWorkerLeaseLostError:
+        raise
     except Exception as exc:
         error = str(exc)
         registry_store.mark_failed(
@@ -216,73 +233,34 @@ def ingest_document(
             action=INGEST_ACTION_FAILED,
             previous_hash=previous_hash,
             new_hash=file_hash,
-            error=error,
+            error="文档处理失败",
+            sequence=sequence,
+            relative_path=relative,
+            processed_at=utc_now(),
+            error_code=INGEST_ERROR_DOCUMENT_PROCESSING_FAILED,
         )
         print(f"失败: {file_path}, 错误: {error}")
         return INGEST_ACTION_FAILED
 
 
 def iter_supported_files(directory: Path):
+    from src.ingestion.catalog import ensure_safe_source_path
+
+    data_raw_root = Path(DATA_RAW_ROOT)
+    ensure_safe_source_path(directory, directory, data_raw_root)
     for file_path in sorted(directory.rglob("*")):
+        if file_path.is_symlink():
+            raise ValueError("入库目录包含符号链接")
+        ensure_safe_source_path(file_path, directory, data_raw_root)
         if file_path.is_file() and file_path.suffix.lower() in SUPPORTED_SUFFIXES:
             yield file_path
 
 
-def ingest_directory(directory: Path, doc_type: str, *, full_scan: bool = False) -> None:
-    registry_store = DocumentRegistryStore(INGEST_REGISTRY_DB_PATH)
-    run_id = create_run_id()
-    started_at = utc_now()
-    registry_store.start_run(
-        run_id=run_id,
-        root_uri=directory.resolve().as_uri(),
-        full_scan=full_scan,
-        started_at=started_at,
-    )
-    embedding_model = get_embedding_model(config.embedding.model)
-    seen_doc_ids = set()
-    failed = False
+def ingest_directory(directory: Path, doc_type: str, *, full_scan: bool = False):
+    from src.ingestion.service import IngestionService
 
-    for file_path in iter_supported_files(directory):
-        action = ingest_document(
-            file_path=file_path,
-            doc_type=doc_type,
-            registry_store=registry_store,
-            run_id=run_id,
-            root_dir=directory,
-            embedding_model=embedding_model,
-        )
-        sample_metadata = load_sample_metadata(file_path)
-        effective_doc_type = sample_metadata.get(META_DOC_TYPE, doc_type)
-        seen_doc_ids.add(derive_doc_id(file_path, effective_doc_type, sample_metadata))
-        failed = failed or action == INGEST_ACTION_FAILED
-
-    if full_scan and not failed:
-        seen_at = utc_now()
-        for record in registry_store.active_documents():
-            if record.doc_id in seen_doc_ids:
-                continue
-            if not file_uri_in_directory(record.source_uri, directory):
-                continue
-            old_ids = list_chunk_ids_by_doc_id(
-                doc_id=record.doc_id,
-                persist_directory=CHROMA_DEFAULT_PERSIST_DIR,
-                embedding_model=embedding_model,
-            )
-            delete_chunk_ids(
-                chunk_ids=old_ids,
-                persist_directory=CHROMA_DEFAULT_PERSIST_DIR,
-                embedding_model=embedding_model,
-            )
-            registry_store.mark_archived(record.doc_id, seen_at)
-            registry_store.record_run_item(
-                run_id=run_id,
-                doc_id=record.doc_id,
-                source_uri=record.source_uri,
-                action=INGEST_ACTION_ARCHIVED,
-                previous_hash=record.file_hash,
-                chunk_count=0,
-            )
-
-    status = INGEST_RUN_STATUS_FAILED if failed else INGEST_RUN_STATUS_SUCCESS
-    registry_store.finish_run(run_id=run_id, status=status, finished_at=utc_now())
-    print(f"入库任务完成: run_id={run_id}, status={status}")
+    service = IngestionService()
+    queued = service.create_directory_run(directory, doc_type, full_scan=full_scan)
+    summary = service.execute_run(queued["run_id"])
+    print(f"入库任务完成: run_id={summary['run_id']}, status={summary['status']}")
+    return summary

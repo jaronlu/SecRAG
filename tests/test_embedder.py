@@ -1,9 +1,47 @@
+import sys
+from types import SimpleNamespace
 from typing import Any
 
 from langchain_core.documents import Document
 
 from src.ingestion import embedder
 from src.schemas.constants import CHROMA_HNSW_SPACE_KEY, CHROMA_SPACE
+
+
+def test_detect_device_prefers_cuda(monkeypatch):
+    fake_torch = SimpleNamespace(
+        cuda=SimpleNamespace(is_available=lambda: True),
+        backends=SimpleNamespace(
+            mps=SimpleNamespace(is_built=lambda: True, is_available=lambda: True)
+        ),
+    )
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+
+    assert embedder._detect_device() == "cuda"
+
+
+def test_detect_device_uses_mps_only_when_built_and_available(monkeypatch):
+    fake_torch = SimpleNamespace(
+        cuda=SimpleNamespace(is_available=lambda: False),
+        backends=SimpleNamespace(
+            mps=SimpleNamespace(is_built=lambda: True, is_available=lambda: True)
+        ),
+    )
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+
+    assert embedder._detect_device() == "mps"
+
+
+def test_detect_device_falls_back_to_cpu_when_mps_unavailable(monkeypatch):
+    fake_torch = SimpleNamespace(
+        cuda=SimpleNamespace(is_available=lambda: False),
+        backends=SimpleNamespace(
+            mps=SimpleNamespace(is_built=lambda: True, is_available=lambda: False)
+        ),
+    )
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+
+    assert embedder._detect_device() == "cpu"
 
 
 def test_get_embedding_model_uses_financial_defaults(monkeypatch):
@@ -59,7 +97,7 @@ def test_upsert_chunks_uses_stable_document_ids(monkeypatch, tmp_path):
         Document(page_content="更多内容", metadata={"doc_id": "doc-1"}, id="chunk-2"),
     ]
     embedding_model: Any = object()
-    captured = {"batches": []}
+    captured: dict[str, Any] = {"batches": []}
 
     class FakeChroma:
         def __init__(self, **kwargs):
@@ -81,9 +119,10 @@ def test_upsert_chunks_uses_stable_document_ids(monkeypatch, tmp_path):
 
 def test_upsert_chunks_rejects_invalid_batch_size(tmp_path):
     chunks = [Document(page_content="测试内容", metadata={}, id="chunk-1")]
+    embedding_model: Any = object()
 
     try:
-        embedder.upsert_chunks(chunks, str(tmp_path), object(), batch_size=0)
+        embedder.upsert_chunks(chunks, str(tmp_path), embedding_model, batch_size=0)
     except ValueError as exc:
         assert "batch_size" in str(exc)
     else:

@@ -38,6 +38,7 @@ Query → Planner → Retriever → Reasoner → Verifier → Composer → Audit
 - **混合检索 + 语义重排**：ChromaDB 向量检索为主，BGE Reranker 对召回结果做语义重排
 - **LangGraph StateGraph 编排**：节点间条件路由，而非固定 Chain
 - **FastAPI 问答接口**：面向内部使用场景的服务化封装
+- **知识库运营入口**：technical 角色可从受控文档分类下拉中执行异步增量入库，查看逐文件结果和任务审计状态
 
 ## 快速开始
 
@@ -63,6 +64,8 @@ uv run python scripts/demo.py
 ```
 
 `scripts/demo.py` 会依次调用 `/v1/qa`（单轮 RAG）和 `/v1/assistant/qa`（完整 Agent 工作流，含权限拒绝场景），打印回答、引用、置信度和追踪信息。
+
+浏览器打开 `http://127.0.0.1:8000/` 可使用“问答 / 文档入库”双 Tab。文档入库只对 `demo-tech` 开放，分类来自服务器 Catalog，不接受任意路径、文件上传或 `full_scan`。
 
 ### Assistant API 身份绑定
 
@@ -180,7 +183,7 @@ CI 在每次 push / PR 时自动跑 lint + 测试。
 当前短板：
 
 - **评估指标还不够强**：需要用 `scripts/evaluate_retrieval.py` 跑出一组稳定的小样本 recall/precision/permission_block_accuracy 结果。
-- **UI 仍偏调试型**：目前结果展示更像 JSON 调试页，后续应拆成 Answer、Citations、Audit Trail 和 Raw JSON。
+- **后台任务仍是单机实现**：当前使用 FastAPI BackgroundTasks + SQLite lease，进程中断后任务会失败，尚未引入持久化任务队列。
 - **LLM 依赖外部网络**：StepFun 或兼容 API 不稳定时会影响现场演示，需要明确网络要求或提供标注清楚的离线 demo mode。
 - **样例数据规模较小**：当前能证明流程，但不能证明效果，需要扩充 20-50 条覆盖不同角色和拒答场景的小评估集。
 - **设计文档发布方式未闭环**：`docs/design` 是本机外部路径软链接，公开仓库前需要内置精简设计文档或在 README 里说明详细设计不随仓库发布。
@@ -189,7 +192,7 @@ CI 在每次 push / PR 时自动跑 lint + 测试。
 
 1. 把 `scripts/check_permissions.py` 的结果写进 README，形成固定权限验收说明。
 2. 跑通 `scripts/evaluate_retrieval.py`，记录本地小样本评估结果。
-3. 优化 UI 展示结构，减少 raw JSON 暴露，把答案、引用和审计信息分区展示。
+3. 为入库任务增加持久化队列和取消/重试能力，覆盖多实例部署。
 
 ## 技术栈
 

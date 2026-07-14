@@ -48,7 +48,7 @@ def test_authenticate_user_rejects_unknown_token():
     with pytest.raises(HTTPException) as exc:
         authenticate_user("Bearer missing-token")
 
-    assert exc.value.status_code == 403
+    assert exc.value.status_code == 401
 
 
 def test_build_initial_state_uses_authenticated_user():

@@ -42,12 +42,12 @@ from src.schemas.constants import (
     SOURCE_REPORT,
     STATE_AMBIGUITY,
     STATE_AUDIT_TRAIL,
-    STATE_CITATIONS,
     STATE_CHAT_HISTORY,
+    STATE_CITATIONS,
     STATE_CLIENT_ID,
     STATE_COMPLIANCE,
-    STATE_CONVERSATION_SUMMARY,
     STATE_CONFIDENCE,
+    STATE_CONVERSATION_SUMMARY,
     STATE_DATA_PERMISSIONS,
     STATE_DEPARTMENT,
     STATE_ENTITIES,
@@ -56,8 +56,8 @@ from src.schemas.constants import (
     STATE_MESSAGES,
     STATE_ORIGINAL_QUERY,
     STATE_QUERY_TYPE,
-    STATE_RESOLVED_QUERY,
     STATE_REASON_ATTEMPTS,
+    STATE_RESOLVED_QUERY,
     STATE_RETRIEVAL_ATTEMPTS,
     STATE_RETRIEVAL_FILTERED_CHUNKS,
     STATE_RETRIEVAL_PLAN,
@@ -72,7 +72,7 @@ from src.schemas.constants import (
     STATE_VERIFICATION,
 )
 from src.schemas.typed_dicts import RetrievalPlanStep, ToolCallDict
-from src.utils.compliance import ComplianceChecker, INVESTMENT_ADVICE_PATTERNS
+from src.utils.compliance import INVESTMENT_ADVICE_PATTERNS, ComplianceChecker
 from src.utils.verifier import CitationExtractor, ComprehensiveVerifier
 
 
@@ -142,7 +142,7 @@ def _structure_answer(content: str) -> str:
     answer = content.strip()
     for prefix in ("Answer:", "回答：", "回答:"):
         if answer.startswith(prefix):
-            answer = answer[len(prefix):].lstrip()
+            answer = answer[len(prefix) :].lstrip()
             break
     for marker in ("\nCitations:", "\nAudit Trail:"):
         if marker in answer:
@@ -202,9 +202,11 @@ def resolve_followup_query(state: AssistantState) -> AssistantState:
     query = state[STATE_ORIGINAL_QUERY]
     summary = state.get(STATE_CONVERSATION_SUMMARY, "")
     followup_markers = ("它", "这个", "该产品", "该公司", "那", "上述", "前面")
-    resolved = f"基于会话实体（{summary}），{query}" if summary and any(
-        marker in query for marker in followup_markers
-    ) else query
+    resolved = (
+        f"基于会话实体（{summary}），{query}"
+        if summary and any(marker in query for marker in followup_markers)
+        else query
+    )
     return _with_state_updates(state, {STATE_RESOLVED_QUERY: resolved})
 
 
@@ -248,13 +250,16 @@ def query_understand(state: AssistantState) -> AssistantState:
             "ambiguity": [],
         }
 
-    return _with_state_updates(state, {
-        STATE_INTENT: result.get("intent", "unknown"),
-        STATE_QUERY_TYPE: result.get("query_type", "unknown"),
-        STATE_ENTITIES: result.get("entities", {}),
-        STATE_REWRITTEN_QUERY: result.get("rewritten_query", effective_query),
-        STATE_AMBIGUITY: result.get("ambiguity", []),
-    })
+    return _with_state_updates(
+        state,
+        {
+            STATE_INTENT: result.get("intent", "unknown"),
+            STATE_QUERY_TYPE: result.get("query_type", "unknown"),
+            STATE_ENTITIES: result.get("entities", {}),
+            STATE_REWRITTEN_QUERY: result.get("rewritten_query", effective_query),
+            STATE_AMBIGUITY: result.get("ambiguity", []),
+        },
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -298,11 +303,13 @@ def planner(state: AssistantState) -> AssistantState:
         parsed_plan = json.loads(raw)
     except json.JSONDecodeError:
         parsed_plan = (
-            [{
-                PLAN_SOURCE: allowed_sources[0],
-                PLAN_QUERY: state[STATE_REWRITTEN_QUERY],
-                PLAN_TOP_K: 3,
-            }]
+            [
+                {
+                    PLAN_SOURCE: allowed_sources[0],
+                    PLAN_QUERY: state[STATE_REWRITTEN_QUERY],
+                    PLAN_TOP_K: 3,
+                }
+            ]
             if allowed_sources
             else []
         )
@@ -321,9 +328,12 @@ def planner(state: AssistantState) -> AssistantState:
                     step[PLAN_FILTERS] = filters
             filtered_plan.append(step)
 
-    return _with_state_updates(state, {
-        STATE_RETRIEVAL_PLAN: filtered_plan,
-    })
+    return _with_state_updates(
+        state,
+        {
+            STATE_RETRIEVAL_PLAN: filtered_plan,
+        },
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -351,12 +361,14 @@ def retrieve(state: AssistantState) -> AssistantState:
     results = retriever.retrieve(plan=normalized_plan)
 
     accumulated = state.get(STATE_RETRIEVAL_RESULTS, []) + results
-    return _with_state_updates(state, {
-        STATE_RETRIEVAL_RESULTS: accumulated,
-        STATE_RETRIEVAL_ATTEMPTS: state.get(STATE_RETRIEVAL_ATTEMPTS, 0) + 1,
-        STATE_RETRIEVAL_TOTAL_CHUNKS: state.get(STATE_RETRIEVAL_TOTAL_CHUNKS, 0)
-        + len(results),
-    })
+    return _with_state_updates(
+        state,
+        {
+            STATE_RETRIEVAL_RESULTS: accumulated,
+            STATE_RETRIEVAL_ATTEMPTS: state.get(STATE_RETRIEVAL_ATTEMPTS, 0) + 1,
+            STATE_RETRIEVAL_TOTAL_CHUNKS: state.get(STATE_RETRIEVAL_TOTAL_CHUNKS, 0) + len(results),
+        },
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -388,10 +400,13 @@ def grade_and_filter(state: AssistantState) -> AssistantState:
         if len(filtered) >= GRADE_TOP_K:
             break
 
-    return _with_state_updates(state, {
-        STATE_RETRIEVAL_RESULTS: filtered + denied,
-        STATE_RETRIEVAL_FILTERED_CHUNKS: len(filtered),
-    })
+    return _with_state_updates(
+        state,
+        {
+            STATE_RETRIEVAL_RESULTS: filtered + denied,
+            STATE_RETRIEVAL_FILTERED_CHUNKS: len(filtered),
+        },
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -427,8 +442,7 @@ def reason(state: AssistantState) -> AssistantState:
             context_part += f"\n{metadata_evidence}"
         context_parts.append(context_part)
     context = "\n\n".join(context_parts) or (
-        "当前轮没有可用文档检索结果；如问题可由授权工具回答，应调用工具并仅依据成功"
-        "工具输出作答。"
+        "当前轮没有可用文档检索结果；如问题可由授权工具回答，应调用工具并仅依据成功工具输出作答。"
     )
 
     # 角色化 prompt
@@ -468,9 +482,7 @@ def reason(state: AssistantState) -> AssistantState:
 {"投顾/销售角色：不得输出" + "买" + "入/" + "卖" + "出/" + "目标" + "价等业务建议，仅提供事实信息。" if role in (ROLE_ADVISOR, ROLE_INSTITUTIONAL_SALES) else ""}
 {"合规角色：引用必须精确到条款/条文号。" if role == ROLE_COMPLIANCE else ""}"""
 
-    planned_sources = {
-        step.get(PLAN_SOURCE, "") for step in state.get(STATE_RETRIEVAL_PLAN, [])
-    }
+    planned_sources = {step.get(PLAN_SOURCE, "") for step in state.get(STATE_RETRIEVAL_PLAN, [])}
     excluded_sources = planned_sources if results else set()
     agent = create_agent(
         model=llm,
@@ -484,7 +496,9 @@ def reason(state: AssistantState) -> AssistantState:
     })
 
     final_msg = response[STATE_MESSAGES][-1]
-    final_content = final_msg.content if isinstance(final_msg.content, str) else str(final_msg.content)
+    final_content = (
+        final_msg.content if isinstance(final_msg.content, str) else str(final_msg.content)
+    )
     final_content = _structure_answer(final_content)
     tool_calls: list[ToolCallDict] = list(state.get(STATE_TOOL_CALLS, []))
     for message in response[STATE_MESSAGES]:
@@ -497,12 +511,15 @@ def reason(state: AssistantState) -> AssistantState:
                     success=message.status != "error",
                 )
             )
-    return _with_state_updates(state, {
-        STATE_MESSAGES: state.get(STATE_MESSAGES, []) + response[STATE_MESSAGES],
-        STATE_TOOL_CALLS: tool_calls,
-        STATE_FINAL_ANSWER: final_content,
-        STATE_REASON_ATTEMPTS: reason_attempts,
-    })
+    return _with_state_updates(
+        state,
+        {
+            STATE_MESSAGES: state.get(STATE_MESSAGES, []) + response[STATE_MESSAGES],
+            STATE_TOOL_CALLS: tool_calls,
+            STATE_FINAL_ANSWER: final_content,
+            STATE_REASON_ATTEMPTS: reason_attempts,
+        },
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -558,9 +575,12 @@ def compliance_check(state: AssistantState) -> AssistantState:
         client_id=state.get(STATE_CLIENT_ID),
     )
 
-    return _with_state_updates(state, {
-        STATE_COMPLIANCE: compliance,
-    })
+    return _with_state_updates(
+        state,
+        {
+            STATE_COMPLIANCE: compliance,
+        },
+    )
 
 
 def permission_denied_response(state: AssistantState) -> AssistantState:
@@ -568,9 +588,7 @@ def permission_denied_response(state: AssistantState) -> AssistantState:
     return _with_state_updates(
         state,
         {
-            STATE_FINAL_ANSWER: _structure_answer(
-                "当前角色无权限访问完成该请求所需的数据源。"
-            ),
+            STATE_FINAL_ANSWER: _structure_answer("当前角色无权限访问完成该请求所需的数据源。"),
             STATE_CITATIONS: [],
             STATE_CONFIDENCE: CONFIDENCE_LOW,
             STATE_RISK_DISCLOSURE: "",
@@ -615,9 +633,7 @@ def compose(state: AssistantState) -> AssistantState:
     # 综合置信度
     verification_conf = state.get(STATE_VERIFICATION, {}).get("confidence", CONFIDENCE_MEDIUM)
     result_count = len([
-        result
-        for result in state.get(STATE_RETRIEVAL_RESULTS, [])
-        if not result.get(RR_DENIED)
+        result for result in state.get(STATE_RETRIEVAL_RESULTS, []) if not result.get(RR_DENIED)
     ])
 
     if not compliance_passed:
@@ -627,12 +643,15 @@ def compose(state: AssistantState) -> AssistantState:
     else:
         confidence = CONFIDENCE_MEDIUM
 
-    return _with_state_updates(state, {
-        STATE_FINAL_ANSWER: final_answer,
-        STATE_CITATIONS: citations,
-        STATE_CONFIDENCE: confidence,
-        STATE_RISK_DISCLOSURE: risk + suitability,
-    })
+    return _with_state_updates(
+        state,
+        {
+            STATE_FINAL_ANSWER: final_answer,
+            STATE_CITATIONS: citations,
+            STATE_CONFIDENCE: confidence,
+            STATE_RISK_DISCLOSURE: risk + suitability,
+        },
+    )
 
 
 def persist_conversation_turn(state: AssistantState) -> AssistantState:
@@ -665,6 +684,9 @@ def audit_log(state: AssistantState) -> AssistantState:
             conversation_store.mark_outbox_failed(audit_entry.request_id, str(exc))
         raise
 
-    return _with_state_updates(state, {
-        STATE_AUDIT_TRAIL: audit_entry_to_trail(audit_entry),
-    })
+    return _with_state_updates(
+        state,
+        {
+            STATE_AUDIT_TRAIL: audit_entry_to_trail(audit_entry),
+        },
+    )

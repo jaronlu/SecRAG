@@ -24,6 +24,25 @@
       font-size: 28px;
       letter-spacing: 0;
     }
+    .tabs {
+      display: flex;
+      gap: 4px;
+      border-bottom: 1px solid #d7dce2;
+      margin-bottom: 20px;
+    }
+    .tab-button {
+      background: transparent;
+      color: #4b5563;
+      border-bottom: 3px solid transparent;
+      border-radius: 4px 4px 0 0;
+    }
+    .tab-button[aria-selected="true"] {
+      color: #1d4ed8;
+      border-bottom-color: #2563eb;
+    }
+    .tab-button:disabled {
+      color: #9ca3af;
+    }
     .panel {
       background: #fff;
       border: 1px solid #d7dce2;
@@ -169,15 +188,84 @@
       font-size: 14px;
       color: #4b5563;
     }
+    .ingestion-form {
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) minmax(220px, 1fr) auto;
+      align-items: end;
+      gap: 14px;
+    }
+    .summary-list {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .summary-item {
+      border-left: 3px solid #9ca3af;
+      padding-left: 10px;
+      min-width: 0;
+    }
+    .summary-item strong,
+    .summary-item span {
+      display: block;
+      overflow-wrap: anywhere;
+    }
+    .summary-item strong {
+      font-size: 13px;
+      color: #6b7280;
+      margin-bottom: 4px;
+    }
+    .table-wrap {
+      overflow-x: auto;
+      margin-top: 14px;
+      border: 1px solid #d7dce2;
+      border-radius: 6px;
+    }
+    table {
+      width: 100%;
+      min-width: 760px;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid #e5e7eb;
+      vertical-align: top;
+    }
+    th {
+      background: #f3f4f6;
+      color: #374151;
+      font-weight: 700;
+    }
+    tbody tr:last-child td { border-bottom: 0; }
+    progress {
+      width: 100%;
+      height: 10px;
+      accent-color: #2563eb;
+    }
+    .section-heading {
+      margin: 24px 0 10px;
+      font-size: 18px;
+    }
+    .error-text { color: #b42318; }
+    .success-text { color: #047857; }
     @media (max-width: 760px) {
       body { padding: 18px; }
       .grid { grid-template-columns: 1fr; }
+      .ingestion-form { grid-template-columns: 1fr; }
+      .summary-list { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
   <main>
     <h1>SecRAG</h1>
+    <div class="tabs" role="tablist" aria-label="页面模式">
+      <button id="qaTab" class="tab-button" type="button" role="tab" aria-selected="true" aria-controls="qaView">问答</button>
+      <button id="ingestionTab" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="ingestionView">文档入库</button>
+    </div>
+    <div id="qaView" role="tabpanel" aria-labelledby="qaTab">
     <section class="panel">
       <label for="query">查询问题</label>
       <textarea id="query" placeholder="输入你的问题，例如：系统操作流程怎么查？"></textarea>
@@ -246,6 +334,74 @@
         <pre id="rawJson"></pre>
       </details>
     </div>
+    </div>
+
+    <div id="ingestionView" role="tabpanel" aria-labelledby="ingestionTab" hidden>
+      <section class="panel">
+        <div class="ingestion-form">
+          <div>
+            <label for="ingestionCategory">文档分类</label>
+            <select id="ingestionCategory"></select>
+          </div>
+          <div>
+            <label for="ingestionPath">目录</label>
+            <input id="ingestionPath" readonly value="等待选择分类" />
+          </div>
+          <button id="startIngestion" type="button" disabled>开始增量入库</button>
+        </div>
+        <div class="summary-list">
+          <div class="summary-item">
+            <strong>文件</strong>
+            <span id="ingestionFileCount">0 个业务文件</span>
+          </div>
+          <div class="summary-item">
+            <strong>Manifest</strong>
+            <span id="ingestionManifestCount">0 个</span>
+          </div>
+          <div class="summary-item">
+            <strong>状态</strong>
+            <span id="ingestionReadiness">等待选择分类</span>
+          </div>
+        </div>
+      </section>
+
+      <h2 class="section-heading">文件清单</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>文件</th><th>格式</th><th>doc_type</th><th>权限级别</th><th>Manifest</th></tr></thead>
+          <tbody id="ingestionFilesBody"><tr><td colspan="5">等待加载</td></tr></tbody>
+        </table>
+      </div>
+
+      <h2 class="section-heading">当前任务</h2>
+      <section class="panel">
+        <div class="toolbar">
+          <span id="ingestionRunStatus" class="status">暂无任务</span>
+          <span id="ingestionProgressText" class="status">0 / 0</span>
+        </div>
+        <progress id="ingestionProgress" max="1" value="0"></progress>
+        <div class="meta-row">
+          <span id="createdCount" class="pill">created 0</span>
+          <span id="replacedCount" class="pill">replaced 0</span>
+          <span id="skippedCount" class="pill">skipped 0</span>
+          <span id="failedCount" class="pill">failed 0</span>
+        </div>
+      </section>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>文件</th><th>动作</th><th>Chunks</th><th>结果</th></tr></thead>
+          <tbody id="ingestionItemsBody"><tr><td colspan="5">暂无结果</td></tr></tbody>
+        </table>
+      </div>
+
+      <h2 class="section-heading">最近任务</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>任务</th><th>分类</th><th>状态</th><th>进度</th><th>排队时间</th></tr></thead>
+          <tbody id="recentRunsBody"><tr><td colspan="5">暂无任务</td></tr></tbody>
+        </table>
+      </div>
+    </div>
   </main>
   <script>
     const submit = document.getElementById("submit");
@@ -265,14 +421,53 @@
     const messageList = document.getElementById("messageList");
     const auditText = document.getElementById("auditText");
     const rawJson = document.getElementById("rawJson");
+    const qaTab = document.getElementById("qaTab");
+    const ingestionTab = document.getElementById("ingestionTab");
+    const qaView = document.getElementById("qaView");
+    const ingestionView = document.getElementById("ingestionView");
+    const ingestionCategory = document.getElementById("ingestionCategory");
+    const ingestionPath = document.getElementById("ingestionPath");
+    const ingestionFileCount = document.getElementById("ingestionFileCount");
+    const ingestionManifestCount = document.getElementById("ingestionManifestCount");
+    const ingestionReadiness = document.getElementById("ingestionReadiness");
+    const ingestionFilesBody = document.getElementById("ingestionFilesBody");
+    const startIngestion = document.getElementById("startIngestion");
+    const ingestionRunStatus = document.getElementById("ingestionRunStatus");
+    const ingestionProgressText = document.getElementById("ingestionProgressText");
+    const ingestionProgress = document.getElementById("ingestionProgress");
+    const ingestionItemsBody = document.getElementById("ingestionItemsBody");
+    const recentRunsBody = document.getElementById("recentRunsBody");
     let lastResultText = "";
+    let ingestionCategories = [];
+    let activeRunId = null;
+    let ingestionPollTimer = null;
+    let ingestionSubmitting = false;
 
     function updateRoleBinding() {
       const selected = tokenSelect.options[tokenSelect.selectedIndex];
       roleBinding.textContent = `绑定 user_role: ${selected.dataset.role}`;
+      const technical = selected.dataset.role === "technical";
+      ingestionTab.disabled = !technical;
+      if (!technical && !ingestionView.hidden) setActiveTab("qa");
     }
 
-    tokenSelect.addEventListener("change", updateRoleBinding);
+    function setActiveTab(tab) {
+      const showIngestion = tab === "ingestion";
+      qaView.hidden = showIngestion;
+      ingestionView.hidden = !showIngestion;
+      qaTab.setAttribute("aria-selected", String(!showIngestion));
+      ingestionTab.setAttribute("aria-selected", String(showIngestion));
+      if (showIngestion) loadIngestionCatalog();
+    }
+
+    qaTab.addEventListener("click", () => setActiveTab("qa"));
+    ingestionTab.addEventListener("click", () => setActiveTab("ingestion"));
+    tokenSelect.addEventListener("change", () => {
+      updateRoleBinding();
+      ingestionCategories = [];
+      activeRunId = null;
+      stopIngestionPolling();
+    });
     updateRoleBinding();
 
     function renderResult(data) {
@@ -332,6 +527,276 @@
         messageList.appendChild(item);
       }
     }
+
+    function ingestionHeaders(json = false) {
+      const headers = {"Authorization": `Bearer ${tokenSelect.value}`};
+      if (json) headers["Content-Type"] = "application/json";
+      return headers;
+    }
+
+    function responseError(payload, fallback) {
+      if (typeof payload?.detail === "string") return payload.detail;
+      if (payload?.detail?.message) return payload.detail.message;
+      return fallback;
+    }
+
+    function setTableMessage(tbody, colspan, message) {
+      const row = document.createElement("tr");
+      const cell = document.createElement("td");
+      cell.colSpan = colspan;
+      cell.textContent = message;
+      row.appendChild(cell);
+      tbody.replaceChildren(row);
+    }
+
+    function stopIngestionPolling() {
+      if (ingestionPollTimer) window.clearTimeout(ingestionPollTimer);
+      ingestionPollTimer = null;
+    }
+
+    function scheduleIngestionPoll() {
+      stopIngestionPolling();
+      if (!activeRunId) return;
+      ingestionPollTimer = window.setTimeout(
+        pollIngestionRun,
+        ingestionView.hidden ? 5000 : 1000
+      );
+    }
+
+    function selectedCategorySummary() {
+      return ingestionCategories.find((item) => item.category_id === ingestionCategory.value);
+    }
+
+    function updateStartIngestionState() {
+      const category = selectedCategorySummary();
+      startIngestion.disabled = !category?.ready || Boolean(activeRunId) || ingestionSubmitting;
+    }
+
+    function renderCategoryOptions(selectedId) {
+      ingestionCategory.replaceChildren();
+      const groups = new Map();
+      for (const category of ingestionCategories) {
+        if (!groups.has(category.group)) groups.set(category.group, []);
+        groups.get(category.group).push(category);
+      }
+      for (const [group, categories] of groups) {
+        const optgroup = document.createElement("optgroup");
+        optgroup.label = group;
+        for (const category of categories) {
+          const option = document.createElement("option");
+          option.value = category.category_id;
+          option.textContent = category.label;
+          option.disabled = !category.ready;
+          optgroup.appendChild(option);
+        }
+        ingestionCategory.appendChild(optgroup);
+      }
+      const fallback = ingestionCategories.find((category) => category.ready)?.category_id || "";
+      ingestionCategory.value = ingestionCategories.some((item) => item.category_id === selectedId)
+        ? selectedId
+        : fallback;
+    }
+
+    async function loadIngestionCatalog() {
+      const selected = tokenSelect.options[tokenSelect.selectedIndex];
+      if (selected.dataset.role !== "technical") return;
+      ingestionReadiness.textContent = "正在检查文件...";
+      ingestionReadiness.className = "";
+      const previousCategory = ingestionCategory.value;
+      try {
+        const response = await fetch("__INGESTION_CATEGORIES_PATH__", {
+          headers: ingestionHeaders()
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(responseError(payload, `加载失败：${response.status}`));
+        ingestionCategories = payload.categories || [];
+        activeRunId = payload.active_run_id || null;
+        renderCategoryOptions(previousCategory);
+        await Promise.all([loadIngestionFiles(), loadRecentRuns()]);
+        if (activeRunId) await pollIngestionRun();
+      } catch (error) {
+        ingestionReadiness.textContent = String(error);
+        ingestionReadiness.className = "error-text";
+        setTableMessage(ingestionFilesBody, 5, "分类加载失败");
+      } finally {
+        updateStartIngestionState();
+      }
+    }
+
+    async function loadIngestionFiles() {
+      const category = selectedCategorySummary();
+      if (!category) {
+        ingestionPath.value = "等待选择分类";
+        setTableMessage(ingestionFilesBody, 5, "等待加载");
+        return;
+      }
+      ingestionPath.value = category.relative_path;
+      ingestionFileCount.textContent = `${category.file_count} 个业务文件`;
+      ingestionManifestCount.textContent = `${category.manifest_count} 个，${category.invalid_manifest_count} 个无效`;
+      ingestionReadiness.textContent = category.ready
+        ? "可以入库"
+        : category.error || `存在 ${category.invalid_manifest_count} 个 manifest 错误`;
+      ingestionReadiness.className = category.ready ? "success-text" : "error-text";
+      setTableMessage(ingestionFilesBody, 5, "正在检查文件...");
+      try {
+        const response = await fetch(
+          `__INGESTION_CATEGORIES_PATH__/${encodeURIComponent(category.category_id)}/files`,
+          {headers: ingestionHeaders()}
+        );
+        const payload = await response.json();
+        if (!response.ok) throw new Error(responseError(payload, `加载失败：${response.status}`));
+        ingestionFilesBody.replaceChildren();
+        for (const file of payload.files || []) {
+          const row = document.createElement("tr");
+          for (const value of [
+            file.relative_path,
+            file.extension,
+            file.doc_type || "-",
+            file.permission_level || "-",
+            file.manifest_status === "valid" ? "有效" : file.error || file.manifest_status
+          ]) {
+            const cell = document.createElement("td");
+            cell.textContent = value;
+            row.appendChild(cell);
+          }
+          ingestionFilesBody.appendChild(row);
+        }
+        if (!ingestionFilesBody.children.length) {
+          setTableMessage(ingestionFilesBody, 5, "分类中没有业务文件");
+        }
+      } catch (error) {
+        setTableMessage(ingestionFilesBody, 5, String(error));
+      }
+      updateStartIngestionState();
+    }
+
+    function renderIngestionRun(run) {
+      const total = run.total_files || 0;
+      const processed = run.processed_files || 0;
+      ingestionRunStatus.textContent = run.error
+        ? `${run.status}: ${run.error}`
+        : run.status;
+      ingestionRunStatus.className = run.status === "failed" ? "status error-text" : "status";
+      ingestionProgressText.textContent = `${processed} / ${total}`;
+      ingestionProgress.max = Math.max(total, 1);
+      ingestionProgress.value = processed;
+      document.getElementById("createdCount").textContent = `created ${run.created || 0}`;
+      document.getElementById("replacedCount").textContent = `replaced ${run.replaced || 0}`;
+      document.getElementById("skippedCount").textContent = `skipped ${run.skipped || 0}`;
+      document.getElementById("failedCount").textContent = `failed ${run.failed || 0}`;
+    }
+
+    async function loadIngestionItems(runId) {
+      const response = await fetch(`__INGESTION_RUNS_PATH__/${encodeURIComponent(runId)}/items`, {
+        headers: ingestionHeaders()
+      });
+      if (!response.ok) return;
+      const payload = await response.json();
+      ingestionItemsBody.replaceChildren();
+      for (const item of payload.items || []) {
+        const row = document.createElement("tr");
+        for (const value of [
+          String(item.sequence),
+          item.relative_path || item.doc_id,
+          item.action,
+          String(item.chunk_count || 0),
+          item.error || "完成"
+        ]) {
+          const cell = document.createElement("td");
+          cell.textContent = value;
+          row.appendChild(cell);
+        }
+        ingestionItemsBody.appendChild(row);
+      }
+      if (!ingestionItemsBody.children.length) {
+        setTableMessage(ingestionItemsBody, 5, "暂无结果");
+      }
+    }
+
+    async function pollIngestionRun() {
+      if (!activeRunId) return;
+      try {
+        const response = await fetch(`__INGESTION_RUNS_PATH__/${encodeURIComponent(activeRunId)}`, {
+          headers: ingestionHeaders()
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(responseError(payload, `查询失败：${response.status}`));
+        renderIngestionRun(payload);
+        await loadIngestionItems(activeRunId);
+        if (payload.status === "success" || payload.status === "failed") {
+          activeRunId = null;
+          stopIngestionPolling();
+          await loadIngestionCatalog();
+        } else {
+          scheduleIngestionPoll();
+        }
+      } catch (error) {
+        ingestionRunStatus.textContent = `轮询失败：${String(error)}`;
+        ingestionRunStatus.className = "status error-text";
+        scheduleIngestionPoll();
+      }
+      updateStartIngestionState();
+    }
+
+    async function loadRecentRuns() {
+      const response = await fetch("__INGESTION_RUNS_PATH__?limit=10", {
+        headers: ingestionHeaders()
+      });
+      if (!response.ok) return;
+      const payload = await response.json();
+      recentRunsBody.replaceChildren();
+      for (const run of payload.runs || []) {
+        const row = document.createElement("tr");
+        for (const value of [
+          run.run_id.slice(0, 12),
+          run.category_id || "CLI",
+          run.status,
+          run.total_files ? `${run.processed_files}/${run.total_files}` : `${run.processed_files}/-`,
+          run.queued_at
+        ]) {
+          const cell = document.createElement("td");
+          cell.textContent = value;
+          row.appendChild(cell);
+        }
+        recentRunsBody.appendChild(row);
+      }
+      if (!recentRunsBody.children.length) {
+        setTableMessage(recentRunsBody, 5, "暂无任务");
+      }
+    }
+
+    ingestionCategory.addEventListener("change", loadIngestionFiles);
+    startIngestion.addEventListener("click", async () => {
+      const category = selectedCategorySummary();
+      if (!category || !category.ready || activeRunId) return;
+      ingestionSubmitting = true;
+      updateStartIngestionState();
+      ingestionRunStatus.textContent = "任务排队中";
+      try {
+        const response = await fetch("__INGESTION_RUNS_PATH__", {
+          method: "POST",
+          headers: ingestionHeaders(true),
+          body: JSON.stringify({category_id: category.category_id})
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          if (response.status === 409 && payload.detail?.active_run_id) {
+            activeRunId = payload.detail.active_run_id;
+          }
+          throw new Error(responseError(payload, `创建失败：${response.status}`));
+        }
+        activeRunId = payload.run_id;
+        renderIngestionRun({...payload, total_files: category.file_count, processed_files: 0});
+        scheduleIngestionPoll();
+      } catch (error) {
+        ingestionRunStatus.textContent = String(error);
+        ingestionRunStatus.className = "status error-text";
+        if (activeRunId) scheduleIngestionPoll();
+      } finally {
+        ingestionSubmitting = false;
+        updateStartIngestionState();
+      }
+    });
 
     submit.addEventListener("click", async () => {
       const query = document.getElementById("query").value.trim();

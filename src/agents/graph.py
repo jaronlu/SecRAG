@@ -14,8 +14,8 @@ from src.agents.nodes import (
     grade_and_filter,
     load_conversation_context,
     permission_denied_response,
-    planner,
     persist_conversation_turn,
+    planner,
     query_understand,
     reason,
     resolve_followup_query,
@@ -24,8 +24,8 @@ from src.agents.nodes import (
 )
 from src.agents.state import AssistantState
 from src.schemas.constants import (
-    DEFAULT_MAX_HOPS,
     CONFIDENCE_HIGH_MIN_RESULTS,
+    DEFAULT_MAX_HOPS,
     MAX_REASON_ATTEMPTS,
     STATE_COMPLIANCE,
     STATE_INTERMEDIATE_STEPS,
@@ -108,6 +108,23 @@ def is_compliant(state: AssistantState) -> Literal["pass", "block"]:
 # 5.2 Graph 定义
 # ══════════════════════════════════════════════════════════════════════
 
+"""
+认证身份
+→ 加载会话
+→ 消解追问
+→ 查询理解
+→ 生成检索计划
+→ 执行检索
+→ 过滤结果
+→ ReAct 推理与工具调用
+→ 提取引用
+→ 四层验证
+→ 合规检查
+→ 组织回答
+→ 保存会话
+→ 写审计日志
+"""
+
 
 def build_agent_graph() -> StateGraph[AssistantState]:
     """构建 fail-closed Agent Graph。
@@ -118,32 +135,44 @@ def build_agent_graph() -> StateGraph[AssistantState]:
     """
     graph = StateGraph(AssistantState)
 
-    # 添加节点
+    # 加载会话
     graph.add_node(
         "load_conversation_context",
         _traced_node("load_conversation_context", load_conversation_context),
     )
+    # 消解追问
     graph.add_node(
         "resolve_followup_query",
         _traced_node("resolve_followup_query", resolve_followup_query),
     )
+    # 查询理解
     graph.add_node("query_understand", _traced_node("query_understand", query_understand))
+    # 生成检索计划
     graph.add_node("planner", _traced_node("planner", planner))
+    # 执行检索
     graph.add_node("retrieve", _traced_node("retrieve", retrieve))
+    # 过滤结果
     graph.add_node("grade_and_filter", _traced_node("grade_and_filter", grade_and_filter))
     graph.add_node(
         "permission_denied_response",
         _traced_node("permission_denied_response", permission_denied_response),
     )
+    # ReAct 推理与工具调用
     graph.add_node("reason", _traced_node("reason", reason))
+    # 提取引用
     graph.add_node("extract_citations", _traced_node("extract_citations", extract_citations))
+    # 四层验证
     graph.add_node("verify", _traced_node("verify", verify))
+    # 合规检查
     graph.add_node("compliance_check", _traced_node("compliance_check", compliance_check))
+    # 组织回答
     graph.add_node("compose", _traced_node("compose", compose))
+    # 保存会话
     graph.add_node(
         "persist_conversation_turn",
         _traced_node("persist_conversation_turn", persist_conversation_turn),
     )
+    # 写审计日志
     graph.add_node("audit_log", audit_log)
 
     # Phase 1：auth_check 由 API Gateway / FastAPI Middleware 承担；
