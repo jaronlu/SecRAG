@@ -6,6 +6,7 @@ from src.schemas.constants import (
     API_ROUTE_ASSISTANT_QA,
     API_ROUTE_ASSISTANT_THREADS,
     API_ROUTE_INGESTION_CATEGORIES,
+    API_ROUTE_INGESTION_CHUNKS,
     API_ROUTE_INGESTION_RUNS,
     ROLE_ADVISOR,
     ROLE_COMPLIANCE,
@@ -71,4 +72,7 @@ def render_ui_html() -> str:
     ).replace(
         "__INGESTION_RUNS_PATH__",
         API_ROUTE_INGESTION_RUNS,
+    ).replace(
+        "__INGESTION_CHUNKS_PATH__",
+        API_ROUTE_INGESTION_CHUNKS,
     )

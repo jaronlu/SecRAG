@@ -165,5 +165,31 @@ class IngestionRunItemsResponse(BaseModel):
     items: list[IngestionRunItemResponse]
 
 
+class IngestionChunkResponse(BaseModel):
+    chunk_id: str
+    chunk_index: int
+    chunk_hash: str
+    doc_type: str
+    title: str
+    stock_code: str
+    date: str
+    page_number: str
+    content_length: int
+    content: str
+    permission_level: str
+    allowed_roles: list[str]
+    parser_version: str
+    chunker_version: str
+    embedding_model: str
+
+
+class IngestionDocumentChunksResponse(BaseModel):
+    doc_id: str
+    total_chunks: int
+    offset: int
+    limit: int
+    chunks: list[IngestionChunkResponse]
+
+
 class IngestionRunsResponse(BaseModel):
     runs: list[IngestionRunResponse]

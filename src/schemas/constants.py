@@ -238,6 +238,7 @@ API_ROUTE_INGESTION_CATEGORY_FILES = "/v1/admin/ingestion/categories/{category_i
 API_ROUTE_INGESTION_RUNS = "/v1/admin/ingestion/runs"
 API_ROUTE_INGESTION_RUN = "/v1/admin/ingestion/runs/{run_id}"
 API_ROUTE_INGESTION_RUN_ITEMS = "/v1/admin/ingestion/runs/{run_id}/items"
+API_ROUTE_INGESTION_CHUNKS = "/v1/admin/ingestion/chunks"
 
 # 入库任务状态与错误码（SCHEMA-REFERENCE §2.8）
 INGEST_RUN_STATUS_QUEUED: Final = "queued"

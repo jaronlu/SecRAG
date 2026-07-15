@@ -73,6 +73,33 @@ class FakeIngestionService:
             }
         ]
 
+    def list_document_chunks(self, doc_id: str, *, offset: int, limit: int):
+        assert doc_id == "doc-1"
+        assert offset == 0
+        assert limit == 50
+        return (
+            [
+                {
+                    "chunk_id": "chunk-1",
+                    "chunk_index": 0,
+                    "chunk_hash": "hash-1",
+                    "doc_type": "financial_data",
+                    "title": "sample",
+                    "stock_code": "600519",
+                    "date": "2026",
+                    "page_number": "",
+                    "content_length": 6,
+                    "content": "stored",
+                    "permission_level": "internal",
+                    "allowed_roles": ["technical"],
+                    "parser_version": "parser-v1",
+                    "chunker_version": "chunker-v1",
+                    "embedding_model": "embedding-v1",
+                }
+            ],
+            1,
+        )
+
     def list_recent_runs(self, limit: int):
         assert limit == 10
         return [self._summary("success")]
@@ -136,6 +163,9 @@ async def test_ingestion_catalog_files_and_runs_api():
             )
             run = await client.get("/v1/admin/ingestion/runs/run-1", headers=headers)
             items = await client.get("/v1/admin/ingestion/runs/run-1/items", headers=headers)
+            chunks = await client.get(
+                "/v1/admin/ingestion/chunks?doc_id=doc-1", headers=headers
+            )
             recent = await client.get("/v1/admin/ingestion/runs?limit=10", headers=headers)
     finally:
         app.dependency_overrides.clear()
@@ -149,6 +179,10 @@ async def test_ingestion_catalog_files_and_runs_api():
     assert fake.executed == ["run-1"]
     assert run.status_code == 200
     assert items.json()["items"][0]["relative_path"].startswith("data/raw/")
+    assert chunks.status_code == 200
+    assert chunks.json()["chunks"][0]["content"] == "stored"
+    assert "source" not in chunks.json()["chunks"][0]
+    assert "embedding" not in chunks.json()["chunks"][0]
     assert recent.status_code == 200
 
 

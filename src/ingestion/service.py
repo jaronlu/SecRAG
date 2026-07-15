@@ -22,6 +22,7 @@ from src.ingestion.catalog import (
     get_ingestion_catalog,
     preflight_category,
 )
+from src.ingestion.chunk_view import inspect_doc_id
 from src.ingestion.embedder import delete_chunk_ids, get_embedding_model, list_chunk_ids_by_doc_id
 from src.ingestion.identity import (
     derive_doc_id,
@@ -59,6 +60,7 @@ from src.schemas.constants import (
 from src.schemas.typed_dicts import (
     IngestionCategoryConfig,
     IngestionCategorySummary,
+    IngestionChunkView,
     IngestionFile,
     IngestionRunItemView,
     IngestionRunSummary,
@@ -72,6 +74,10 @@ class CategoryPreflightError(ValueError):
 
 
 class IngestRunNotFoundError(LookupError):
+    pass
+
+
+class IngestDocumentNotFoundError(LookupError):
     pass
 
 
@@ -141,6 +147,42 @@ class IngestionService:
 
     def list_category_files(self, category_id: str) -> list[IngestionFile]:
         return self._preflight(category_id).files
+
+    def list_document_chunks(
+        self,
+        doc_id: str,
+        *,
+        offset: int,
+        limit: int,
+    ) -> tuple[list[IngestionChunkView], int]:
+        rows = inspect_doc_id(
+            doc_id,
+            persist_directory=self.persist_directory,
+            full_content=True,
+        )
+        if not rows:
+            raise IngestDocumentNotFoundError(doc_id)
+        chunks: list[IngestionChunkView] = [
+            {
+                "chunk_id": row["chunk_id"],
+                "chunk_index": row["chunk_index"],
+                "chunk_hash": row["chunk_hash"],
+                "doc_type": row["doc_type"],
+                "title": row["title"],
+                "stock_code": row["stock_code"],
+                "date": row["date"],
+                "page_number": row["page_number"],
+                "content_length": row["content_length"],
+                "content": row.get("content", ""),
+                "permission_level": row["permission_level"],
+                "allowed_roles": row["allowed_roles"],
+                "parser_version": row["parser_version"],
+                "chunker_version": row["chunker_version"],
+                "embedding_model": row["embedding_model"],
+            }
+            for row in rows[offset : offset + limit]
+        ]
+        return chunks, len(rows)
 
     def _create_from_preflight(
         self,

@@ -261,3 +261,21 @@ class IngestionRunItemView(TypedDict):
     processed_at: str
     error_code: str
     error: str
+
+
+class IngestionChunkView(TypedDict):
+    chunk_id: str
+    chunk_index: int
+    chunk_hash: str
+    doc_type: str
+    title: str
+    stock_code: str
+    date: str
+    page_number: str
+    content_length: int
+    content: str
+    permission_level: str
+    allowed_roles: list[str]
+    parser_version: str
+    chunker_version: str
+    embedding_model: str

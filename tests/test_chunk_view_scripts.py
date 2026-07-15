@@ -6,12 +6,17 @@ from scripts import preview_chunks
 from src.ingestion import chunk_view
 from src.schemas.constants import (
     DOC_TYPE_FINANCIAL_DATA,
+    META_ALLOWED_ROLES,
     META_CHUNK_HASH,
     META_CHUNK_ID,
     META_CHUNK_INDEX,
+    META_CHUNKER_VERSION,
     META_DATE,
     META_DOC_ID,
     META_DOC_TYPE,
+    META_EMBEDDING_MODEL,
+    META_PARSER_VERSION,
+    META_PERMISSION_LEVEL,
     META_SOURCE,
     META_STOCK_CODE,
     META_TITLE,
@@ -32,6 +37,11 @@ def test_build_chunk_views_and_markdown_preview():
                 META_TITLE: "标题",
                 META_STOCK_CODE: "600519",
                 META_DATE: "2026",
+                META_PERMISSION_LEVEL: "internal",
+                META_ALLOWED_ROLES: "technical,compliance",
+                META_PARSER_VERSION: "parser-v1",
+                META_CHUNKER_VERSION: "chunker-v1",
+                META_EMBEDDING_MODEL: "embedding-v1",
             },
         )
     ]
@@ -42,6 +52,7 @@ def test_build_chunk_views_and_markdown_preview():
     assert rows[0]["doc_id"] == "doc-1"
     assert rows[0]["content_length"] == len(chunks[0].page_content)
     assert rows[0]["content_preview"].endswith("...")
+    assert rows[0]["allowed_roles"] == ["technical", "compliance"]
     assert "total_chunks: 1" in markdown
     assert "- chunk_id: `chunk-1`" in markdown
 
@@ -61,6 +72,11 @@ def test_render_jsonl_outputs_one_row_per_chunk():
             "page_number": "",
             "content_length": 10,
             "content_preview": "内容",
+            "permission_level": "internal",
+            "allowed_roles": ["technical"],
+            "parser_version": "parser-v1",
+            "chunker_version": "chunker-v1",
+            "embedding_model": "embedding-v1",
         }
     ]
 
@@ -152,6 +168,11 @@ def test_preview_cli_reads_stored_chunks_by_doc_id(monkeypatch, capsys):
                 "page_number": "",
                 "content_length": 10,
                 "content_preview": "stored",
+                "permission_level": "internal",
+                "allowed_roles": ["technical"],
+                "parser_version": "parser-v1",
+                "chunker_version": "chunker-v1",
+                "embedding_model": "embedding-v1",
             }
         ]
 

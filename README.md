@@ -38,7 +38,7 @@ Query → Planner → Retriever → Reasoner → Verifier → Composer → Audit
 - **混合检索 + 语义重排**：ChromaDB 向量检索为主，BGE Reranker 对召回结果做语义重排
 - **LangGraph StateGraph 编排**：节点间条件路由，而非固定 Chain
 - **FastAPI 问答接口**：面向内部使用场景的服务化封装
-- **知识库运营入口**：technical 角色可从受控文档分类下拉中执行异步增量入库，查看逐文件结果和任务审计状态
+- **知识库运营入口**：technical 角色可从受控文档分类下拉中执行异步增量入库，查看逐文件结果、任务审计状态和 Chroma active chunks
 
 ## 快速开始
 
@@ -65,7 +65,7 @@ uv run python scripts/demo.py
 
 `scripts/demo.py` 会依次调用 `/v1/qa`（单轮 RAG）和 `/v1/assistant/qa`（完整 Agent 工作流，含权限拒绝场景），打印回答、引用、置信度和追踪信息。
 
-浏览器打开 `http://127.0.0.1:8000/` 可使用“问答 / 文档入库”双 Tab。文档入库只对 `demo-tech` 开放，分类来自服务器 Catalog，不接受任意路径、文件上传或 `full_scan`。
+浏览器打开 `http://127.0.0.1:8000/` 可使用“问答 / 文档入库”双 Tab。文档入库只对 `demo-tech` 开放，分类来自服务器 Catalog，不接受任意路径、文件上传或 `full_scan`；逐文件结果可继续查看已写入 ChromaDB 的 Chunk 正文与模型版本，不返回原始向量。
 
 ### Assistant API 身份绑定
 

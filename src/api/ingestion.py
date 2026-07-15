@@ -8,14 +8,16 @@ from src.api.auth import AuthenticatedUser, authenticate_user
 from src.ingestion.service import (
     ActiveIngestRunError,
     CategoryPreflightError,
-    IngestRunNotFoundError,
+    IngestDocumentNotFoundError,
     IngestionService,
+    IngestRunNotFoundError,
     UnknownIngestionCategoryError,
     UnsafeIngestionPathError,
 )
 from src.schemas.constants import (
     API_ROUTE_INGESTION_CATEGORIES,
     API_ROUTE_INGESTION_CATEGORY_FILES,
+    API_ROUTE_INGESTION_CHUNKS,
     API_ROUTE_INGESTION_RUN,
     API_ROUTE_INGESTION_RUN_ITEMS,
     API_ROUTE_INGESTION_RUNS,
@@ -24,12 +26,14 @@ from src.schemas.constants import (
 from src.schemas.request_response import (
     IngestionCategoriesResponse,
     IngestionCategoryResponse,
+    IngestionChunkResponse,
+    IngestionDocumentChunksResponse,
     IngestionFileResponse,
     IngestionFilesResponse,
     IngestionRunCreate,
     IngestionRunCreateResponse,
-    IngestionRunItemsResponse,
     IngestionRunItemResponse,
+    IngestionRunItemsResponse,
     IngestionRunResponse,
     IngestionRunsResponse,
 )
@@ -54,6 +58,8 @@ def _translate_error(exc: Exception) -> HTTPException:
         return HTTPException(status_code=404, detail="文档分类不存在")
     if isinstance(exc, IngestRunNotFoundError):
         return HTTPException(status_code=404, detail="入库任务不存在")
+    if isinstance(exc, IngestDocumentNotFoundError):
+        return HTTPException(status_code=404, detail="该文档没有可用 Chunks")
     if isinstance(exc, ActiveIngestRunError):
         return HTTPException(
             status_code=409,
@@ -89,6 +95,31 @@ def get_ingestion_category_files(
     return IngestionFilesResponse(
         category_id=category_id,
         files=[IngestionFileResponse(**file) for file in files],
+    )
+
+
+@router.get(API_ROUTE_INGESTION_CHUNKS, response_model=IngestionDocumentChunksResponse)
+def get_ingestion_document_chunks(
+    doc_id: str = Query(min_length=1, max_length=500),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=100),
+    _: AuthenticatedUser = Depends(require_technical_user),
+    service: IngestionService = Depends(_get_ingestion_service),
+):
+    try:
+        chunks, total_chunks = service.list_document_chunks(
+            doc_id,
+            offset=offset,
+            limit=limit,
+        )
+    except Exception as exc:
+        raise _translate_error(exc) from exc
+    return IngestionDocumentChunksResponse(
+        doc_id=doc_id,
+        total_chunks=total_chunks,
+        offset=offset,
+        limit=limit,
+        chunks=[IngestionChunkResponse(**chunk) for chunk in chunks],
     )
 
 

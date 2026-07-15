@@ -26,13 +26,18 @@ from src.ingestion.identity import (
 from src.schemas.constants import (
     CHROMA_COLLECTION_NAME,
     CHROMA_DEFAULT_PERSIST_DIR,
+    META_ALLOWED_ROLES,
     META_CHUNK_HASH,
     META_CHUNK_ID,
     META_CHUNK_INDEX,
+    META_CHUNKER_VERSION,
     META_DATE,
     META_DOC_ID,
     META_DOC_TYPE,
+    META_EMBEDDING_MODEL,
     META_PAGE_NUMBER,
+    META_PARSER_VERSION,
+    META_PERMISSION_LEVEL,
     META_SOURCE,
     META_STOCK_CODE,
     META_TITLE,
@@ -54,6 +59,11 @@ class ChunkView(TypedDict):
     page_number: str
     content_length: int
     content_preview: str
+    permission_level: str
+    allowed_roles: list[str]
+    parser_version: str
+    chunker_version: str
+    embedding_model: str
     content: NotRequired[str]
 
 
@@ -71,6 +81,15 @@ def _metadata_int(metadata: dict[str, Any], key: str) -> int:
     if isinstance(value, str) and value.isdigit():
         return int(value)
     return 0
+
+
+def _metadata_roles(metadata: dict[str, Any]) -> list[str]:
+    value = metadata.get(META_ALLOWED_ROLES, "")
+    if isinstance(value, list):
+        return [str(role) for role in value if role]
+    if isinstance(value, str):
+        return [role.strip() for role in value.split(",") if role.strip()]
+    return []
 
 
 def _preview_text(content: str, max_chars: int) -> str:
@@ -102,6 +121,11 @@ def build_chunk_views(
             "page_number": _metadata_text(metadata, META_PAGE_NUMBER),
             "content_length": len(chunk.page_content),
             "content_preview": _preview_text(chunk.page_content, preview_chars),
+            "permission_level": _metadata_text(metadata, META_PERMISSION_LEVEL),
+            "allowed_roles": _metadata_roles(metadata),
+            "parser_version": _metadata_text(metadata, META_PARSER_VERSION),
+            "chunker_version": _metadata_text(metadata, META_CHUNKER_VERSION),
+            "embedding_model": _metadata_text(metadata, META_EMBEDDING_MODEL),
         }
         if full_content:
             row["content"] = chunk.page_content

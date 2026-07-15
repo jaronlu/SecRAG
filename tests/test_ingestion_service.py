@@ -133,6 +133,49 @@ def test_create_run_is_atomic_and_rejects_second_active_run(tmp_path):
     assert exc.value.run_id == first["run_id"]
 
 
+def test_list_document_chunks_returns_paginated_safe_view(monkeypatch, tmp_path):
+    service = _service(tmp_path)
+
+    def fake_inspect_doc_id(doc_id: str, **kwargs):
+        assert doc_id == "doc-1"
+        assert kwargs == {
+            "persist_directory": str(tmp_path / "chroma"),
+            "full_content": True,
+        }
+        return [
+            {
+                "doc_id": "doc-1",
+                "chunk_id": f"chunk-{index}",
+                "chunk_index": index,
+                "chunk_hash": f"hash-{index}",
+                "doc_type": "financial_data",
+                "source": "/private/source.csv",
+                "title": "财务数据",
+                "stock_code": "600519",
+                "date": "2026",
+                "page_number": "",
+                "content_length": 4,
+                "content_preview": "内容",
+                "content": f"内容 {index}",
+                "permission_level": "internal",
+                "allowed_roles": ["technical"],
+                "parser_version": "parser-v1",
+                "chunker_version": "chunker-v1",
+                "embedding_model": "embedding-v1",
+            }
+            for index in range(3)
+        ]
+
+    monkeypatch.setattr(service_module, "inspect_doc_id", fake_inspect_doc_id)
+
+    chunks, total = service.list_document_chunks("doc-1", offset=1, limit=1)
+
+    assert total == 3
+    assert chunks[0]["chunk_id"] == "chunk-1"
+    assert chunks[0]["content"] == "内容 1"
+    assert "source" not in chunks[0]
+
+
 def test_execute_run_processes_only_snapshot(monkeypatch, tmp_path):
     _write_source(tmp_path)
     service = _service(tmp_path)

@@ -93,6 +93,12 @@
       background: #e5e7eb;
       color: #111827;
     }
+    .table-button {
+      background: transparent;
+      color: #1d4ed8;
+      padding: 4px 0;
+      font-size: 14px;
+    }
     .danger-button {
       background: #b42318;
     }
@@ -248,6 +254,79 @@
       margin: 24px 0 10px;
       font-size: 18px;
     }
+    .chunk-inspector {
+      border-top: 1px solid #d7dce2;
+      border-bottom: 1px solid #d7dce2;
+      min-height: 132px;
+    }
+    .chunk-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 14px 0;
+    }
+    .chunk-toolbar strong,
+    .chunk-toolbar span {
+      overflow-wrap: anywhere;
+    }
+    .pipeline-summary {
+      margin-top: 5px;
+      color: #4b5563;
+      font-size: 13px;
+    }
+    .chunk-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      border-top: 1px solid #e5e7eb;
+    }
+    .chunk-row {
+      display: grid;
+      grid-template-columns: 64px minmax(0, 1fr);
+      gap: 14px;
+      padding: 16px 0;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .chunk-row:last-child { border-bottom: 0; }
+    .chunk-index {
+      color: #1d4ed8;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+    .chunk-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 12px;
+      color: #6b7280;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+    .chunk-content {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      line-height: 1.65;
+      color: #111827;
+    }
+    .chunk-details {
+      margin-top: 10px;
+      color: #4b5563;
+      font-size: 13px;
+    }
+    .chunk-details code {
+      display: block;
+      margin-top: 6px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .chunk-message {
+      padding: 18px 0;
+      color: #6b7280;
+    }
+    .chunk-load-more {
+      padding: 14px 0;
+      text-align: center;
+    }
     .error-text { color: #b42318; }
     .success-text { color: #047857; }
     @media (max-width: 760px) {
@@ -255,6 +334,8 @@
       .grid { grid-template-columns: 1fr; }
       .ingestion-form { grid-template-columns: 1fr; }
       .summary-list { grid-template-columns: 1fr; }
+      .chunk-toolbar { display: block; }
+      .chunk-row { grid-template-columns: 44px minmax(0, 1fr); gap: 10px; }
     }
   </style>
 </head>
@@ -389,16 +470,31 @@
       </section>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>#</th><th>文件</th><th>动作</th><th>Chunks</th><th>结果</th></tr></thead>
-          <tbody id="ingestionItemsBody"><tr><td colspan="5">暂无结果</td></tr></tbody>
+          <thead><tr><th>#</th><th>文件</th><th>动作</th><th>Chunks</th><th>结果</th><th>查看</th></tr></thead>
+          <tbody id="ingestionItemsBody"><tr><td colspan="6">暂无结果</td></tr></tbody>
         </table>
       </div>
+
+      <h2 class="section-heading">Embedding Chunks</h2>
+      <section class="chunk-inspector" aria-live="polite">
+        <div class="chunk-toolbar">
+          <div>
+            <strong id="chunkDocumentName">尚未选择文档</strong>
+            <div id="chunkPipelineSummary" class="pipeline-summary">文档 -> Embedding -> ChromaDB</div>
+          </div>
+          <span id="chunkDisplayCount" class="status">0 Chunks</span>
+        </div>
+        <ol id="chunkList" class="chunk-list"><li class="chunk-message">尚未选择文档</li></ol>
+        <div class="chunk-load-more">
+          <button id="loadMoreChunks" class="secondary-button" type="button" hidden>加载更多</button>
+        </div>
+      </section>
 
       <h2 class="section-heading">最近任务</h2>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>任务</th><th>分类</th><th>状态</th><th>进度</th><th>排队时间</th></tr></thead>
-          <tbody id="recentRunsBody"><tr><td colspan="5">暂无任务</td></tr></tbody>
+          <thead><tr><th>任务</th><th>分类</th><th>状态</th><th>进度</th><th>排队时间</th><th>查看</th></tr></thead>
+          <tbody id="recentRunsBody"><tr><td colspan="6">暂无任务</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -437,11 +533,19 @@
     const ingestionProgress = document.getElementById("ingestionProgress");
     const ingestionItemsBody = document.getElementById("ingestionItemsBody");
     const recentRunsBody = document.getElementById("recentRunsBody");
+    const chunkDocumentName = document.getElementById("chunkDocumentName");
+    const chunkPipelineSummary = document.getElementById("chunkPipelineSummary");
+    const chunkDisplayCount = document.getElementById("chunkDisplayCount");
+    const chunkList = document.getElementById("chunkList");
+    const loadMoreChunks = document.getElementById("loadMoreChunks");
     let lastResultText = "";
     let ingestionCategories = [];
     let activeRunId = null;
     let ingestionPollTimer = null;
     let ingestionSubmitting = false;
+    let selectedChunkItem = null;
+    let chunkOffset = 0;
+    let chunkTotal = 0;
 
     function updateRoleBinding() {
       const selected = tokenSelect.options[tokenSelect.selectedIndex];
@@ -467,6 +571,7 @@
       ingestionCategories = [];
       activeRunId = null;
       stopIngestionPolling();
+      resetChunkInspector();
     });
     updateRoleBinding();
 
@@ -538,6 +643,11 @@
       if (typeof payload?.detail === "string") return payload.detail;
       if (payload?.detail?.message) return payload.detail.message;
       return fallback;
+    }
+
+    function ingestionErrorMessage(error) {
+      if (error instanceof TypeError) return "无法连接服务，请确认 SecRAG 后端已启动";
+      return String(error);
     }
 
     function setTableMessage(tbody, colspan, message) {
@@ -615,7 +725,7 @@
         await Promise.all([loadIngestionFiles(), loadRecentRuns()]);
         if (activeRunId) await pollIngestionRun();
       } catch (error) {
-        ingestionReadiness.textContent = String(error);
+        ingestionReadiness.textContent = ingestionErrorMessage(error);
         ingestionReadiness.className = "error-text";
         setTableMessage(ingestionFilesBody, 5, "分类加载失败");
       } finally {
@@ -665,7 +775,7 @@
           setTableMessage(ingestionFilesBody, 5, "分类中没有业务文件");
         }
       } catch (error) {
-        setTableMessage(ingestionFilesBody, 5, String(error));
+        setTableMessage(ingestionFilesBody, 5, ingestionErrorMessage(error));
       }
       updateStartIngestionState();
     }
@@ -684,6 +794,111 @@
       document.getElementById("replacedCount").textContent = `replaced ${run.replaced || 0}`;
       document.getElementById("skippedCount").textContent = `skipped ${run.skipped || 0}`;
       document.getElementById("failedCount").textContent = `failed ${run.failed || 0}`;
+    }
+
+    function setChunkMessage(message, error = false) {
+      const item = document.createElement("li");
+      item.className = error ? "chunk-message error-text" : "chunk-message";
+      item.textContent = message;
+      chunkList.replaceChildren(item);
+    }
+
+    function resetChunkInspector() {
+      selectedChunkItem = null;
+      chunkOffset = 0;
+      chunkTotal = 0;
+      chunkDocumentName.textContent = "尚未选择文档";
+      chunkPipelineSummary.textContent = "文档 -> Embedding -> ChromaDB";
+      chunkDisplayCount.textContent = "0 Chunks";
+      loadMoreChunks.hidden = true;
+      setChunkMessage("尚未选择文档");
+    }
+
+    function appendChunkRows(chunks) {
+      for (const chunk of chunks) {
+        const row = document.createElement("li");
+        row.className = "chunk-row";
+
+        const index = document.createElement("div");
+        index.className = "chunk-index";
+        index.textContent = `#${chunk.chunk_index}`;
+
+        const body = document.createElement("div");
+        const meta = document.createElement("div");
+        meta.className = "chunk-meta";
+        for (const value of [
+          `${chunk.content_length} 字`,
+          chunk.doc_type || "未标注文档类型",
+          chunk.page_number ? `第 ${chunk.page_number} 页` : "无页码"
+        ]) {
+          const span = document.createElement("span");
+          span.textContent = value;
+          meta.appendChild(span);
+        }
+
+        const content = document.createElement("div");
+        content.className = "chunk-content";
+        content.textContent = chunk.content || "空内容";
+
+        const details = document.createElement("details");
+        details.className = "chunk-details";
+        const summary = document.createElement("summary");
+        summary.textContent = "元数据";
+        const code = document.createElement("code");
+        code.textContent = [
+          `chunk_id: ${chunk.chunk_id}`,
+          `chunk_hash: ${chunk.chunk_hash}`,
+          `permission: ${chunk.permission_level || "-"}`,
+          `allowed_roles: ${(chunk.allowed_roles || []).join(", ") || "-"}`,
+          `parser: ${chunk.parser_version || "-"}`,
+          `chunker: ${chunk.chunker_version || "-"}`,
+          `embedding_model: ${chunk.embedding_model || "-"}`
+        ].join("\n");
+        details.append(summary, code);
+        body.append(meta, content, details);
+        row.append(index, body);
+        chunkList.appendChild(row);
+      }
+    }
+
+    async function loadDocumentChunks(item, reset = true) {
+      if (!item?.doc_id) return;
+      if (reset) {
+        selectedChunkItem = item;
+        chunkOffset = 0;
+        chunkTotal = Number(item.chunk_count || 0);
+        chunkDocumentName.textContent = item.relative_path || item.doc_id;
+        chunkPipelineSummary.textContent = "文档 -> Embedding -> ChromaDB";
+        chunkDisplayCount.textContent = `0 / ${chunkTotal} Chunks`;
+        loadMoreChunks.hidden = true;
+        setChunkMessage("正在读取 Chroma Chunks...");
+      }
+      try {
+        const params = new URLSearchParams({
+          doc_id: item.doc_id,
+          offset: String(chunkOffset),
+          limit: "50"
+        });
+        const response = await fetch(`__INGESTION_CHUNKS_PATH__?${params}`, {
+          headers: ingestionHeaders()
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(responseError(payload, `加载失败：${response.status}`));
+        const chunks = payload.chunks || [];
+        if (reset) chunkList.replaceChildren();
+        appendChunkRows(chunks);
+        chunkOffset = Number(payload.offset || 0) + chunks.length;
+        chunkTotal = Number(payload.total_chunks || 0);
+        const model = chunks[0]?.embedding_model || "未记录模型";
+        chunkPipelineSummary.textContent =
+          `文档 -> Embedding (${model}) -> ChromaDB / ${chunkTotal} Chunks`;
+        chunkDisplayCount.textContent = `${chunkOffset} / ${chunkTotal} Chunks`;
+        loadMoreChunks.hidden = chunks.length === 0 || chunkOffset >= chunkTotal;
+        if (chunkTotal === 0) setChunkMessage("该文档没有可用 Chunks");
+      } catch (error) {
+        loadMoreChunks.hidden = true;
+        setChunkMessage(ingestionErrorMessage(error), true);
+      }
     }
 
     async function loadIngestionItems(runId) {
@@ -706,10 +921,23 @@
           cell.textContent = value;
           row.appendChild(cell);
         }
+        const actionCell = document.createElement("td");
+        const inspectButton = document.createElement("button");
+        const inspectable = ["created", "replaced", "skipped"].includes(item.action)
+          && Boolean(item.doc_id)
+          && Number(item.chunk_count || 0) > 0;
+        inspectButton.type = "button";
+        inspectButton.className = "table-button";
+        inspectButton.textContent = "查看";
+        inspectButton.disabled = !inspectable;
+        inspectButton.title = inspectable ? "查看已入库 Chunks" : "没有可查看的 Chunks";
+        inspectButton.addEventListener("click", () => loadDocumentChunks(item));
+        actionCell.appendChild(inspectButton);
+        row.appendChild(actionCell);
         ingestionItemsBody.appendChild(row);
       }
       if (!ingestionItemsBody.children.length) {
-        setTableMessage(ingestionItemsBody, 5, "暂无结果");
+        setTableMessage(ingestionItemsBody, 6, "暂无结果");
       }
     }
 
@@ -731,7 +959,7 @@
           scheduleIngestionPoll();
         }
       } catch (error) {
-        ingestionRunStatus.textContent = `轮询失败：${String(error)}`;
+        ingestionRunStatus.textContent = `轮询失败：${ingestionErrorMessage(error)}`;
         ingestionRunStatus.className = "status error-text";
         scheduleIngestionPoll();
       }
@@ -758,14 +986,38 @@
           cell.textContent = value;
           row.appendChild(cell);
         }
+        const actionCell = document.createElement("td");
+        const viewButton = document.createElement("button");
+        viewButton.type = "button";
+        viewButton.className = "table-button";
+        viewButton.textContent = "查看";
+        viewButton.addEventListener("click", async () => {
+          const response = await fetch(
+            `__INGESTION_RUNS_PATH__/${encodeURIComponent(run.run_id)}`,
+            {headers: ingestionHeaders()}
+          );
+          if (!response.ok) return;
+          const selectedRun = await response.json();
+          renderIngestionRun(selectedRun);
+          await loadIngestionItems(run.run_id);
+          if (["queued", "running"].includes(selectedRun.status)) {
+            activeRunId = run.run_id;
+            scheduleIngestionPoll();
+          }
+        });
+        actionCell.appendChild(viewButton);
+        row.appendChild(actionCell);
         recentRunsBody.appendChild(row);
       }
       if (!recentRunsBody.children.length) {
-        setTableMessage(recentRunsBody, 5, "暂无任务");
+        setTableMessage(recentRunsBody, 6, "暂无任务");
       }
     }
 
     ingestionCategory.addEventListener("change", loadIngestionFiles);
+    loadMoreChunks.addEventListener("click", () => {
+      if (selectedChunkItem) loadDocumentChunks(selectedChunkItem, false);
+    });
     startIngestion.addEventListener("click", async () => {
       const category = selectedCategorySummary();
       if (!category || !category.ready || activeRunId) return;
@@ -789,7 +1041,7 @@
         renderIngestionRun({...payload, total_files: category.file_count, processed_files: 0});
         scheduleIngestionPoll();
       } catch (error) {
-        ingestionRunStatus.textContent = String(error);
+        ingestionRunStatus.textContent = ingestionErrorMessage(error);
         ingestionRunStatus.className = "status error-text";
         if (activeRunId) scheduleIngestionPoll();
       } finally {
