@@ -153,7 +153,7 @@ def build_agent_graph() -> StateGraph[AssistantState]:
     graph.add_node("retrieve", _traced_node("retrieve", retrieve))
     # 过滤结果
     graph.add_node("grade_and_filter", _traced_node("grade_and_filter", grade_and_filter))
-    # ReAct 推理与工具调用
+    # 全部结果被拒时提前终止
     graph.add_node(
         "permission_denied_response",
         _traced_node("permission_denied_response", permission_denied_response),

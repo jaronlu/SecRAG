@@ -15,6 +15,7 @@
       margin: 0;
       padding: 32px;
     }
+    [hidden] { display: none !important; }
     main {
       max-width: 960px;
       margin: 0 auto;
@@ -126,6 +127,15 @@
       margin: 0 0 10px;
       font-size: 16px;
     }
+    .output-section-heading {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .output-section-heading h3 { margin: 0; }
+    .output-section-heading .meta-row { margin-top: 0; }
     .answer-text {
       white-space: pre-wrap;
       line-height: 1.65;
@@ -143,6 +153,47 @@
       font-size: 13px;
       color: #374151;
       background: #f8fafc;
+    }
+    .pill-success {
+      color: #047857;
+      border-color: #a7d7c5;
+      background: #ecfdf5;
+    }
+    .pill-warning {
+      color: #92400e;
+      border-color: #f5d08a;
+      background: #fffbeb;
+    }
+    .pill-danger {
+      color: #b42318;
+      border-color: #efb4ae;
+      background: #fff1f0;
+    }
+    .message-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .message-item {
+      display: grid;
+      grid-template-columns: 56px minmax(0, 1fr);
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .message-item:last-child { border-bottom: 0; }
+    .message-role {
+      font-weight: 700;
+      color: #374151;
+    }
+    .message-content {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      line-height: 1.6;
+    }
+    .message-empty {
+      color: #6b7280;
+      padding: 8px 0;
     }
     .citation-list {
       margin: 0;
@@ -336,6 +387,8 @@
       .summary-list { grid-template-columns: 1fr; }
       .chunk-toolbar { display: block; }
       .chunk-row { grid-template-columns: 44px minmax(0, 1fr); gap: 10px; }
+      .output-section-heading { display: block; }
+      .output-section-heading .meta-row { margin-top: 10px; }
     }
   </style>
 </head>
@@ -391,27 +444,29 @@
     <section id="emptyResult" class="output-section">等待查询...</section>
     <div id="resultSections" class="result-sections" hidden>
       <section class="output-section">
-        <h3>Messages</h3>
-        <ol id="messageList" class="citation-list"></ol>
+        <h3>会话记录</h3>
+        <ol id="messageList" class="message-list"><li class="message-empty">暂无会话消息</li></ol>
       </section>
       <section class="output-section">
-        <h3>Answer</h3>
-        <div id="answerText" class="answer-text"></div>
-        <div class="meta-row">
-          <span id="confidenceText" class="pill"></span>
-          <span id="complianceText" class="pill"></span>
+        <div class="output-section-heading">
+          <h3>回答</h3>
+          <div class="meta-row" aria-label="回答状态">
+            <span id="confidenceText" class="pill">置信度：未评估</span>
+            <span id="complianceText" class="pill">合规：未评估</span>
+          </div>
         </div>
+        <div id="answerText" class="answer-text"></div>
       </section>
       <section class="output-section">
-        <h3>Citations</h3>
+        <h3>引用</h3>
         <ol id="citationList" class="citation-list"></ol>
       </section>
       <details class="output-section">
-        <summary>Audit Trail</summary>
+        <summary>审计信息</summary>
         <pre id="auditText"></pre>
       </details>
       <details class="output-section">
-        <summary>Raw JSON</summary>
+        <summary>原始响应</summary>
         <pre id="rawJson"></pre>
       </details>
     </div>
@@ -575,6 +630,38 @@
     });
     updateRoleBinding();
 
+    function setMessageListState(message, error = false) {
+      const item = document.createElement("li");
+      item.className = error ? "message-empty error-text" : "message-empty";
+      item.textContent = message;
+      messageList.replaceChildren(item);
+    }
+
+    function renderAnswerStatus(confidence, compliance) {
+      const confidenceLabels = {high: "高", medium: "中", low: "低"};
+      const confidenceLevel = confidenceLabels[confidence] || "未评估";
+      const confidenceClass = confidence === "high"
+        ? "pill pill-success"
+        : confidence === "medium"
+          ? "pill pill-warning"
+          : confidence === "low"
+            ? "pill pill-danger"
+            : "pill";
+      const complianceLabel = compliance.passed === true
+        ? "通过"
+        : compliance.passed === false
+          ? "未通过"
+          : "未评估";
+      confidenceText.textContent = `置信度：${confidenceLevel}`;
+      confidenceText.className = confidenceClass;
+      complianceText.textContent = `合规：${complianceLabel}`;
+      complianceText.className = compliance.passed === true
+        ? "pill pill-success"
+        : compliance.passed === false
+          ? "pill pill-danger"
+          : "pill";
+    }
+
     function renderResult(data) {
       emptyResult.hidden = true;
       resultSections.hidden = false;
@@ -586,8 +673,7 @@
       if (data.thread_id) document.getElementById("threadId").value = data.thread_id;
 
       answerText.textContent = answer || "无回答内容";
-      confidenceText.textContent = `confidence: ${data.confidence || "n/a"}`;
-      complianceText.textContent = `compliance: ${compliance.passed === false ? "blocked" : "passed/unknown"}`;
+      renderAnswerStatus(data.confidence, compliance);
 
       citationList.replaceChildren();
       if (citations.length === 0) {
@@ -608,28 +694,51 @@
       auditText.textContent = JSON.stringify(audit, null, 2);
       rawJson.textContent = JSON.stringify(data, null, 2);
       lastResultText = [
-        `Answer:\n${answer}`,
-        `Citations:\n${citations.map((c, i) => `${i + 1}. ${c.doc_title || "未知文档"} — ${c.source || ""}`).join("\n") || "无引用"}`,
-        `Audit Trail:\n${JSON.stringify(audit, null, 2)}`
+        `回答：\n${answer}`,
+        `引用：\n${citations.map((c, i) => `${i + 1}. ${c.doc_title || "未知文档"} — ${c.source || ""}`).join("\n") || "无引用"}`,
+        `审计信息：\n${JSON.stringify(audit, null, 2)}`
       ].join("\n\n");
     }
 
     async function loadMessages() {
       const threadId = document.getElementById("threadId").value.trim();
       if (!threadId) {
-        messageList.replaceChildren();
+        setMessageListState("暂无会话消息");
         return;
       }
-      const response = await fetch(`__THREADS_PATH__/${encodeURIComponent(threadId)}/messages`, {
-        headers: {"Authorization": `Bearer ${tokenSelect.value}`}
-      });
-      if (!response.ok) return;
-      const payload = await response.json();
-      messageList.replaceChildren();
-      for (const message of payload.messages || []) {
-        const item = document.createElement("li");
-        item.textContent = `${message.role}: ${message.content}`;
-        messageList.appendChild(item);
+      try {
+        const response = await fetch(`__THREADS_PATH__/${encodeURIComponent(threadId)}/messages`, {
+          headers: {"Authorization": `Bearer ${tokenSelect.value}`}
+        });
+        if (!response.ok) {
+          setMessageListState("会话记录加载失败", true);
+          return;
+        }
+        const payload = await response.json();
+        const messages = payload.messages || [];
+        if (!messages.length) {
+          setMessageListState("暂无会话消息");
+          return;
+        }
+        messageList.replaceChildren();
+        for (const message of messages) {
+          const item = document.createElement("li");
+          item.className = "message-item";
+          const role = document.createElement("span");
+          role.className = "message-role";
+          role.textContent = message.role === "user"
+            ? "用户"
+            : message.role === "assistant"
+              ? "助手"
+              : "消息";
+          const content = document.createElement("span");
+          content.className = "message-content";
+          content.textContent = message.content || "无内容";
+          item.append(role, content);
+          messageList.appendChild(item);
+        }
+      } catch {
+        setMessageListState("无法连接服务，请确认 SecRAG 后端已启动", true);
       }
     }
 
@@ -645,8 +754,11 @@
       return fallback;
     }
 
-    function ingestionErrorMessage(error) {
-      if (error instanceof TypeError) return "无法连接服务，请确认 SecRAG 后端已启动";
+    function requestErrorMessage(
+      error,
+      networkMessage = "无法连接服务，请确认 SecRAG 后端已启动"
+    ) {
+      if (error instanceof TypeError) return networkMessage;
       return String(error);
     }
 
@@ -725,7 +837,7 @@
         await Promise.all([loadIngestionFiles(), loadRecentRuns()]);
         if (activeRunId) await pollIngestionRun();
       } catch (error) {
-        ingestionReadiness.textContent = ingestionErrorMessage(error);
+        ingestionReadiness.textContent = requestErrorMessage(error);
         ingestionReadiness.className = "error-text";
         setTableMessage(ingestionFilesBody, 5, "分类加载失败");
       } finally {
@@ -775,7 +887,7 @@
           setTableMessage(ingestionFilesBody, 5, "分类中没有业务文件");
         }
       } catch (error) {
-        setTableMessage(ingestionFilesBody, 5, ingestionErrorMessage(error));
+        setTableMessage(ingestionFilesBody, 5, requestErrorMessage(error));
       }
       updateStartIngestionState();
     }
@@ -897,7 +1009,7 @@
         if (chunkTotal === 0) setChunkMessage("该文档没有可用 Chunks");
       } catch (error) {
         loadMoreChunks.hidden = true;
-        setChunkMessage(ingestionErrorMessage(error), true);
+        setChunkMessage(requestErrorMessage(error), true);
       }
     }
 
@@ -959,7 +1071,7 @@
           scheduleIngestionPoll();
         }
       } catch (error) {
-        ingestionRunStatus.textContent = `轮询失败：${ingestionErrorMessage(error)}`;
+        ingestionRunStatus.textContent = `轮询失败：${requestErrorMessage(error)}`;
         ingestionRunStatus.className = "status error-text";
         scheduleIngestionPoll();
       }
@@ -1041,7 +1153,7 @@
         renderIngestionRun({...payload, total_files: category.file_count, processed_files: 0});
         scheduleIngestionPoll();
       } catch (error) {
-        ingestionRunStatus.textContent = ingestionErrorMessage(error);
+        ingestionRunStatus.textContent = requestErrorMessage(error);
         ingestionRunStatus.className = "status error-text";
         if (activeRunId) scheduleIngestionPoll();
       } finally {
@@ -1088,11 +1200,23 @@
         } catch {
           data = { raw: text };
         }
+        if (!response.ok) {
+          resultSections.hidden = true;
+          emptyResult.hidden = false;
+          emptyResult.textContent = responseError(data, `请求失败：${response.status}`);
+          statusEl.textContent = `请求失败：${response.status}`;
+          return;
+        }
         renderResult(data);
-        if (response.ok) await loadMessages();
-        statusEl.textContent = response.ok ? "完成" : `请求失败：${response.status}`;
+        await loadMessages();
+        statusEl.textContent = "完成";
       } catch (error) {
-        renderResult({ raw: String(error) });
+        resultSections.hidden = true;
+        emptyResult.hidden = false;
+        emptyResult.textContent = requestErrorMessage(
+          error,
+          "连接中断，请重试；较复杂查询可能仍在后台完成"
+        );
         statusEl.textContent = "请求失败";
       } finally {
         submit.disabled = false;
@@ -1102,7 +1226,7 @@
     newThread.addEventListener("click", () => {
       document.getElementById("threadId").value = "";
       document.getElementById("query").value = "";
-      messageList.replaceChildren();
+      setMessageListState("暂无会话消息");
       resultSections.hidden = true;
       emptyResult.hidden = false;
       emptyResult.textContent = "等待查询...";
