@@ -13,3 +13,21 @@ def build_chroma_where(doc_type: str, extra: Optional[Dict] = None) -> Optional[
     if len(conditions) == 1:
         return conditions[0]
     return {"$and": conditions}
+
+
+# ──────────────────────────────────────────────
+# 调用示例
+# ──────────────────────────────────────────────
+#
+# 示例 1：只有一个条件 → 直接返回
+#   build_chroma_where("pdf")
+#   # 返回: {"doc_type": "pdf"}
+#
+# 示例 2：传入 extra → 多条件
+#   build_chroma_where("pdf", {"source": "arxiv"})
+#   # conditions = [{"doc_type": "pdf"}, {"source": "arxiv"}]
+#   # 返回: {"$and": [{"doc_type": "pdf"}, {"source": "arxiv"}]}
+#
+# 设计意图：
+#   - ChromaDB 的 where 参数要求单个条件是字典，多个条件必须用 $and 包一层
+#   - 这个函数帮你自动判断用哪种格式，调用方不用关心底层语法
