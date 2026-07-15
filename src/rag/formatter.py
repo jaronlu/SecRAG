@@ -1,7 +1,11 @@
 """引用格式化和置信度评估
 
-⚡ 字段统一：读取 retrieval_results 和 metadata 时使用 src/schemas/constants 中的常量。
-输出 dict 的字段名对应 SCHEMA-REFERENCE §3.1 Citation 模型。
+Retriever 只管检索，返回原始结果。
+formatter 负责把检索结果转成：
+- 带引用标注的答案结构（citations）
+- 置信度评估（confidence）
+
+下游接口和前端都消费这两个字段。
 """
 
 from src.schemas.constants import (
@@ -34,13 +38,16 @@ def estimate_confidence(retrieval_results: list[RetrievalResult]) -> str:
     if not retrieval_results:
         return CONFIDENCE_LOW
 
+    # 取最高分的检索结果
     top_score = retrieval_results[0][RR_SCORE]
     if (
+        # 最高分达到高置信度阈值 且 结果数量足够多
         top_score >= CONFIDENCE_HIGH_THRESHOLD
         and len(retrieval_results) >= CONFIDENCE_HIGH_MIN_RESULTS
     ):
         return CONFIDENCE_HIGH
     elif top_score >= CONFIDENCE_MEDIUM_THRESHOLD:
+        # 最高分达到中置信度阈值
         return CONFIDENCE_MEDIUM
     else:
         return CONFIDENCE_LOW

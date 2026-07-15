@@ -1,3 +1,10 @@
+"""RAG Chain：把检索 + 格式化 + 提示词 + LLM 串成 LCEL pipeline。
+
+编排原则：
+- main.py 优先提供外部 context，避免链内重复检索
+- 未传入 context 时，自动检索 + 格式化后送入 LLM
+"""
+
 from typing import Any, Dict
 
 from langchain_core.output_parsers import StrOutputParser
@@ -16,6 +23,7 @@ from src.schemas.constants import (
 )
 from src.schemas.typed_dicts import RetrievalResult
 
+# 模块级检索器实例，chain 内部自动检索时复用
 retriever = ChromaVectorRetriever()
 
 
@@ -67,9 +75,8 @@ def _prepare_inputs(inputs: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def build_rag_chain():
+    """编译 LCEL RAG pipeline"""
     llm = _build_llm()
 
-    # 支持外部传入预格式化的 context（由 main.py 等编排层提供），
-    # 未传入时回退到内部自动检索+格式化。
     chain = RunnableLambda(_prepare_inputs) | prompt | llm | StrOutputParser()
     return chain
