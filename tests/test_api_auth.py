@@ -18,8 +18,12 @@ from src.schemas.constants import (
     STATE_DEPARTMENT,
     STATE_RESOLVED_QUERY,
     STATE_REASON_ATTEMPTS,
+    STATE_REASON_MESSAGE_START,
+    STATE_REASON_STARTED_PERF_COUNTER,
     STATE_RETRIEVAL_ATTEMPTS,
     STATE_THREAD_ID,
+    STATE_TOOL_ITERATIONS,
+    STATE_TOOL_MESSAGE_CURSOR,
     STATE_TURN_ID,
     STATE_TURN_INDEX,
     STATE_USER_ID,
@@ -73,6 +77,10 @@ def test_build_initial_state_uses_authenticated_user():
     assert audit_trail.get(AUDIT_STARTED_PERF_COUNTER, 0) > 0
     assert state[STATE_RETRIEVAL_ATTEMPTS] == 0
     assert state[STATE_REASON_ATTEMPTS] == 0
+    assert state[STATE_TOOL_ITERATIONS] == 0
+    assert state[STATE_REASON_MESSAGE_START] == 0
+    assert state[STATE_TOOL_MESSAGE_CURSOR] == 0
+    assert state[STATE_REASON_STARTED_PERF_COUNTER] == 0.0
     assert SOURCE_FAQ in ROLE_ALLOWED_SOURCES[state[STATE_USER_ROLE]]
     assert SOURCE_REPORT in ROLE_ALLOWED_SOURCES[state[STATE_USER_ROLE]]
 

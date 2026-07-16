@@ -4,9 +4,13 @@
 """
 
 import json
-from typing import Any
+import time
+from functools import lru_cache
+from typing import Any, Callable, Literal, cast
 
-from langchain_core.messages import HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
+from langgraph.prebuilt.tool_node import ToolCallRequest
+from langgraph.types import Command
 
 from src.agents.state import AssistantState
 from src.config import config
@@ -18,6 +22,7 @@ from src.schemas.constants import (
     DEFAULT_TOP_K,
     GRADE_TOP_K,
     LLM_PROVIDER_OPENAI,
+    MAX_TOOL_ITERATIONS,
     META_CHUNK_ID,
     META_DATE,
     META_SOURCE,
@@ -53,10 +58,13 @@ from src.schemas.constants import (
     STATE_ENTITIES,
     STATE_FINAL_ANSWER,
     STATE_INTENT,
+    STATE_INTERMEDIATE_STEPS,
     STATE_MESSAGES,
     STATE_ORIGINAL_QUERY,
     STATE_QUERY_TYPE,
     STATE_REASON_ATTEMPTS,
+    STATE_REASON_MESSAGE_START,
+    STATE_REASON_STARTED_PERF_COUNTER,
     STATE_RESOLVED_QUERY,
     STATE_RETRIEVAL_ATTEMPTS,
     STATE_RETRIEVAL_FILTERED_CHUNKS,
@@ -67,11 +75,13 @@ from src.schemas.constants import (
     STATE_RISK_DISCLOSURE,
     STATE_THREAD_ID,
     STATE_TOOL_CALLS,
+    STATE_TOOL_ITERATIONS,
+    STATE_TOOL_MESSAGE_CURSOR,
     STATE_USER_ID,
     STATE_USER_ROLE,
     STATE_VERIFICATION,
 )
-from src.schemas.typed_dicts import RetrievalPlanStep, ToolCallDict
+from src.schemas.typed_dicts import IntermediateStep, RetrievalPlanStep, ToolCallDict
 from src.utils.compliance import INVESTMENT_ADVICE_PATTERNS, ComplianceChecker
 from src.utils.verifier import CitationExtractor, ComprehensiveVerifier
 
@@ -417,23 +427,11 @@ def grade_and_filter(state: AssistantState) -> dict[str, Any]:
 # ══════════════════════════════════════════════════════════════════════
 
 
-def reason(state: AssistantState) -> dict[str, Any]:
-    """LLM 推理 + 工具调用
-
-    技术债：当前使用 langchain.agents.create_agent 嵌套在 LangGraph 节点内。
-    已知问题：
-      - 每次调用重新编译 agent graph 和绑定工具（性能浪费）
-      - 嵌套 Graph 的状态管理与外层 checkpoint 隔离
-    Phase 2 重构：将 ReAct 循环建模为 Graph 子图
-      reason → [tool_calls?] → tool_executor → reason
-    全程在 StateGraph 范式内，状态与 checkpoint 完整保留。
-    """
-    from langchain.agents import create_agent
-
-    from src.agents.tools import get_tools_for_role
-
-    results = state.get(STATE_RETRIEVAL_RESULTS, [])
-    reason_attempts = state.get(STATE_REASON_ATTEMPTS, 0) + 1
+def _build_reason_system_prompt(state: AssistantState) -> str:
+    """Build the role-aware prompt from current retrieval evidence."""
+    results = [
+        result for result in state.get(STATE_RETRIEVAL_RESULTS, []) if not result.get(RR_DENIED)
+    ]
 
     # 构建 context：只把前 5 条结果喂给 LLM，控制 prompt 长度
     context_parts = []
@@ -485,28 +483,113 @@ def reason(state: AssistantState) -> dict[str, Any]:
 {"投顾/销售角色：不得输出" + "买" + "入/" + "卖" + "出/" + "目标" + "价等业务建议，仅提供事实信息。" if role in (ROLE_ADVISOR, ROLE_INSTITUTIONAL_SALES) else ""}
 {"合规角色：引用必须精确到条款/条文号。" if role == ROLE_COMPLIANCE else ""}"""
 
-    # 若当前轮已有检索结果，就把这些来源从工具里排除，避免 Agent 重复检索
-    planned_sources = {step.get(PLAN_SOURCE, "") for step in state.get(STATE_RETRIEVAL_PLAN, [])}
-    excluded_sources = planned_sources if results else set()
-    agent = create_agent(
-        model=llm,
-        tools=get_tools_for_role(role, excluded_retrieval_sources=excluded_sources),
-        system_prompt=system_prompt,
-    )
-    response = agent.invoke({
-        "messages": [
-            HumanMessage(content=state.get(STATE_RESOLVED_QUERY) or state[STATE_ORIGINAL_QUERY])
-        ]
-    })
+    return system_prompt
 
-    final_msg = response[STATE_MESSAGES][-1]
-    final_content = (
-        final_msg.content if isinstance(final_msg.content, str) else str(final_msg.content)
+
+def _excluded_retrieval_sources(state: AssistantState) -> tuple[str, ...]:
+    """Return sources already satisfied by usable outer-graph retrieval results."""
+    has_usable_results = any(
+        not result.get(RR_DENIED) for result in state.get(STATE_RETRIEVAL_RESULTS, [])
     )
-    final_content = _structure_answer(final_content)
-    # 持久化本轮工具调用记录，供后续 verify / audit 使用
-    tool_calls: list[ToolCallDict] = list(state.get(STATE_TOOL_CALLS, []))
-    for message in response[STATE_MESSAGES]:
+    if not has_usable_results:
+        return ()
+    return tuple(
+        sorted({
+            step.get(PLAN_SOURCE, "")
+            for step in state.get(STATE_RETRIEVAL_PLAN, [])
+            if step.get(PLAN_SOURCE)
+        })
+    )
+
+
+def _reason_tools(state: AssistantState):
+    """Resolve the tools visible and executable for the current state."""
+    from src.agents.tools import get_tools_for_role
+
+    return get_tools_for_role(
+        state.get(STATE_USER_ROLE, ROLE_OPERATIONS),
+        excluded_retrieval_sources=set(_excluded_retrieval_sources(state)),
+    )
+
+
+@lru_cache(maxsize=64)
+def _get_bound_reason_model(role: str, excluded_sources: tuple[str, ...]):
+    """Cache immutable tool bindings; prompts remain state-dependent."""
+    from src.agents.tools import get_tools_for_role
+
+    tools = get_tools_for_role(role, excluded_retrieval_sources=set(excluded_sources))
+    return llm.bind_tools(tools)
+
+
+def prepare_reason(state: AssistantState) -> dict[str, Any]:
+    """Start one verification-aware ReAct attempt."""
+    messages = list(state.get(STATE_MESSAGES, []))
+    reason_attempt = state.get(STATE_REASON_ATTEMPTS, 0) + 1
+    query = state.get(STATE_RESOLVED_QUERY) or state[STATE_ORIGINAL_QUERY]
+    issues = state.get(STATE_VERIFICATION, {}).get("issues", [])
+    if reason_attempt > 1:
+        issue_text = "\n".join(f"- {issue}" for issue in issues) or "- 上次回答未通过验证"
+        user_content = (
+            f"原问题：{query}\n\n上次回答未通过验证：\n{issue_text}\n\n请只依据可验证证据修正回答。"
+        )
+    else:
+        user_content = query
+
+    message_start = len(messages)
+    return {
+        STATE_MESSAGES: [HumanMessage(content=user_content)],
+        STATE_REASON_ATTEMPTS: reason_attempt,
+        STATE_TOOL_ITERATIONS: 0,
+        STATE_REASON_MESSAGE_START: message_start,
+        STATE_TOOL_MESSAGE_CURSOR: message_start,
+        STATE_REASON_STARTED_PERF_COUNTER: time.perf_counter(),
+        STATE_FINAL_ANSWER: "",
+    }
+
+
+def call_reason_model(state: AssistantState) -> dict[str, Any]:
+    """Invoke the cached role-aware model binding for the current ReAct attempt."""
+    messages = list(state.get(STATE_MESSAGES, []))
+    start = min(max(state.get(STATE_REASON_MESSAGE_START, 0), 0), len(messages))
+    attempt_messages = messages[start:]
+    if not attempt_messages:
+        raise ValueError("ReAct 推理缺少当前尝试的输入消息")
+
+    role = state.get(STATE_USER_ROLE, ROLE_OPERATIONS)
+    bound_model = _get_bound_reason_model(role, _excluded_retrieval_sources(state))
+    response = bound_model.invoke([
+        SystemMessage(content=_build_reason_system_prompt(state)),
+        *attempt_messages,
+    ])
+    if not isinstance(response, AIMessage):
+        raise TypeError("ReAct 模型必须返回 AIMessage")
+    return {STATE_MESSAGES: [response]}
+
+
+def authorize_reason_tool_call(
+    request: ToolCallRequest,
+    execute: Callable[[ToolCallRequest], ToolMessage | Command[Any]],
+) -> ToolMessage | Command[Any]:
+    """Enforce role and source permissions again at the tool execution boundary."""
+    state = cast(AssistantState, request.state)
+    allowed_names = {tool.name for tool in _reason_tools(state)}
+    tool_name = request.tool_call["name"]
+    if tool_name not in allowed_names:
+        return ToolMessage(
+            content="当前角色或检索计划无权调用该工具。",
+            name=tool_name,
+            tool_call_id=request.tool_call["id"],
+            status="error",
+        )
+    return execute(request)
+
+
+def record_tool_results(state: AssistantState) -> dict[str, Any]:
+    """Append only ToolMessages produced since the previous tool audit cursor."""
+    messages = list(state.get(STATE_MESSAGES, []))
+    cursor = min(max(state.get(STATE_TOOL_MESSAGE_CURSOR, 0), 0), len(messages))
+    tool_calls = list(state.get(STATE_TOOL_CALLS, []))
+    for message in messages[cursor:]:
         if isinstance(message, ToolMessage):
             output = message.content if isinstance(message.content, str) else str(message.content)
             tool_calls.append(
@@ -517,10 +600,79 @@ def reason(state: AssistantState) -> dict[str, Any]:
                 )
             )
     return {
-        STATE_MESSAGES: response[STATE_MESSAGES],
         STATE_TOOL_CALLS: tool_calls,
+        STATE_TOOL_ITERATIONS: state.get(STATE_TOOL_ITERATIONS, 0) + 1,
+        STATE_TOOL_MESSAGE_CURSOR: len(messages),
+    }
+
+
+def route_reason_model(state: AssistantState) -> Literal["tools", "finalize", "limit"]:
+    """Route the ReAct loop after a model response."""
+    messages = list(state.get(STATE_MESSAGES, []))
+    if not messages or not isinstance(messages[-1], AIMessage):
+        raise ValueError("ReAct 路由缺少 AIMessage")
+    if not messages[-1].tool_calls:
+        return "finalize"
+    if state.get(STATE_TOOL_ITERATIONS, 0) >= MAX_TOOL_ITERATIONS:
+        return "limit"
+    return "tools"
+
+
+def _reason_trace(state: AssistantState, *, success: bool = True) -> list[IntermediateStep]:
+    started = state.get(STATE_REASON_STARTED_PERF_COUNTER, time.perf_counter())
+    step = IntermediateStep(
+        step="reason",
+        duration_ms=max((time.perf_counter() - started) * 1000, 0.0),
+        success=success,
+    )
+    return list(state.get(STATE_INTERMEDIATE_STEPS, [])) + [step]
+
+
+def finalize_reason(state: AssistantState) -> dict[str, Any]:
+    """Store the final model response and close the current ReAct attempt."""
+    messages = list(state.get(STATE_MESSAGES, []))
+    if not messages or not isinstance(messages[-1], AIMessage) or messages[-1].tool_calls:
+        raise ValueError("ReAct 结束时必须存在无未决工具调用的 AIMessage")
+    content = messages[-1].content
+    final_content = _structure_answer(content if isinstance(content, str) else str(content))
+    return {
         STATE_FINAL_ANSWER: final_content,
-        STATE_REASON_ATTEMPTS: reason_attempts,
+        STATE_INTERMEDIATE_STEPS: _reason_trace(state),
+    }
+
+
+def tool_limit_response(state: AssistantState) -> dict[str, Any]:
+    """Fail closed when the model exceeds the per-attempt tool loop limit."""
+    messages = list(state.get(STATE_MESSAGES, []))
+    last_message = messages[-1] if messages else None
+    pending_calls = last_message.tool_calls if isinstance(last_message, AIMessage) else []
+    answer = _structure_answer("工具调用次数达到上限，无法安全完成当前请求。")
+    limit_tool_messages = [
+        ToolMessage(
+            content="工具调用次数达到上限，已停止执行。",
+            name=tool_call["name"],
+            tool_call_id=tool_call["id"],
+            status="error",
+        )
+        for tool_call in pending_calls
+    ]
+    limit_messages: list[BaseMessage] = list(limit_tool_messages)
+    limit_messages.append(AIMessage(content=answer))
+    tool_calls = list(state.get(STATE_TOOL_CALLS, []))
+    tool_calls.extend(
+        ToolCallDict(
+            tool=message.name or "unknown",
+            output=str(message.content),
+            success=False,
+        )
+        for message in limit_tool_messages
+    )
+    return {
+        STATE_MESSAGES: limit_messages,
+        STATE_TOOL_CALLS: tool_calls,
+        STATE_TOOL_MESSAGE_CURSOR: len(messages) + len(limit_messages),
+        STATE_FINAL_ANSWER: answer,
+        STATE_INTERMEDIATE_STEPS: _reason_trace(state, success=False),
     }
 
 

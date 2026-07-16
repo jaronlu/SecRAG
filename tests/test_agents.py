@@ -13,11 +13,13 @@ import pytest
 from src.agents.graph import (
     _traced_node,
     build_agent_graph,
+    build_reason_subgraph,
     is_compliant,
     should_reason_again,
     should_retry_retrieval,
 )
 from src.agents.nodes import (
+    _get_bound_reason_model,
     _structure_answer,
     audit_log,
     compliance_check,
@@ -25,7 +27,7 @@ from src.agents.nodes import (
     extract_citations,
     grade_and_filter,
     planner,
-    reason,
+    prepare_reason,
     retrieve,
     verify,
 )
@@ -47,6 +49,7 @@ from src.schemas.constants import (
     CONFIDENCE_HIGH,
     CONFIDENCE_LOW,
     CONFIDENCE_MEDIUM,
+    MAX_TOOL_ITERATIONS,
     META_CHUNK_ID,
     META_SOURCE,
     META_TITLE,
@@ -79,6 +82,8 @@ from src.schemas.constants import (
     STATE_ORIGINAL_QUERY,
     STATE_QUERY_TYPE,
     STATE_REASON_ATTEMPTS,
+    STATE_REASON_MESSAGE_START,
+    STATE_REASON_STARTED_PERF_COUNTER,
     STATE_RETRIEVAL_ATTEMPTS,
     STATE_RETRIEVAL_FILTERED_CHUNKS,
     STATE_RETRIEVAL_PLAN,
@@ -86,6 +91,8 @@ from src.schemas.constants import (
     STATE_RETRIEVAL_TOTAL_CHUNKS,
     STATE_REWRITTEN_QUERY,
     STATE_TOOL_CALLS,
+    STATE_TOOL_ITERATIONS,
+    STATE_TOOL_MESSAGE_CURSOR,
     STATE_USER_ROLE,
     STATE_VERIFICATION,
 )
@@ -112,6 +119,14 @@ def _state(**overrides: Any) -> AssistantState:
             STATE_USER_ROLE: ROLE_OPERATIONS,
             STATE_VERIFICATION: {},
             STATE_COMPLIANCE: {},
+            STATE_MESSAGES: [],
+            STATE_TOOL_CALLS: [],
+            STATE_INTERMEDIATE_STEPS: [],
+            STATE_REASON_ATTEMPTS: 0,
+            STATE_TOOL_ITERATIONS: 0,
+            STATE_REASON_MESSAGE_START: 0,
+            STATE_TOOL_MESSAGE_CURSOR: 0,
+            STATE_REASON_STARTED_PERF_COUNTER: 0.0,
             **overrides,
         },
     )
@@ -627,6 +642,12 @@ class TestRetrieve:
 
 
 class TestRoleAwareTools:
+    @pytest.fixture(autouse=True)
+    def _clear_reason_model_cache(self):
+        _get_bound_reason_model.cache_clear()
+        yield
+        _get_bound_reason_model.cache_clear()
+
     def test_technical_role_gets_all_design_allowed_retrieval_tools(self):
         from src.agents.tools import get_tools_for_role
 
@@ -637,22 +658,20 @@ class TestRoleAwareTools:
         assert "calculator" in tool_names
 
     def test_reason_binds_role_filtered_tools(self, monkeypatch):
-        from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
-        from langgraph.graph import add_messages
+        from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
         captured = {}
-        response_message = AIMessage(content="ok", id="response")
 
-        def fake_create_agent(model, tools, system_prompt):
-            captured["tool_names"] = {tool.name for tool in tools}
+        class FakeLLM:
+            def bind_tools(self, tools):
+                captured["tool_names"] = {tool.name for tool in tools}
+                return self
 
-            class FakeAgent:
-                def invoke(self, payload):
-                    return {STATE_MESSAGES: [response_message]}
+            def invoke(self, messages):
+                captured["model_messages"] = messages
+                return AIMessage(content="ok", id="response")
 
-            return FakeAgent()
-
-        monkeypatch.setattr("langchain.agents.create_agent", fake_create_agent)
+        monkeypatch.setattr("src.agents.nodes.llm", FakeLLM())
 
         prior_message = HumanMessage(content="previous", id="prior")
         state = _state(**{
@@ -663,35 +682,38 @@ class TestRoleAwareTools:
             STATE_RETRIEVAL_RESULTS: [_result("context", score=0.8)],
         })
 
-        result = reason(state)
-        merged_messages = cast(
-            list[BaseMessage],
-            add_messages(list(state[STATE_MESSAGES]), result[STATE_MESSAGES]),
-        )
+        result = build_reason_subgraph().invoke(state)
 
         assert SOURCE_FAQ in captured["tool_names"]
         assert SOURCE_REPORT in captured["tool_names"]
-        assert result[STATE_MESSAGES] == [response_message]
-        assert [message.content for message in merged_messages] == ["previous", "ok"]
+        model_messages = captured["model_messages"]
+        assert isinstance(model_messages[0], SystemMessage)
+        assert [message.content for message in model_messages[1:]] == ["查询"]
+        assert [message.content for message in result[STATE_MESSAGES]] == [
+            "previous",
+            "查询",
+            "ok",
+        ]
         assert result[STATE_FINAL_ANSWER] == "## 结论\n\nok"
         assert result[STATE_REASON_ATTEMPTS] == 1
+        assert result[STATE_INTERMEDIATE_STEPS][-1]["step"] == "reason"
 
     def test_reason_uses_metadata_context_and_excludes_already_retrieved_source(self, monkeypatch):
-        from langchain_core.messages import AIMessage
+        from langchain_core.messages import AIMessage, SystemMessage
 
         captured = {}
 
-        def fake_create_agent(model, tools, system_prompt):
-            captured["tool_names"] = {tool.name for tool in tools}
-            captured["system_prompt"] = system_prompt
+        class FakeLLM:
+            def bind_tools(self, tools):
+                captured["tool_names"] = {tool.name for tool in tools}
+                return self
 
-            class FakeAgent:
-                def invoke(self, payload):
-                    return {STATE_MESSAGES: [AIMessage(content="评级为买入，机构为诚通证券")]}
+            def invoke(self, messages):
+                assert isinstance(messages[0], SystemMessage)
+                captured["system_prompt"] = messages[0].content
+                return AIMessage(content="评级为买入，机构为诚通证券")
 
-            return FakeAgent()
-
-        monkeypatch.setattr("langchain.agents.create_agent", fake_create_agent)
+        monkeypatch.setattr("src.agents.nodes.llm", FakeLLM())
         state = _state(**{
             STATE_USER_ROLE: ROLE_ADVISOR,
             STATE_ORIGINAL_QUERY: "贵州茅台的评级和机构",
@@ -712,7 +734,7 @@ class TestRoleAwareTools:
             ],
         })
 
-        reason(state)
+        build_reason_subgraph().invoke(state)
 
         assert SOURCE_REPORT not in captured["tool_names"]
         assert "机构=诚通证券" in captured["system_prompt"]
@@ -726,45 +748,129 @@ class TestRoleAwareTools:
 
         captured = {}
 
-        def fake_create_agent(model, tools, system_prompt):
-            captured["system_prompt"] = system_prompt
+        class FakeLLM:
+            def bind_tools(self, tools):
+                captured["bind_count"] = captured.get("bind_count", 0) + 1
+                captured["tool_names"] = {tool.name for tool in tools}
+                return self
 
-            class FakeAgent:
-                def invoke(self, payload):
-                    return {
-                        STATE_MESSAGES: [
-                            ToolMessage(
-                                content="平安银行研报由示例机构发布",
-                                tool_call_id="call-1",
-                                name="sql_query_tool",
-                            ),
-                            AIMessage(content="平安银行研报由示例机构发布"),
-                        ]
-                    }
+            def invoke(self, messages):
+                captured.setdefault("prompts", []).append(messages[0].content)
+                if isinstance(messages[-1], ToolMessage):
+                    return AIMessage(content=f"计算结果为 {messages[-1].content}")
+                return AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "calculator",
+                            "args": {"expression": "1+1"},
+                            "id": "call-1",
+                        }
+                    ],
+                )
 
-            return FakeAgent()
-
-        monkeypatch.setattr("langchain.agents.create_agent", fake_create_agent)
+        monkeypatch.setattr("src.agents.nodes.llm", FakeLLM())
         state = _state(**{
             STATE_USER_ROLE: ROLE_ADVISOR,
-            STATE_ORIGINAL_QUERY: "AKShare 东方财富研报索引样本",
+            STATE_ORIGINAL_QUERY: "计算 1+1",
             STATE_DEPARTMENT: "wealth",
-            STATE_MESSAGES: [],
             STATE_RETRIEVAL_RESULTS: [],
         })
 
-        result = reason(state)
+        result = build_reason_subgraph().invoke(state)
 
-        assert "没有可用文档检索结果" in captured["system_prompt"]
-        assert "纯工具回答不得编造文档引用" in captured["system_prompt"]
-        assert result[STATE_FINAL_ANSWER] == "## 结论\n\n平安银行研报由示例机构发布"
+        assert "没有可用文档检索结果" in captured["prompts"][0]
+        assert "纯工具回答不得编造文档引用" in captured["prompts"][0]
+        assert result[STATE_FINAL_ANSWER] == "## 结论\n\n计算结果为 2.0000"
         assert result[STATE_TOOL_CALLS] == [
             {
-                "tool": "sql_query_tool",
-                "output": "平安银行研报由示例机构发布",
+                "tool": "calculator",
+                "output": "2.0000",
                 "success": True,
             }
         ]
+        assert captured["bind_count"] == 1
+
+    def test_reason_rejects_tool_hidden_from_role(self, monkeypatch):
+        from langchain_core.messages import AIMessage, ToolMessage
+
+        class FakeLLM:
+            def bind_tools(self, tools):
+                assert SOURCE_FAQ not in {tool.name for tool in tools}
+                return self
+
+            def invoke(self, messages):
+                if isinstance(messages[-1], ToolMessage):
+                    return AIMessage(content="无法调用未授权工具")
+                return AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": SOURCE_FAQ,
+                            "args": {"query": "内部问题"},
+                            "id": "denied-1",
+                        }
+                    ],
+                )
+
+        monkeypatch.setattr("src.agents.nodes.llm", FakeLLM())
+        result = build_reason_subgraph().invoke(_state(**{
+            STATE_USER_ROLE: ROLE_ADVISOR,
+            STATE_ORIGINAL_QUERY: "内部问题",
+        }))
+
+        assert result[STATE_TOOL_CALLS][0]["tool"] == SOURCE_FAQ
+        assert result[STATE_TOOL_CALLS][0]["success"] is False
+        assert "无权调用" in result[STATE_TOOL_CALLS][0]["output"]
+
+    def test_reason_stops_after_tool_iteration_limit(self, monkeypatch):
+        from langchain_core.messages import AIMessage
+
+        class FakeLLM:
+            calls = 0
+
+            def bind_tools(self, tools):
+                return self
+
+            def invoke(self, messages):
+                self.calls += 1
+                return AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "calculator",
+                            "args": {"expression": "1+1"},
+                            "id": f"call-{self.calls}",
+                        }
+                    ],
+                )
+
+        monkeypatch.setattr("src.agents.nodes.llm", FakeLLM())
+        result = build_reason_subgraph().invoke(_state(**{
+            STATE_USER_ROLE: ROLE_ADVISOR,
+            STATE_ORIGINAL_QUERY: "持续计算",
+        }))
+
+        assert result[STATE_TOOL_ITERATIONS] == MAX_TOOL_ITERATIONS
+        assert len(result[STATE_TOOL_CALLS]) == MAX_TOOL_ITERATIONS + 1
+        assert result[STATE_TOOL_CALLS][-1] == {
+            "tool": "calculator",
+            "output": "工具调用次数达到上限，已停止执行。",
+            "success": False,
+        }
+        assert result[STATE_TOOL_MESSAGE_CURSOR] == len(result[STATE_MESSAGES])
+        assert "工具调用次数达到上限" in result[STATE_FINAL_ANSWER]
+        assert result[STATE_INTERMEDIATE_STEPS][-1]["success"] is False
+
+    def test_prepare_reason_includes_verification_feedback_on_retry(self):
+        result = prepare_reason(_state(**{
+            STATE_ORIGINAL_QUERY: "净利润是多少",
+            STATE_REASON_ATTEMPTS: 1,
+            STATE_VERIFICATION: {"passed": False, "issues": ["数字缺少来源"]},
+        }))
+
+        assert "原问题：净利润是多少" in result[STATE_MESSAGES][0].content
+        assert "数字缺少来源" in result[STATE_MESSAGES][0].content
 
 
 class TestStructuredAnswer:

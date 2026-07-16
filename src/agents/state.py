@@ -63,6 +63,10 @@ class AssistantState(TypedDict):
     tool_calls: list[ToolCallDict]
     intermediate_steps: list[IntermediateStep]
     reason_attempts: int
+    tool_iterations: int
+    reason_message_start: int
+    tool_message_cursor: int
+    reason_started_perf_counter: float
 
     # 验证结果 — STATE_VERIFICATION
     verification: VerificationResult

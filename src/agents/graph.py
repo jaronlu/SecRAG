@@ -5,24 +5,32 @@ from typing import Any, Literal, Protocol
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.prebuilt import ToolNode
 
 from src.agents.nodes import (
     audit_log,
+    authorize_reason_tool_call,
+    call_reason_model,
     compliance_check,
     compose,
     extract_citations,
+    finalize_reason,
     grade_and_filter,
     load_conversation_context,
     permission_denied_response,
     persist_conversation_turn,
     planner,
+    prepare_reason,
     query_understand,
-    reason,
+    record_tool_results,
     resolve_followup_query,
     retrieve,
+    route_reason_model,
+    tool_limit_response,
     verify,
 )
 from src.agents.state import AssistantState
+from src.agents.tools import tools
 from src.schemas.constants import (
     CONFIDENCE_HIGH_MIN_RESULTS,
     DEFAULT_MAX_HOPS,
@@ -126,6 +134,37 @@ def is_compliant(state: AssistantState) -> Literal["pass", "block"]:
 """
 
 
+def build_reason_subgraph() -> CompiledStateGraph[AssistantState]:
+    """Compile the checkpoint-aware ReAct loop once per outer graph build."""
+    graph = StateGraph(AssistantState)
+    graph.add_node("prepare_reason", prepare_reason)
+    graph.add_node("call_reason_model", call_reason_model)
+    graph.add_node(
+        "execute_reason_tools",
+        ToolNode(tools, wrap_tool_call=authorize_reason_tool_call),
+    )
+    graph.add_node("record_tool_results", record_tool_results)
+    graph.add_node("finalize_reason", finalize_reason)
+    graph.add_node("tool_limit_response", tool_limit_response)
+
+    graph.add_edge(START, "prepare_reason")
+    graph.add_edge("prepare_reason", "call_reason_model")
+    graph.add_conditional_edges(
+        "call_reason_model",
+        route_reason_model,
+        {
+            "tools": "execute_reason_tools",
+            "finalize": "finalize_reason",
+            "limit": "tool_limit_response",
+        },
+    )
+    graph.add_edge("execute_reason_tools", "record_tool_results")
+    graph.add_edge("record_tool_results", "call_reason_model")
+    graph.add_edge("finalize_reason", END)
+    graph.add_edge("tool_limit_response", END)
+    return graph.compile()
+
+
 def build_agent_graph() -> StateGraph[AssistantState]:
     """构建 fail-closed Agent Graph。
 
@@ -134,6 +173,7 @@ def build_agent_graph() -> StateGraph[AssistantState]:
     条件路由：检索不足则重新检索，验证失败则重新推理，合规拦截仍走 compose。
     """
     graph = StateGraph(AssistantState)
+    reason_subgraph = build_reason_subgraph()
 
     # 加载会话
     graph.add_node(
@@ -159,7 +199,7 @@ def build_agent_graph() -> StateGraph[AssistantState]:
         _traced_node("permission_denied_response", permission_denied_response),
     )
     # ReAct 推理与工具调用
-    graph.add_node("reason", _traced_node("reason", reason))
+    graph.add_node("reason", reason_subgraph)
     # 提取引用
     graph.add_node("extract_citations", _traced_node("extract_citations", extract_citations))
     # 四层验证
