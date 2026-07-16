@@ -88,7 +88,7 @@ class ChromaVectorRetriever(BaseRetriever):
 #   retriever = ChromaVectorRetriever()
 #   results = retriever.retrieve("什么是 RAG？", top_k=3)
 #   # 内部流程：
-#   #   1. _embed("什么是 RAG？") -> [0.123, -0.456, ...]  (768维向量)
+#   #   1. _embed("什么是 RAG？") -> [0.123, -0.456, ...]  (维度由配置模型决定)
 #   #   2. collection.query(query_embeddings=[...], n_results=3)
 #   #   3. _format() -> [
 #   #        RetrievalResult(content="RAG 是...", metadata={"source": "..."}, score=0.89),

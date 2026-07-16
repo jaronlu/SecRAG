@@ -133,7 +133,7 @@ class TestGradeAndFilter:
     def test_empty_results(self):
         state = _state()
         result = grade_and_filter(state)
-        assert result[STATE_RETRIEVAL_RESULTS] == []
+        assert result == {}
 
     def test_sorts_by_score_desc(self):
         r1 = _result("a", score=0.7)
@@ -178,10 +178,10 @@ class TestGradeAndFilter:
 
         assert result[STATE_RETRIEVAL_FILTERED_CHUNKS] == 1
 
-    def test_preserves_other_state_fields(self):
+    def test_does_not_reemit_other_state_fields(self):
         state = _state(**{STATE_FINAL_ANSWER: "unchanged"})
         result = grade_and_filter(state)
-        assert result[STATE_FINAL_ANSWER] == "unchanged"
+        assert STATE_FINAL_ANSWER not in result
 
 
 def test_planner_injects_stock_code_filter_for_report_search(monkeypatch):
@@ -637,33 +637,42 @@ class TestRoleAwareTools:
         assert "calculator" in tool_names
 
     def test_reason_binds_role_filtered_tools(self, monkeypatch):
-        from langchain_core.messages import AIMessage
+        from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+        from langgraph.graph import add_messages
 
         captured = {}
+        response_message = AIMessage(content="ok", id="response")
 
         def fake_create_agent(model, tools, system_prompt):
             captured["tool_names"] = {tool.name for tool in tools}
 
             class FakeAgent:
                 def invoke(self, payload):
-                    return {STATE_MESSAGES: [AIMessage(content="ok")]}
+                    return {STATE_MESSAGES: [response_message]}
 
             return FakeAgent()
 
         monkeypatch.setattr("langchain.agents.create_agent", fake_create_agent)
 
+        prior_message = HumanMessage(content="previous", id="prior")
         state = _state(**{
             STATE_USER_ROLE: ROLE_TECHNICAL,
             STATE_ORIGINAL_QUERY: "查询",
             STATE_DEPARTMENT: "tech",
-            STATE_MESSAGES: [],
+            STATE_MESSAGES: [prior_message],
             STATE_RETRIEVAL_RESULTS: [_result("context", score=0.8)],
         })
 
         result = reason(state)
+        merged_messages = cast(
+            list[BaseMessage],
+            add_messages(list(state[STATE_MESSAGES]), result[STATE_MESSAGES]),
+        )
 
         assert SOURCE_FAQ in captured["tool_names"]
         assert SOURCE_REPORT in captured["tool_names"]
+        assert result[STATE_MESSAGES] == [response_message]
+        assert [message.content for message in merged_messages] == ["previous", "ok"]
         assert result[STATE_FINAL_ANSWER] == "## 结论\n\nok"
         assert result[STATE_REASON_ATTEMPTS] == 1
 
@@ -965,11 +974,18 @@ class TestAuditLog:
         assert audit[AUDIT_REASONING]["execution_path"] == ["retrieve", "reason", "audit_log"]
 
     def test_traced_node_records_name_duration_and_success(self):
-        wrapped = _traced_node("sample", lambda state: {**state, STATE_FINAL_ANSWER: "ok"})
+        wrapped = _traced_node("sample", lambda state: {STATE_FINAL_ANSWER: "ok"})
 
-        result = wrapped(_state(**{STATE_INTERMEDIATE_STEPS: []}))
+        result = wrapped(_state(**{
+            STATE_MESSAGES: [],
+            STATE_INTERMEDIATE_STEPS: [
+                {"step": "previous", "duration_ms": 1.0, "success": True}
+            ],
+        }))
 
         step = result[STATE_INTERMEDIATE_STEPS][-1]
+        assert STATE_MESSAGES not in result
+        assert result[STATE_INTERMEDIATE_STEPS][0]["step"] == "previous"
         assert step["step"] == "sample"
         assert step["duration_ms"] >= 0
         assert step["success"] is True

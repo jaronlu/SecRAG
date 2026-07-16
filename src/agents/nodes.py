@@ -4,7 +4,7 @@
 """
 
 import json
-from typing import Any, cast
+from typing import Any
 
 from langchain_core.messages import HumanMessage, ToolMessage
 
@@ -78,6 +78,7 @@ from src.utils.verifier import CitationExtractor, ComprehensiveVerifier
 
 def _build_llm():
     """根据 config 选择 LLM 后端（复用 rag/chain.py 的同名模式）"""
+    # 延迟导入 provider 依赖，避免项目启动时必须安装所有 LLM 后端
     if config.llm.provider == LLM_PROVIDER_OPENAI:
         from langchain_openai import ChatOpenAI
 
@@ -96,36 +97,37 @@ def _build_llm():
     )
 
 
+# 模块级 LLM 实例，所有节点共享（避免每个节点重复创建）
 llm = _build_llm()
 
 
 def _get_audit_store():
+    """懒加载审计存储（首次调用时才导入并创建实例）"""
+    # 审计库只在最终落盘时用到，延迟导入可减少启动依赖
     from src.utils.audit import SQLiteAuditStore
 
     return SQLiteAuditStore(config.audit_db_path)
 
 
 def _get_conversation_store():
+    """懒加载对话存储"""
+    # 对话历史同样不需要在模块导入阶段就初始化连接
     from src.utils.conversation import SQLiteConversationStore
 
     return SQLiteConversationStore(config.conversation_db_path)
 
 
-# ══════════════════════════════════════════════════════════════════════
 # 共享规则关键词（verify 与 compliance_check 共用，避免重复定义漂移）
-# ══════════════════════════════════════════════════════════════════════
-
 _ADVICE_KEYWORDS = INVESTMENT_ADVICE_PATTERNS
+# 以下实例初始化开销低且被多个节点复用，放在模块顶层避免重复创建
 _COMPLIANCE_CHECKER = ComplianceChecker()
 _CITATION_EXTRACTOR = CitationExtractor()
 _VERIFIER = ComprehensiveVerifier()
 
 
-def _with_state_updates(state: AssistantState, updates: dict[str, Any]) -> AssistantState:
-    return cast(AssistantState, {**state, **updates})
-
-
 def _format_evidence_metadata(metadata: dict[str, Any]) -> str:
+    """把元数据格式化成结构化证据字符串，供 prompt 使用"""
+    # 只保留存在的字段，避免 prompt 里出现大量空白键值对
     fields = (
         ("institution", "机构"),
         ("rating", "评级"),
@@ -140,16 +142,20 @@ def _format_evidence_metadata(metadata: dict[str, Any]) -> str:
 def _structure_answer(content: str) -> str:
     """Normalize visible answer text into a stable Markdown structure."""
     answer = content.strip()
+    # 去掉 LLM 可能输出的英文前缀
     for prefix in ("Answer:", "回答：", "回答:"):
         if answer.startswith(prefix):
             answer = answer[len(prefix) :].lstrip()
             break
+    # 截断到 Citations / Audit Trail 之前，避免内部标记泄露给用户
     for marker in ("\nCitations:", "\nAudit Trail:"):
         if marker in answer:
             answer = answer.split(marker, 1)[0].rstrip()
+    # 如果已经结构化，或为空，直接返回
     if not answer or answer.startswith("## 结论"):
         return answer
 
+    # 按空行拆成结论和明细，统一套回固定 Markdown 结构
     conclusion, separator, details = answer.partition("\n\n")
     structured = f"## 结论\n\n{conclusion.strip()}"
     if separator and details.strip():
@@ -158,6 +164,8 @@ def _structure_answer(content: str) -> str:
 
 
 def _normalize_plan_step(step: object, default_query: str = "") -> RetrievalPlanStep | None:
+    """把 LLM 返回的原始检索步骤规范化成 RetrievalPlanStep，失败返回 None"""
+    # LLM 输出不可信，先做类型防御，避免后续 .get() 或属性访问崩溃
     if not isinstance(step, dict):
         return None
 
@@ -182,23 +190,22 @@ def _normalize_plan_step(step: object, default_query: str = "") -> RetrievalPlan
 # ══════════════════════════════════════════════════════════════════════
 
 
-def load_conversation_context(state: AssistantState) -> AssistantState:
+def load_conversation_context(state: AssistantState) -> dict[str, Any]:
     """Load recent visible messages and entity summary for the current owner."""
+    # 只读取当前线程 + 当前用户可见的历史，避免串号或跨用户泄露
     history, summary = _get_conversation_store().load_context(
         thread_id=state[STATE_THREAD_ID],
         user_id=state[STATE_USER_ID],
     )
-    return _with_state_updates(
-        state,
-        {
-            STATE_CHAT_HISTORY: history,
-            STATE_CONVERSATION_SUMMARY: summary,
-        },
-    )
+    return {
+        STATE_CHAT_HISTORY: history,
+        STATE_CONVERSATION_SUMMARY: summary,
+    }
 
 
-def resolve_followup_query(state: AssistantState) -> AssistantState:
+def resolve_followup_query(state: AssistantState) -> dict[str, Any]:
     """Resolve pronoun-style follow-ups using stored entity context only."""
+    # 仅依赖当前会话摘要做指代消解，不引入外部上下文，降低幻觉风险
     query = state[STATE_ORIGINAL_QUERY]
     summary = state.get(STATE_CONVERSATION_SUMMARY, "")
     followup_markers = ("它", "这个", "该产品", "该公司", "那", "上述", "前面")
@@ -207,7 +214,7 @@ def resolve_followup_query(state: AssistantState) -> AssistantState:
         if summary and any(marker in query for marker in followup_markers)
         else query
     )
-    return _with_state_updates(state, {STATE_RESOLVED_QUERY: resolved})
+    return {STATE_RESOLVED_QUERY: resolved}
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -215,8 +222,9 @@ def resolve_followup_query(state: AssistantState) -> AssistantState:
 # ══════════════════════════════════════════════════════════════════════
 
 
-def query_understand(state: AssistantState) -> AssistantState:
+def query_understand(state: AssistantState) -> dict[str, Any]:
     """查询理解：意图分类、实体抽取、查询重写、歧义检测"""
+    # 优先使用“指代消解后的查询”，否则回退到原始查询
     effective_query = state.get(STATE_RESOLVED_QUERY) or state[STATE_ORIGINAL_QUERY]
     prompt = f"""请分析以下行业业务查询：
 
@@ -224,8 +232,7 @@ def query_understand(state: AssistantState) -> AssistantState:
 【用户角色】{state[STATE_USER_ROLE]}
 【用户部门】{state[STATE_DEPARTMENT]}
 
-请以 JSON 格式返回：
-{{
+请以 JSON 格式返回：{{
   "intent": "产品咨询 | 交易规则 | 法规咨询 | 研报观点 | 规则审查 | FAQ | 技术支持",
   "query_type": "product_inquiry | rule_inquiry | regulation_inquiry | report_inquiry | faq_inquiry | technical_inquiry",
   "entities": {{"product_name": "", "product_type": "", "stock_code": "", "regulation_name": "", "client_segment": ""}},
@@ -242,6 +249,7 @@ def query_understand(state: AssistantState) -> AssistantState:
             raw = str(raw)
         result = json.loads(raw)
     except json.JSONDecodeError:
+        # LLM 未按格式返回 JSON 时，不阻断流程，用默认值兜底
         result = {
             "intent": "unknown",
             "query_type": "unknown",
@@ -250,16 +258,13 @@ def query_understand(state: AssistantState) -> AssistantState:
             "ambiguity": [],
         }
 
-    return _with_state_updates(
-        state,
-        {
-            STATE_INTENT: result.get("intent", "unknown"),
-            STATE_QUERY_TYPE: result.get("query_type", "unknown"),
-            STATE_ENTITIES: result.get("entities", {}),
-            STATE_REWRITTEN_QUERY: result.get("rewritten_query", effective_query),
-            STATE_AMBIGUITY: result.get("ambiguity", []),
-        },
-    )
+    return {
+        STATE_INTENT: result.get("intent", "unknown"),
+        STATE_QUERY_TYPE: result.get("query_type", "unknown"),
+        STATE_ENTITIES: result.get("entities", {}),
+        STATE_REWRITTEN_QUERY: result.get("rewritten_query", effective_query),
+        STATE_AMBIGUITY: result.get("ambiguity", []),
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -267,8 +272,9 @@ def query_understand(state: AssistantState) -> AssistantState:
 # ══════════════════════════════════════════════════════════════════════
 
 
-def planner(state: AssistantState) -> AssistantState:
+def planner(state: AssistantState) -> dict[str, Any]:
     """检索计划生成：根据意图、角色、查询类型生成多步检索计划"""
+    # 先查当前角色允许访问的数据源，作为后续计划的权限边界
     allowed_sources = ROLE_ALLOWED_SOURCES.get(state[STATE_USER_ROLE], [])
 
     prompt = f"""根据以下查询理解结果，生成检索计划：
@@ -302,6 +308,7 @@ def planner(state: AssistantState) -> AssistantState:
             raw = str(raw)
         parsed_plan = json.loads(raw)
     except json.JSONDecodeError:
+        # LLM 未返回合法 JSON 时，退化为单源检索，保证流程继续
         parsed_plan = (
             [
                 {
@@ -320,20 +327,17 @@ def planner(state: AssistantState) -> AssistantState:
     for raw_step in raw_steps:
         step = _normalize_plan_step(raw_step, state[STATE_REWRITTEN_QUERY])
         if step is not None and step.get(PLAN_SOURCE) in allowed_sources:
+            # 研报通常按股票组织，补股票代码过滤可提高召回精度
             if step.get(PLAN_SOURCE) == SOURCE_REPORT:
                 stock_code = str(state.get(STATE_ENTITIES, {}).get(META_STOCK_CODE, ""))
                 if stock_code:
                     filters = dict(step.get(PLAN_FILTERS) or {})
+                    # 只保留代码部分，去掉沪市 .SH / 深市 .SZ 等后缀
                     filters[META_STOCK_CODE] = stock_code.split(".", maxsplit=1)[0]
                     step[PLAN_FILTERS] = filters
             filtered_plan.append(step)
 
-    return _with_state_updates(
-        state,
-        {
-            STATE_RETRIEVAL_PLAN: filtered_plan,
-        },
-    )
+    return {STATE_RETRIEVAL_PLAN: filtered_plan}
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -341,8 +345,9 @@ def planner(state: AssistantState) -> AssistantState:
 # ══════════════════════════════════════════════════════════════════════
 
 
-def retrieve(state: AssistantState) -> AssistantState:
+def retrieve(state: AssistantState) -> dict[str, Any]:
     """使用 HybridRetriever 按角色权限执行一轮检索计划。"""
+    # 先把 state 里可能被合并过的计划重新标准化，避免旧结构残留
     normalized_plan: list[RetrievalPlanStep] = []
     for step in state.get(STATE_RETRIEVAL_PLAN, []):
         normalized_plan.append(
@@ -360,15 +365,13 @@ def retrieve(state: AssistantState) -> AssistantState:
     )
     results = retriever.retrieve(plan=normalized_plan)
 
+    # 把本轮结果累加到已有结果上，支持后续重写查询后再检索一轮
     accumulated = state.get(STATE_RETRIEVAL_RESULTS, []) + results
-    return _with_state_updates(
-        state,
-        {
-            STATE_RETRIEVAL_RESULTS: accumulated,
-            STATE_RETRIEVAL_ATTEMPTS: state.get(STATE_RETRIEVAL_ATTEMPTS, 0) + 1,
-            STATE_RETRIEVAL_TOTAL_CHUNKS: state.get(STATE_RETRIEVAL_TOTAL_CHUNKS, 0) + len(results),
-        },
-    )
+    return {
+        STATE_RETRIEVAL_RESULTS: accumulated,
+        STATE_RETRIEVAL_ATTEMPTS: state.get(STATE_RETRIEVAL_ATTEMPTS, 0) + 1,
+        STATE_RETRIEVAL_TOTAL_CHUNKS: state.get(STATE_RETRIEVAL_TOTAL_CHUNKS, 0) + len(results),
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -376,19 +379,22 @@ def retrieve(state: AssistantState) -> AssistantState:
 # ══════════════════════════════════════════════════════════════════════
 
 
-def grade_and_filter(state: AssistantState) -> AssistantState:
+def grade_and_filter(state: AssistantState) -> dict[str, Any]:
     """相关性评分与过滤：按 score 排序，保留前 GRADE_TOP_K 条"""
     results = state.get(STATE_RETRIEVAL_RESULTS, [])
     if not results:
-        return state
+        return {}
 
+    # 先把无权限结果摘出来；保留它们是为了后续可明确提示用户“部分结果无权查看”
     denied = [result for result in results if result.get(RR_DENIED)]
     filtered = []
     seen_evidence = set()
+    # 先按相似度降序，优先保留高相关证据
     for result in sorted(results, key=lambda x: x.get(RR_SCORE, 0), reverse=True):
         if result.get(RR_DENIED) or result.get(RR_SCORE, 0) < RETRIEVAL_MIN_SCORE:
             continue
         metadata = result.get(RR_METADATA, {})
+        # 以来源 + 内容指纹去重，避免同一证据反复占据上下文窗口
         key = (
             metadata.get(META_SOURCE),
             metadata.get(META_CHUNK_ID) or result.get(RR_CONTENT, ""),
@@ -400,13 +406,10 @@ def grade_and_filter(state: AssistantState) -> AssistantState:
         if len(filtered) >= GRADE_TOP_K:
             break
 
-    return _with_state_updates(
-        state,
-        {
-            STATE_RETRIEVAL_RESULTS: filtered + denied,
-            STATE_RETRIEVAL_FILTERED_CHUNKS: len(filtered),
-        },
-    )
+    return {
+        STATE_RETRIEVAL_RESULTS: filtered + denied,
+        STATE_RETRIEVAL_FILTERED_CHUNKS: len(filtered),
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -414,7 +417,7 @@ def grade_and_filter(state: AssistantState) -> AssistantState:
 # ══════════════════════════════════════════════════════════════════════
 
 
-def reason(state: AssistantState) -> AssistantState:
+def reason(state: AssistantState) -> dict[str, Any]:
     """LLM 推理 + 工具调用
 
     技术债：当前使用 langchain.agents.create_agent 嵌套在 LangGraph 节点内。
@@ -432,7 +435,7 @@ def reason(state: AssistantState) -> AssistantState:
     results = state.get(STATE_RETRIEVAL_RESULTS, [])
     reason_attempts = state.get(STATE_REASON_ATTEMPTS, 0) + 1
 
-    # 构建 context
+    # 构建 context：只把前 5 条结果喂给 LLM，控制 prompt 长度
     context_parts = []
     for index, result in enumerate(results[:5]):
         metadata = result[RR_METADATA]
@@ -445,7 +448,7 @@ def reason(state: AssistantState) -> AssistantState:
         "当前轮没有可用文档检索结果；如问题可由授权工具回答，应调用工具并仅依据成功工具输出作答。"
     )
 
-    # 角色化 prompt
+    # 角色化 prompt：不同岗位的权限边界和回答风格不同
     role_instructions = {
         ROLE_ADVISOR: "你是机构投顾助手。基于内部知识库为客户提供准确的产品/规则/市场信息。",
         ROLE_INSTITUTIONAL_SALES: "你是机构销售助手。为机构客户提供研究支持和市场洞察。",
@@ -482,6 +485,7 @@ def reason(state: AssistantState) -> AssistantState:
 {"投顾/销售角色：不得输出" + "买" + "入/" + "卖" + "出/" + "目标" + "价等业务建议，仅提供事实信息。" if role in (ROLE_ADVISOR, ROLE_INSTITUTIONAL_SALES) else ""}
 {"合规角色：引用必须精确到条款/条文号。" if role == ROLE_COMPLIANCE else ""}"""
 
+    # 若当前轮已有检索结果，就把这些来源从工具里排除，避免 Agent 重复检索
     planned_sources = {step.get(PLAN_SOURCE, "") for step in state.get(STATE_RETRIEVAL_PLAN, [])}
     excluded_sources = planned_sources if results else set()
     agent = create_agent(
@@ -500,6 +504,7 @@ def reason(state: AssistantState) -> AssistantState:
         final_msg.content if isinstance(final_msg.content, str) else str(final_msg.content)
     )
     final_content = _structure_answer(final_content)
+    # 持久化本轮工具调用记录，供后续 verify / audit 使用
     tool_calls: list[ToolCallDict] = list(state.get(STATE_TOOL_CALLS, []))
     for message in response[STATE_MESSAGES]:
         if isinstance(message, ToolMessage):
@@ -511,15 +516,12 @@ def reason(state: AssistantState) -> AssistantState:
                     success=message.status != "error",
                 )
             )
-    return _with_state_updates(
-        state,
-        {
-            STATE_MESSAGES: state.get(STATE_MESSAGES, []) + response[STATE_MESSAGES],
-            STATE_TOOL_CALLS: tool_calls,
-            STATE_FINAL_ANSWER: final_content,
-            STATE_REASON_ATTEMPTS: reason_attempts,
-        },
-    )
+    return {
+        STATE_MESSAGES: response[STATE_MESSAGES],
+        STATE_TOOL_CALLS: tool_calls,
+        STATE_FINAL_ANSWER: final_content,
+        STATE_REASON_ATTEMPTS: reason_attempts,
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -527,8 +529,9 @@ def reason(state: AssistantState) -> AssistantState:
 # ══════════════════════════════════════════════════════════════════════
 
 
-def extract_citations(state: AssistantState) -> AssistantState:
+def extract_citations(state: AssistantState) -> dict[str, Any]:
     """Extract citations only from this turn's usable retrieval results."""
+    # 用“消解/重写后的查询”做引用匹配，比原始查询更贴近本轮实际意图
     query = (
         state.get(STATE_RESOLVED_QUERY)
         or state.get(STATE_REWRITTEN_QUERY)
@@ -538,10 +541,10 @@ def extract_citations(state: AssistantState) -> AssistantState:
         state.get(STATE_RETRIEVAL_RESULTS, []),
         query=query,
     )
-    return _with_state_updates(state, {STATE_CITATIONS: citations})
+    return {STATE_CITATIONS: citations}
 
 
-def verify(state: AssistantState) -> AssistantState:
+def verify(state: AssistantState) -> dict[str, Any]:
     """Run source, number, consistency, and hallucination verification."""
     verification = _VERIFIER.verify(
         answer=state.get(STATE_FINAL_ANSWER, ""),
@@ -552,13 +555,14 @@ def verify(state: AssistantState) -> AssistantState:
 
     role = state.get(STATE_USER_ROLE)
     issues = list(verification.get("issues", []))
+    # 投顾/销售岗额外拦截业务建议关键词，防止越权输出
     if role in (ROLE_ADVISOR, ROLE_INSTITUTIONAL_SALES):
         for pattern in _ADVICE_KEYWORDS:
             if pattern in state.get(STATE_FINAL_ANSWER, ""):
                 issues.append(f"投顾/销售角色不得输出业务建议: {pattern}")
     if issues:
         verification.update(passed=False, issues=issues, confidence=CONFIDENCE_LOW)
-    return _with_state_updates(state, {STATE_VERIFICATION: verification})
+    return {STATE_VERIFICATION: verification}
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -566,8 +570,9 @@ def verify(state: AssistantState) -> AssistantState:
 # ══════════════════════════════════════════════════════════════════════
 
 
-def compliance_check(state: AssistantState) -> AssistantState:
+def compliance_check(state: AssistantState) -> dict[str, Any]:
     """合规检查：敏感词、业务建议、风险提示、适当性"""
+    # 最终答案 + 角色 + 客户号一起送入，便于做适当性和角色化拦截
     answer = state.get(STATE_FINAL_ANSWER, "")
     compliance = _COMPLIANCE_CHECKER.check(
         answer,
@@ -575,35 +580,28 @@ def compliance_check(state: AssistantState) -> AssistantState:
         client_id=state.get(STATE_CLIENT_ID),
     )
 
-    return _with_state_updates(
-        state,
-        {
-            STATE_COMPLIANCE: compliance,
-        },
-    )
+    return {STATE_COMPLIANCE: compliance}
 
 
-def permission_denied_response(state: AssistantState) -> AssistantState:
+def permission_denied_response(state: AssistantState) -> dict[str, Any]:
     """Terminate before LLM reasoning when every retrieval result is denied."""
-    return _with_state_updates(
-        state,
-        {
-            STATE_FINAL_ANSWER: _structure_answer("当前角色无权限访问完成该请求所需的数据源。"),
-            STATE_CITATIONS: [],
-            STATE_CONFIDENCE: CONFIDENCE_LOW,
-            STATE_RISK_DISCLOSURE: "",
-            STATE_VERIFICATION: {
-                "passed": False,
-                "issues": ["permission_denied"],
-                "confidence": CONFIDENCE_LOW,
-            },
-            STATE_COMPLIANCE: {
-                "passed": False,
-                "flags": ["permission_denied"],
-                "risk_disclosure": "",
-            },
+    # 在进入 LLM 推理前短路返回，既省成本，也避免把无权限内容继续带入后续节点
+    return {
+        STATE_FINAL_ANSWER: _structure_answer("当前角色无权限访问完成该请求所需的数据源。"),
+        STATE_CITATIONS: [],
+        STATE_CONFIDENCE: CONFIDENCE_LOW,
+        STATE_RISK_DISCLOSURE: "",
+        STATE_VERIFICATION: {
+            "passed": False,
+            "issues": ["permission_denied"],
+            "confidence": CONFIDENCE_LOW,
         },
-    )
+        STATE_COMPLIANCE: {
+            "passed": False,
+            "flags": ["permission_denied"],
+            "risk_disclosure": "",
+        },
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -611,7 +609,7 @@ def permission_denied_response(state: AssistantState) -> AssistantState:
 # ══════════════════════════════════════════════════════════════════════
 
 
-def compose(state: AssistantState) -> AssistantState:
+def compose(state: AssistantState) -> dict[str, Any]:
     """生成最终回答：带引用、置信度、风险提示"""
     answer = state.get(STATE_FINAL_ANSWER, "")
     citations = state.get(STATE_CITATIONS, [])
@@ -622,15 +620,17 @@ def compose(state: AssistantState) -> AssistantState:
     suitability = compliance.get("suitability_warning", "")
     verification_passed = state.get(STATE_VERIFICATION, {}).get("passed", False)
     compliance_passed = compliance.get("passed", False)
+    # 验证不通过时，直接替换为安全提示，并清空引用，避免继续传播不可靠答案
     if not verification_passed:
         answer = "当前答案未通过来源或数字验证，无法安全返回。请补充可验证资料后重试。"
         citations = []
+    # 合规不通过时，停止输出，但保留风险提示/适当性警告作为最终兜底说明
     elif not compliance_passed:
         answer = "当前请求或生成内容未通过合规检查，已停止输出。"
         citations = []
     final_answer = _structure_answer(answer) + suitability + risk
 
-    # 综合置信度
+    # 综合置信度：合规失败直接低；高置信 + 至少 3 条有效结果才算高
     verification_conf = state.get(STATE_VERIFICATION, {}).get("confidence", CONFIDENCE_MEDIUM)
     result_count = len([
         result for result in state.get(STATE_RETRIEVAL_RESULTS, []) if not result.get(RR_DENIED)
@@ -643,21 +643,19 @@ def compose(state: AssistantState) -> AssistantState:
     else:
         confidence = CONFIDENCE_MEDIUM
 
-    return _with_state_updates(
-        state,
-        {
-            STATE_FINAL_ANSWER: final_answer,
-            STATE_CITATIONS: citations,
-            STATE_CONFIDENCE: confidence,
-            STATE_RISK_DISCLOSURE: risk + suitability,
-        },
-    )
+    return {
+        STATE_FINAL_ANSWER: final_answer,
+        STATE_CITATIONS: citations,
+        STATE_CONFIDENCE: confidence,
+        STATE_RISK_DISCLOSURE: risk + suitability,
+    }
 
 
-def persist_conversation_turn(state: AssistantState) -> AssistantState:
+def persist_conversation_turn(state: AssistantState) -> dict[str, Any]:
     """Persist the visible turn and durable audit outbox event atomically."""
+    # 将本轮可见对话写入 SQLite；返回空更新，不改变当前 state
     _get_conversation_store().insert_turn(state)
-    return state
+    return {}
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -665,28 +663,48 @@ def persist_conversation_turn(state: AssistantState) -> AssistantState:
 # ══════════════════════════════════════════════════════════════════════
 
 
-def audit_log(state: AssistantState) -> AssistantState:
+def audit_log(state: AssistantState) -> dict[str, Any]:
     """记录追踪日志——覆盖 Query → Retrieve → Reason → Verify → Compose 全链路
 
     实现委托给 src/utils/audit.py 的 AuditLogger（AuditEntry 模型的权威构建者），
     避免与该模块重复维护同一份字段拼装逻辑。
     """
+    # AuditLogger 负责把整条 state 组装成结构化审计事件
     from src.utils.audit import AuditLogger, audit_entry_to_trail
 
     audit_entry = AuditLogger().log(state)
     conversation_store = _get_conversation_store()
     try:
+        # 先写入审计库；若存在对话 outbox，则同步标记为已处理
         _get_audit_store().insert(audit_entry)
         if conversation_store.get_outbox_status(audit_entry.request_id) is not None:
             conversation_store.mark_outbox_processed(audit_entry.request_id)
     except Exception as exc:
+        # 审计写入失败时，至少把 outbox 标成失败，避免丢失问题线索
         if conversation_store.get_outbox_status(audit_entry.request_id) is not None:
             conversation_store.mark_outbox_failed(audit_entry.request_id, str(exc))
         raise
 
-    return _with_state_updates(
-        state,
-        {
-            STATE_AUDIT_TRAIL: audit_entry_to_trail(audit_entry),
-        },
-    )
+    return {STATE_AUDIT_TRAIL: audit_entry_to_trail(audit_entry)}
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Data Flow
+# ══════════════════════════════════════════════════════════════════════
+
+#
+# User Query
+#   -> load_conversation_context
+#   -> resolve_followup_query
+#   -> query_understand
+#   -> planner
+#   -> retrieve
+#   -> grade_and_filter
+#   -> reason (may call tools)
+#   -> extract_citations
+#   -> verify
+#   -> compliance_check
+#   -> compose
+#   -> persist_conversation_turn
+#   -> audit_log
+#   -> Final Answer

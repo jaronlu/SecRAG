@@ -21,6 +21,7 @@ from src.schemas.typed_dicts import (
 #   作为补偿，每个字段注释标注对应的 STATE_* 常量，新增/重命名时务必同步更新 constants.py。
 
 
+# 这是 LangGraph Agent 的共享状态定义，相当于整个 Agent 图的"全局内存"。所有节点（nodes）读写同一份状态，按 key 协作。后面 graph、nodes、tools 都在消费这个结构。
 class AssistantState(TypedDict):
     # 用户上下文 — STATE_USER_ID / STATE_USER_ROLE / STATE_DEPARTMENT / STATE_DATA_PERMISSIONS / STATE_CLIENT_ID
     user_id: str
@@ -55,6 +56,9 @@ class AssistantState(TypedDict):
     retrieval_filtered_chunks: int
 
     # 推理过程 — STATE_MESSAGES / STATE_TOOL_CALLS / STATE_INTERMEDIATE_STEPS / STATE_REASON_ATTEMPTS
+    # Sequence 是抽象基类，表示"有序、可索引、可遍历"
+    # 它比 list 宽泛，list[str] 是 Sequence[str] 的子类型
+    # Sequence[BaseMessage] 定义类型：有序消息集合
     messages: Annotated[Sequence[BaseMessage], add_messages]
     tool_calls: list[ToolCallDict]
     intermediate_steps: list[IntermediateStep]

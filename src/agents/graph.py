@@ -1,7 +1,7 @@
 """Agent Graph 构建——节点编排、条件路由、Checkpointer"""
 
 import time
-from typing import Literal, Protocol
+from typing import Any, Literal, Protocol
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -38,7 +38,7 @@ from src.schemas.typed_dicts import IntermediateStep
 
 
 class _AgentNode(Protocol):
-    def __call__(self, state: AssistantState) -> AssistantState: ...
+    def __call__(self, state: AssistantState) -> dict[str, Any]: ...
 
 
 def _traced_node(
@@ -47,7 +47,7 @@ def _traced_node(
 ) -> _AgentNode:
     """Record the actual node path and elapsed time in state."""
 
-    def wrapped(state: AssistantState) -> AssistantState:
+    def wrapped(state: AssistantState) -> dict[str, Any]:
         started = time.perf_counter()
         result = node(state)
         step: IntermediateStep = {
@@ -57,7 +57,7 @@ def _traced_node(
         }
         return {
             **result,
-            STATE_INTERMEDIATE_STEPS: result.get(STATE_INTERMEDIATE_STEPS, []) + [step],
+            STATE_INTERMEDIATE_STEPS: state.get(STATE_INTERMEDIATE_STEPS, []) + [step],
         }
 
     return wrapped
