@@ -4,8 +4,8 @@
 
 机构内部投研知识平台 — Agentic RAG 系统。完整设计文档见 `docs/design/`。
 - `docs/design` 只是软连接
-- 文档真实路径: `~/llm-wiki/workshop/agentic-rag-securities/raw/`
-- 项目级设计同步规则: `~/llm-wiki/workshop/agentic-rag-securities/AGENTS.md`
+- 文档真实路径: `~/llm-wiki/workshop/SecRAG/raw/`
+- 项目级设计同步规则: `~/llm-wiki/workshop/SecRAG/AGENTS.md`
 ## 设计文档索引
 
 | 文档 | 路径 |
