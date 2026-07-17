@@ -71,6 +71,7 @@ from src.schemas.constants import (
     SOURCE_FAQ,
     SOURCE_PRODUCT,
     SOURCE_REPORT,
+    SOURCE_SQL,
     STATE_AUDIT_TRAIL,
     STATE_CITATIONS,
     STATE_CLIENT_ID,
@@ -696,7 +697,19 @@ class TestRoleAwareTools:
 
         assert SOURCE_FAQ in tool_names
         assert SOURCE_REPORT in tool_names
+        assert SOURCE_SQL not in tool_names
         assert "calculator" in tool_names
+
+    def test_structured_financial_tool_is_role_gated(self):
+        from src.agents.tools import get_tools_for_role
+
+        advisor_tools = {tool.name for tool in get_tools_for_role(ROLE_ADVISOR)}
+        operations_tools = {tool.name for tool in get_tools_for_role(ROLE_OPERATIONS)}
+        unknown_tools = {tool.name for tool in get_tools_for_role("unknown")}
+
+        assert SOURCE_SQL in advisor_tools
+        assert SOURCE_SQL not in operations_tools
+        assert not {SOURCE_PRODUCT, SOURCE_REPORT, SOURCE_FAQ, SOURCE_SQL} & unknown_tools
 
     def test_report_tool_filters_chunk_not_allowed_for_technical_role(self, monkeypatch):
         from langchain_core.messages import AIMessage

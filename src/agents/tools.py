@@ -15,6 +15,7 @@ from src.schemas.constants import (
     SOURCE_PRODUCT,
     SOURCE_REGULATION,
     SOURCE_REPORT,
+    SOURCE_SQL,
     STATE_DATA_PERMISSIONS,
     STATE_USER_ROLE,
 )
@@ -164,6 +165,7 @@ _RETRIEVAL_TOOL_SOURCES = {
     regulation_search.name: SOURCE_REGULATION,
     report_search.name: SOURCE_REPORT,
     faq_search.name: SOURCE_FAQ,
+    sql_query_tool.name: SOURCE_SQL,
 }
 
 
@@ -172,7 +174,7 @@ def get_tools_for_role(
     excluded_retrieval_sources: set[str] | None = None,
 ):
     """Return tools visible to the ReAct agent for the given role."""
-    allowed_sources = set(ROLE_ALLOWED_SOURCES.get(user_role, [SOURCE_FAQ]))
+    allowed_sources = set(ROLE_ALLOWED_SOURCES.get(user_role, []))
     excluded_sources = excluded_retrieval_sources or set()
     return [
         tool_item
