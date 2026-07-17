@@ -1028,7 +1028,28 @@ class TestCompose:
         })
         result = compose(state)
         assert RESTRICTED_TEXT not in result[STATE_FINAL_ANSWER]
+        assert result[STATE_CONFIDENCE] == CONFIDENCE_LOW
         assert result[STATE_CITATIONS] == []
+
+    def test_retrieval_results_replace_after_explicit_accumulation(self):
+        from langgraph.graph import END, START, StateGraph
+
+        graph = StateGraph(AssistantState)
+        graph.add_node("retrieve", lambda state: {
+            STATE_RETRIEVAL_RESULTS: state.get(STATE_RETRIEVAL_RESULTS, []) + [_result("new")]
+        })
+        graph.add_node("filter", lambda state: {
+            STATE_RETRIEVAL_RESULTS: [state[STATE_RETRIEVAL_RESULTS][-1]]
+        })
+        graph.add_edge(START, "retrieve")
+        graph.add_edge("retrieve", "filter")
+        graph.add_edge("filter", END)
+
+        result = graph.compile().invoke(_state(**{
+            STATE_RETRIEVAL_RESULTS: [_result("old")],
+        }))
+
+        assert [item[RR_CONTENT] for item in result[STATE_RETRIEVAL_RESULTS]] == ["new"]
 
     def test_compliance_failure_returns_fixed_safe_response(self):
         state = _state(**{
@@ -1053,7 +1074,7 @@ class TestCompose:
         state = _state(**{
             STATE_FINAL_ANSWER: "内容",
             STATE_COMPLIANCE: {"passed": False, "risk_disclosure": "", "suitability_warning": ""},
-            STATE_VERIFICATION: {"confidence": CONFIDENCE_HIGH},
+            STATE_VERIFICATION: {"passed": True, "confidence": CONFIDENCE_HIGH},
             STATE_RETRIEVAL_RESULTS: [_result("a"), _result("b"), _result("c")],
         })
         result = compose(state)
@@ -1063,7 +1084,7 @@ class TestCompose:
         state = _state(**{
             STATE_FINAL_ANSWER: "内容",
             STATE_COMPLIANCE: {"passed": True, "risk_disclosure": "", "suitability_warning": ""},
-            STATE_VERIFICATION: {"confidence": CONFIDENCE_HIGH},
+            STATE_VERIFICATION: {"passed": True, "confidence": CONFIDENCE_HIGH},
             STATE_RETRIEVAL_RESULTS: [_result("a"), _result("b"), _result("c")],
         })
         result = compose(state)
@@ -1073,7 +1094,7 @@ class TestCompose:
         state = _state(**{
             STATE_FINAL_ANSWER: "内容",
             STATE_COMPLIANCE: {"passed": True, "risk_disclosure": "", "suitability_warning": ""},
-            STATE_VERIFICATION: {"confidence": CONFIDENCE_HIGH},
+            STATE_VERIFICATION: {"passed": True, "confidence": CONFIDENCE_HIGH},
             STATE_RETRIEVAL_RESULTS: [_result("a")],
         })
         result = compose(state)

@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -35,7 +37,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     # App
-    app_env: str = "development"
+    app_env: Literal["development", "production", "test"] = "development"
     app_debug: bool = True
     app_host: str = "0.0.0.0"
     app_port: int = 8000

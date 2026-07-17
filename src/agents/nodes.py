@@ -811,7 +811,7 @@ def compose(state: AssistantState) -> dict[str, Any]:
         result for result in state.get(STATE_RETRIEVAL_RESULTS, []) if not result.get(RR_DENIED)
     ])
 
-    if not compliance_passed:
+    if not verification_passed or not compliance_passed:
         confidence = CONFIDENCE_LOW
     elif verification_conf == CONFIDENCE_HIGH and result_count >= 3:
         confidence = CONFIDENCE_HIGH

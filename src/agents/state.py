@@ -50,8 +50,8 @@ class AssistantState(TypedDict):
     retrieval_plan: list[RetrievalPlanStep]
     retrieval_attempts: int  # 多跳检索计数器（impl-04 使用）
 
-    # 检索结果 — STATE_RETRIEVAL_RESULTS（reducer: concatenate）
-    retrieval_results: Annotated[list[RetrievalResult], "concatenate"]
+    # 检索结果 — STATE_RETRIEVAL_RESULTS；顺序节点显式累加或替换
+    retrieval_results: list[RetrievalResult]
     retrieval_total_chunks: int
     retrieval_filtered_chunks: int
 
