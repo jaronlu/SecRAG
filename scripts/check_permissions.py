@@ -13,20 +13,25 @@ from src.schemas.constants import (
     PLAN_QUERY,
     PLAN_SOURCE,
     ROLE_INSTITUTIONAL_SALES,
+    ROLE_DATA_PERMISSIONS,
     ROLE_OPERATIONS,
     ROLE_TECHNICAL,
     SOURCE_FAQ,
     SOURCE_REPORT,
     STATE_RETRIEVAL_RESULTS,
+    RR_DENIED,
 )
 
 
 def _visible_count(role: str, source: str, query: str) -> int:
-    retriever = HybridRetriever(user_role=role)
+    retriever = HybridRetriever(
+        user_role=role,
+        data_permissions=ROLE_DATA_PERMISSIONS.get(role, []),
+    )
     results = retriever.retrieve([{PLAN_SOURCE: source, PLAN_QUERY: query, "top_k": 5}])
     state = cast(AssistantState, {STATE_RETRIEVAL_RESULTS: results})
     filtered = grade_and_filter(state)[STATE_RETRIEVAL_RESULTS]
-    return len(filtered)
+    return sum(not result.get(RR_DENIED) for result in filtered)
 
 
 def main() -> None:

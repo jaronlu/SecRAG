@@ -127,7 +127,41 @@ def test_evaluate_retrieval_computes_permission_accuracy(monkeypatch, tmp_path):
 
     assert summary["permission_block_accuracy"] == 1.0
     assert summary["coverage"] == 1.0
-    assert summary["precision@5"] == 0.1
+    assert summary["precision@5"] == 0.2
+
+
+def test_permission_only_samples_do_not_lower_retrieval_metrics(monkeypatch, tmp_path):
+    class FakeHybridRetriever:
+        def __init__(self, user_role: str, data_permissions: list[str]):
+            self.user_role = user_role
+
+        def retrieve(self, plan):
+            if self.user_role == ROLE_TECHNICAL:
+                return [{RR_DENIED: True, RR_METADATA: {}}]
+            return [{RR_METADATA: {META_CHUNK_ID: "chunk-1"}}]
+
+    monkeypatch.setattr(eval_script, "HybridRetriever", FakeHybridRetriever)
+    dataset_path = _write_dataset(tmp_path, [
+        {
+            "query": "产品风险",
+            "user_role": ROLE_ADVISOR,
+            "source": SOURCE_PRODUCT,
+            "relevant_chunk_ids": ["chunk-1"],
+        },
+        {
+            "query": "内部资料",
+            "user_role": ROLE_TECHNICAL,
+            "source": SOURCE_PRODUCT,
+            "relevant_chunk_ids": [],
+            "expected_permission_denied": True,
+        },
+    ])
+
+    summary = eval_script.evaluate_retrieval(dataset_path)
+
+    assert summary["recall@5"] == 1.0
+    assert summary["recall@10"] == 1.0
+    assert summary["mrr"] == 1.0
 
 
 def test_evaluate_retrieval_requires_plan_or_source_hint(tmp_path):

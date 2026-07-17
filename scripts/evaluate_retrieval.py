@@ -177,21 +177,17 @@ def evaluate_retrieval(dataset_path: str | Path) -> dict[str, float]:
             mrr = 1 / first_rank if first_rank is not None else 0.0
             precision5 = len(top5_ids & relevant_doc_ids) / 5
             coverage = 1.0 if top10_ids & relevant_doc_ids else 0.0
+            metrics["recall@5"].append(recall5)
+            metrics["recall@10"].append(recall10)
+            metrics["mrr"].append(mrr)
+            metrics["precision@5"].append(precision5)
         else:
-            recall5 = 0.0
-            recall10 = 0.0
-            mrr = 0.0
-            precision5 = 0.0
             coverage = 1.0 if expect_permission_denied == actual_permission_denied else 0.0
 
         permission_block_accuracy = (
             1.0 if actual_permission_denied == expect_permission_denied else 0.0
         )
 
-        metrics["recall@5"].append(recall5)
-        metrics["recall@10"].append(recall10)
-        metrics["mrr"].append(mrr)
-        metrics["precision@5"].append(precision5)
         metrics["coverage"].append(coverage)
         metrics["permission_block_accuracy"].append(permission_block_accuracy)
 

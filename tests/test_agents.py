@@ -51,6 +51,8 @@ from src.schemas.constants import (
     CONFIDENCE_MEDIUM,
     MAX_TOOL_ITERATIONS,
     META_CHUNK_ID,
+    META_ALLOWED_ROLES,
+    META_PERMISSION_LEVEL,
     META_SOURCE,
     META_TITLE,
     PLAN_FILTERS,
@@ -63,6 +65,7 @@ from src.schemas.constants import (
     ROLE_OPERATIONS,
     ROLE_TECHNICAL,
     RR_CONTENT,
+    RR_DENIED,
     RR_METADATA,
     RR_SCORE,
     SOURCE_FAQ,
@@ -93,6 +96,7 @@ from src.schemas.constants import (
     STATE_TOOL_CALLS,
     STATE_TOOL_ITERATIONS,
     STATE_TOOL_MESSAGE_CURSOR,
+    STATE_DATA_PERMISSIONS,
     STATE_USER_ROLE,
     STATE_VERIFICATION,
 )
@@ -656,6 +660,57 @@ class TestRoleAwareTools:
         assert SOURCE_FAQ in tool_names
         assert SOURCE_REPORT in tool_names
         assert "calculator" in tool_names
+
+    def test_report_tool_filters_chunk_not_allowed_for_technical_role(self, monkeypatch):
+        from langchain_core.messages import AIMessage
+        from langgraph.graph import END, START, StateGraph
+        from langgraph.prebuilt import ToolNode
+
+        from src.agents.tools import report_search
+        from src.retrieval.base import BaseRetriever
+
+        class RestrictedReportRetriever(BaseRetriever):
+            def retrieve(self, query: str, top_k: int = 5, filters=None):
+                return [{
+                    RR_CONTENT: "confidential report content",
+                    RR_METADATA: {
+                        META_SOURCE: "restricted-report.pdf",
+                        META_PERMISSION_LEVEL: "confidential",
+                        META_ALLOWED_ROLES: [ROLE_COMPLIANCE],
+                    },
+                    RR_SCORE: 0.9,
+                }]
+
+        monkeypatch.setattr(
+            "src.retrieval.hybrid_retriever.ChromaVectorRetriever",
+            RestrictedReportRetriever,
+        )
+        state = _state(**{
+            STATE_USER_ROLE: ROLE_TECHNICAL,
+            STATE_DATA_PERMISSIONS: ["public", "internal", "confidential"],
+            STATE_MESSAGES: [
+                AIMessage(
+                    content="",
+                    tool_calls=[{
+                        "name": report_search.name,
+                        "args": {"query": "confidential"},
+                        "id": "report-call",
+                        "type": "tool_call",
+                    }],
+                )
+            ],
+        })
+
+        graph = StateGraph(AssistantState)
+        graph.add_node("tools", ToolNode([report_search]))
+        graph.add_edge(START, "tools")
+        graph.add_edge("tools", END)
+        result = graph.compile().invoke(state)
+        tool_output = result[STATE_MESSAGES][-1].content
+        payload = json.loads(tool_output)
+
+        assert payload[0][RR_DENIED] is True
+        assert "confidential report content" not in tool_output
 
     def test_reason_binds_role_filtered_tools(self, monkeypatch):
         from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
