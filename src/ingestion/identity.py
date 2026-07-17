@@ -32,6 +32,7 @@ from src.schemas.constants import (
     META_SOURCE,
     META_STOCK_CODE,
     META_TITLE,
+    DOC_TYPE_RETRIEVAL_SOURCES,
     PERMISSION_CONFIDENTIAL,
     PERMISSION_INTERNAL,
     PERMISSION_PUBLIC,
@@ -101,6 +102,19 @@ def load_sample_metadata(file_path: Path) -> dict[str, Any]:
         raise ValueError(f"非法 allowed_roles: {sorted(unknown_roles)}")
     if permission != PERMISSION_PUBLIC and not allowed_roles:
         raise ValueError("internal/confidential 文档必须声明 allowed_roles")
+
+    doc_type = metadata.get(META_DOC_TYPE)
+    retrieval_source = metadata.get(META_RETRIEVAL_SOURCE)
+    if doc_type is not None:
+        expected_source = DOC_TYPE_RETRIEVAL_SOURCES.get(str(doc_type))
+        if expected_source is None:
+            raise ValueError(f"非法 doc_type: {doc_type}")
+        if retrieval_source and retrieval_source != expected_source:
+            raise ValueError(
+                f"retrieval_source 与 doc_type 不匹配: {retrieval_source} != {expected_source}"
+            )
+    elif retrieval_source and retrieval_source not in set(DOC_TYPE_RETRIEVAL_SOURCES.values()):
+        raise ValueError(f"非法 retrieval_source: {retrieval_source}")
     return metadata
 
 
@@ -292,7 +306,8 @@ def normalize_chunks(
         chunk.metadata.setdefault(META_TITLE, title)
         chunk.metadata.setdefault(META_DATE, date)
         chunk.metadata.setdefault(META_PERMISSION_LEVEL, PERMISSION_INTERNAL)
-        chunk.metadata.setdefault(META_RETRIEVAL_SOURCE, "")
+        if not chunk.metadata.get(META_RETRIEVAL_SOURCE):
+            chunk.metadata[META_RETRIEVAL_SOURCE] = DOC_TYPE_RETRIEVAL_SOURCES[doc_type]
         chunk.metadata[META_FILE_HASH] = file_hash
         chunk.metadata[META_METADATA_HASH] = metadata_hash
         chunk.metadata[META_PARSE_HASH] = parse_hash

@@ -6,13 +6,14 @@ from collections.abc import Iterable
 from src.schemas.constants import ROLE_ADVISOR, ROLE_COMPLIANCE
 from src.schemas.typed_dicts import ComplianceResult
 
+TARGET_PRICE_PATTERN = "目标" + "价"
 INVESTMENT_ADVICE_PATTERNS: tuple[str, ...] = (
     "推荐" + "买" + "入",
     "建议" + "买" + "入",
     "建议" + "卖" + "出",
     "建议" + "增" + "持",
     "建议" + "减" + "持",
-    "目标" + "价",
+    TARGET_PRICE_PATTERN,
 )
 SENSITIVE_KEYWORDS: tuple[str, ...] = ("内" + "幕" + "信息", "未" + "公开", "业绩" + "预测")
 HIGH_RISK_PRODUCTS: tuple[str, ...] = ("标的型" + "产品", "混合型" + "产品", "私" + "募" + "产品")
@@ -40,6 +41,7 @@ class ComplianceChecker:
         *,
         user_role: str | None = None,
         client_id: str | None = None,
+        allow_attributed_target_price: bool = False,
     ) -> ComplianceResult:
         flags: list[str] = []
 
@@ -47,6 +49,8 @@ class ComplianceChecker:
             flags.append(f"sensitive:{keyword}")
 
         for pattern in self._matched_investment_advice_patterns(text):
+            if pattern == TARGET_PRICE_PATTERN and allow_attributed_target_price:
+                continue
             flags.append(f"advice:{pattern}")
 
         if user_role == ROLE_COMPLIANCE and not self._has_article_reference(text):

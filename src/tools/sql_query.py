@@ -137,7 +137,7 @@ def run_select_query(
         conn.close()
 
 
-@tool
+@tool("sql_query")
 def sql_query_tool(query: str) -> str:
     """Query the local financial SQLite database with read-only safety checks.
 

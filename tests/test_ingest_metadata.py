@@ -19,6 +19,8 @@ from src.schemas.constants import (
     DOC_TYPE_ANNOUNCEMENT,
     DOC_TYPE_FAQ,
     DOC_TYPE_FINANCIAL_DATA,
+    DOC_TYPE_MEETING_MINUTES,
+    DOC_TYPE_RETRIEVAL_SOURCES,
     DOC_TYPE_RESEARCH_REPORT,
     META_ALLOWED_ROLES,
     META_DOC_ID,
@@ -33,6 +35,7 @@ from src.schemas.constants import (
     ROLE_TECHNICAL,
     SOURCE_FAQ,
     SOURCE_REPORT,
+    SOURCE_SQL,
 )
 
 
@@ -68,6 +71,19 @@ def test_non_public_manifest_requires_allowed_roles(tmp_path):
     )
 
     with pytest.raises(ValueError, match="必须声明 allowed_roles"):
+        load_sample_metadata(file_path)
+
+
+def test_manifest_rejects_doc_type_retrieval_source_mismatch(tmp_path):
+    file_path = tmp_path / "announcement.pdf"
+    file_path.write_bytes(b"%PDF-1.4")
+    file_path.with_name(file_path.name + ".meta.json").write_text(
+        '{"doc_type":"announcement","retrieval_source":"faq_search",'
+        '"permission_level":"internal","allowed_roles":["compliance"]}',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="不匹配"):
         load_sample_metadata(file_path)
 
 
@@ -171,6 +187,37 @@ def test_normalize_chunks_embeds_permission_metadata():
     assert metadata[META_RETRIEVAL_SOURCE] == SOURCE_FAQ
     assert metadata[META_PERMISSION_LEVEL] == "internal"
     assert metadata[META_ALLOWED_ROLES] == "technical"
+
+
+def test_all_doc_types_have_reachable_default_retrieval_sources():
+    assert set(DOC_TYPE_RETRIEVAL_SOURCES) == {
+        "research_report",
+        "announcement",
+        "regulation",
+        "financial_data",
+        "meeting_minutes",
+        "product",
+        "faq",
+    }
+    assert DOC_TYPE_RETRIEVAL_SOURCES[DOC_TYPE_ANNOUNCEMENT] == SOURCE_REPORT
+    assert DOC_TYPE_RETRIEVAL_SOURCES[DOC_TYPE_FINANCIAL_DATA] == SOURCE_SQL
+    assert DOC_TYPE_RETRIEVAL_SOURCES[DOC_TYPE_MEETING_MINUTES] == SOURCE_REPORT
+
+
+def test_normalize_chunks_fills_missing_retrieval_source_from_doc_type():
+    chunks = [Document(page_content="投委会讨论", metadata={})]
+
+    normalized = normalize_chunks(
+        chunks=chunks,
+        file_path=Path("meeting.md"),
+        doc_type=DOC_TYPE_MEETING_MINUTES,
+        sample_metadata={
+            META_PERMISSION_LEVEL: "internal",
+            META_ALLOWED_ROLES: [ROLE_COMPLIANCE],
+        },
+    )
+
+    assert normalized[0].metadata[META_RETRIEVAL_SOURCE] == SOURCE_REPORT
 
 
 def test_derives_real_data_doc_ids_from_stable_sources():

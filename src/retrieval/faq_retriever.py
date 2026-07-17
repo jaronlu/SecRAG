@@ -3,14 +3,14 @@
 from typing import Dict, Optional
 
 from src.retrieval.base import BaseRetriever
-from src.retrieval.filters import build_chroma_where
+from src.retrieval.filters import build_retrieval_source_where
 from src.retrieval.vector_retriever import ChromaVectorRetriever
-from src.schemas.constants import DEFAULT_TOP_K, DOC_TYPE_FAQ
+from src.schemas.constants import DEFAULT_TOP_K, SOURCE_FAQ
 from src.schemas.typed_dicts import RetrievalResult
 
 
 class FAQRetriever(BaseRetriever):
-    """FAQ 检索：封装 ChromaVectorRetriever，按 doc_type=faq 过滤"""
+    """FAQ 检索：按 retrieval_source=faq_search 过滤。"""
 
     def __init__(self, engine: Optional[BaseRetriever] = None):
         self._engine = engine or ChromaVectorRetriever()
@@ -24,7 +24,7 @@ class FAQRetriever(BaseRetriever):
         return self._engine.retrieve(
             query,
             top_k=top_k,
-            filters=build_chroma_where(DOC_TYPE_FAQ, filters),
+            filters=build_retrieval_source_where(SOURCE_FAQ, filters),
         )
 
 

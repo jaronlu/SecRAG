@@ -2,17 +2,26 @@
 
 from typing import Dict, Optional
 
-from src.schemas.constants import META_DOC_TYPE
+from src.schemas.constants import META_DOC_TYPE, META_RETRIEVAL_SOURCE
+
+
+def _build_required_where(field: str, value: str, extra: Optional[Dict] = None) -> Dict:
+    conditions = [{field: value}]
+    if extra:
+        conditions.extend([{key: item} for key, item in extra.items()])
+    if len(conditions) == 1:
+        return conditions[0]
+    return {"$and": conditions}
 
 
 def build_chroma_where(doc_type: str, extra: Optional[Dict] = None) -> Optional[Dict]:
     """构建 ChromaDB where 子句：单条件直接返回，多条件用 $and 包装"""
-    conditions = [{META_DOC_TYPE: doc_type}]
-    if extra:
-        conditions.extend([{k: v} for k, v in extra.items()])
-    if len(conditions) == 1:
-        return conditions[0]
-    return {"$and": conditions}
+    return _build_required_where(META_DOC_TYPE, doc_type, extra)
+
+
+def build_retrieval_source_where(source: str, extra: Optional[Dict] = None) -> Dict:
+    """构建强制 retrieval_source 的 ChromaDB where 子句。"""
+    return _build_required_where(META_RETRIEVAL_SOURCE, source, extra)
 
 
 # ──────────────────────────────────────────────

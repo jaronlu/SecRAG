@@ -194,6 +194,17 @@ SOURCE_PRODUCT: Final = "product_search"
 SOURCE_REGULATION: Final = "regulation_search"
 SOURCE_REPORT: Final = "report_search"
 SOURCE_FAQ: Final = "faq_search"
+SOURCE_SQL: Final = "sql_query"
+
+DOC_TYPE_RETRIEVAL_SOURCES: dict[str, str] = {
+    DOC_TYPE_RESEARCH_REPORT: SOURCE_REPORT,
+    DOC_TYPE_ANNOUNCEMENT: SOURCE_REPORT,
+    DOC_TYPE_REGULATION: SOURCE_REGULATION,
+    DOC_TYPE_FINANCIAL_DATA: SOURCE_SQL,
+    DOC_TYPE_MEETING_MINUTES: SOURCE_REPORT,
+    DOC_TYPE_PRODUCT: SOURCE_PRODUCT,
+    DOC_TYPE_FAQ: SOURCE_FAQ,
+}
 
 # ══════════════════════════════════════════════════════════════════════
 # query_type 枚举  (SCHEMA-REFERENCE §2.5)
@@ -228,7 +239,6 @@ FINANCIAL_DB_PATH = "data/financial.db"
 AUDIT_DB_PATH = "data/audit.db"
 CONVERSATION_DB_PATH = "data/conversations.db"
 INGEST_REGISTRY_DB_PATH = "data/ingest_registry.db"
-API_ROUTE_QA = "/v1/qa"
 API_ROUTE_ASSISTANT_QA = "/v1/assistant/qa"
 API_ROUTE_ASSISTANT_THREADS = "/v1/assistant/threads"
 API_ROUTE_ASSISTANT_THREAD = "/v1/assistant/threads/{thread_id}"

@@ -352,7 +352,7 @@ class TestVerify:
             STATE_RETRIEVAL_RESULTS: [],
             STATE_TOOL_CALLS: [
                 {
-                    "tool": "sql_query_tool",
+                    "tool": "sql_query",
                     "output": "平安银行研报由示例机构发布",
                     "success": True,
                 }
@@ -369,7 +369,7 @@ class TestVerify:
             STATE_RETRIEVAL_RESULTS: [],
             STATE_TOOL_CALLS: [
                 {
-                    "tool": "sql_query_tool",
+                    "tool": "sql_query",
                     "output": "平安银行研报由示例机构发布",
                     "success": False,
                 }
@@ -392,7 +392,7 @@ class TestVerify:
             STATE_RETRIEVAL_RESULTS: [],
             STATE_TOOL_CALLS: [
                 {
-                    "tool": "sql_query_tool",
+                    "tool": "sql_query",
                     "output": (
                         '[{"stock_code":"000001","report_date":"2026-04-26",'
                         '"eps_2026":2.08}]'
@@ -412,7 +412,7 @@ class TestVerify:
             STATE_RETRIEVAL_RESULTS: [],
             STATE_TOOL_CALLS: [
                 {
-                    "tool": "sql_query_tool",
+                    "tool": "sql_query",
                     "output": '[{"stock_code":"000001","eps_2026":2.08}]',
                     "success": True,
                 }
@@ -528,6 +528,43 @@ class TestComplianceCheck:
         state = _state(**{STATE_FINAL_ANSWER: f"{ADVICE_BUY}这只标的"})
         result = compliance_check(state)
         assert any("advice" in f for f in result[STATE_COMPLIANCE].get("flags", []))
+
+    def test_verified_attributed_target_price_passes(self):
+        evidence = "某机构研报记录的目标价为100元"
+        retrieval = _result(
+            evidence,
+            meta={META_SOURCE: "report.pdf", META_CHUNK_ID: "chunk-1"},
+        )
+        citation = {
+            "source": "report.pdf",
+            "chunk_id": "chunk-1",
+            "quote": evidence,
+            "metadata": {},
+        }
+        state = _state(**{
+            STATE_USER_ROLE: ROLE_ADVISOR,
+            STATE_FINAL_ANSWER: f"{evidence} [来源1]",
+            STATE_RETRIEVAL_RESULTS: [retrieval],
+            STATE_CITATIONS: [citation],
+        })
+
+        verification = verify(state)[STATE_VERIFICATION]
+        state[STATE_VERIFICATION] = verification
+        compliance = compliance_check(state)[STATE_COMPLIANCE]
+
+        assert verification.get("passed") is True
+        assert compliance.get("passed") is True
+
+    def test_unattributed_target_price_is_blocked(self):
+        state = _state(**{
+            STATE_USER_ROLE: ROLE_ADVISOR,
+            STATE_FINAL_ANSWER: "目标价为100元",
+            STATE_RETRIEVAL_RESULTS: [_result("估值为100元")],
+        })
+
+        verification = verify(state)[STATE_VERIFICATION]
+
+        assert any("目标价" in issue for issue in verification.get("issues", []))
 
     def test_risk_disclosure_appended(self):
         state = _state(**{STATE_FINAL_ANSWER: "正常回答"})

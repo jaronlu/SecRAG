@@ -17,19 +17,12 @@ from src.api.auth import (
 from src.api.ingestion import router as ingestion_router
 from src.api.ui import render_ui_html
 from src.config import config
-from src.rag.chain import build_rag_chain, format_docs
-from src.rag.formatter import estimate_confidence, format_citations
-from src.retrieval.vector_retriever import ChromaVectorRetriever
 from src.schemas.constants import (
     AGENT_RECURSION_LIMIT,
     API_ROUTE_ASSISTANT_QA,
     API_ROUTE_ASSISTANT_THREAD,
     API_ROUTE_ASSISTANT_THREAD_MESSAGES,
     API_ROUTE_ASSISTANT_THREADS,
-    API_ROUTE_QA,
-    META_SOURCE,
-    RR_METADATA,
-    STATE_AUDIT_TRAIL,
     STATE_CITATIONS,
     STATE_COMPLIANCE,
     STATE_CONFIDENCE,
@@ -44,8 +37,6 @@ from src.schemas.request_response import (
     ConversationMessagesResponse,
     ConversationThreadCreate,
     ConversationThreadResponse,
-    QARequest,
-    QAResponse,
 )
 
 app = FastAPI(title="机构内部投研知识平台", version="0.1.0")
@@ -75,57 +66,8 @@ async def chrome_devtools_probe():
     return {}
 
 
-# 构建 RAG 链（langchain LCEL），全局复用，避免每次请求重新编译
-rag_chain = build_rag_chain()
-
-# 检索器全局复用，避免反复创建 ChromaDB 客户端
-retriever = ChromaVectorRetriever(persist_directory=config.chroma.persist_directory)
-
 # 追踪日志记录器（结构化 JSON，可对接 ELK / Loki）
 audit_logger = logging.getLogger("secrag.audit")
-
-
-@app.post(API_ROUTE_QA, response_model=QAResponse)
-async def qa(request: QARequest):
-    if config.app_env != "development":
-        raise HTTPException(status_code=404, detail="Not Found")
-    request_id = str(uuid.uuid4())
-
-    try:
-        # 1. 检索（仅一次，结果同时用于生成和引用格式化）
-        retrieval_results = retriever.retrieve(
-            query=request.query,
-            top_k=request.top_k,
-        )
-
-        # 2. 将检索结果格式化为 context 传入生成链，避免链内重复检索
-        context = format_docs(retrieval_results)
-        answer = rag_chain.invoke({
-            "question": request.query,
-            "context": context,
-        })
-
-        # 3. 格式化引用与置信度
-        citations = format_citations(retrieval_results)
-        confidence = estimate_confidence(retrieval_results)
-
-        # 4. 追踪日志
-        audit_logger.info({
-            "request_id": request_id,
-            "query": request.query,
-            "top_k": request.top_k,
-            "retrieval_count": len(retrieval_results),
-            "confidence": confidence,
-        })
-        return QAResponse(
-            answer=answer,
-            citations=citations,
-            confidence=confidence,
-            retrieval_path=[r.get(RR_METADATA, {}).get(META_SOURCE, "") for r in retrieval_results],
-        )
-    except Exception:
-        audit_logger.exception("QA 请求处理失败: request_id=%s", request_id)
-        raise HTTPException(status_code=500, detail="内部处理错误")
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -289,5 +231,4 @@ async def assistant_qa(
         citations=result[STATE_CITATIONS],
         confidence=result[STATE_CONFIDENCE],
         compliance=result[STATE_COMPLIANCE],
-        audit_trail=result[STATE_AUDIT_TRAIL],
     )

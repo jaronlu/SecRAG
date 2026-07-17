@@ -63,7 +63,7 @@ uv run uvicorn src.api.main:app --port 8000
 uv run python scripts/demo.py
 ```
 
-`scripts/demo.py` 会依次调用 `/v1/qa`（单轮 RAG）和 `/v1/assistant/qa`（完整 Agent 工作流，含权限拒绝场景），打印回答、引用、置信度和追踪信息。
+`scripts/demo.py` 会调用唯一问答入口 `/v1/assistant/qa`，覆盖授权查询与权限拒绝场景，打印回答、引用、置信度和合规状态。完整审计仅服务端持久化，不回传客户端。
 
 浏览器打开 `http://127.0.0.1:8000/` 可使用“问答 / 文档入库”双 Tab。文档入库只对 `demo-tech` 开放，分类来自服务器 Catalog，不接受任意路径、文件上传或 `full_scan`；逐文件结果可继续查看已写入 ChromaDB 的 Chunk 正文与模型版本，不返回原始向量。
 

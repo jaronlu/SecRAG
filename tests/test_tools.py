@@ -12,6 +12,7 @@ from src.tools.sql_query import normalize_select_sql, run_select_query, sql_quer
 from src.tools.suitability import suitability_check
 from src.utils.tracing import Tracer
 from src.ingestion.financial_store import import_research_reports_index
+from src.schemas.constants import SOURCE_SQL
 
 
 def test_safe_eval_uses_decimal_precision():
@@ -146,6 +147,7 @@ def test_import_and_query_research_report_index(tmp_path):
 
 
 def test_sql_query_tool_does_not_expose_db_path():
+    assert sql_query_tool.name == SOURCE_SQL
     assert "db_path" not in sql_query_tool.args
 
 

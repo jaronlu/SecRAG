@@ -3,10 +3,10 @@ from fastapi import HTTPException
 from httpx import ConnectError
 
 from src.api.auth import AuthenticatedUser
-from src.api.main import assistant_qa, qa
-from src.config import config
+from src.api.main import app, assistant_qa
+from src.api.ui import render_ui_html
 from src.schemas.constants import AGENT_RECURSION_LIMIT, ROLE_TECHNICAL
-from src.schemas.request_response import AssistantQARequest, QARequest
+from src.schemas.request_response import AssistantQARequest
 from src.utils.conversation import SQLiteConversationStore
 
 
@@ -71,14 +71,15 @@ async def test_assistant_qa_returns_500_for_internal_error(monkeypatch):
     assert exc.value.status_code == 500
 
 
-@pytest.mark.asyncio
-async def test_basic_qa_route_is_hidden_outside_development(monkeypatch):
-    monkeypatch.setattr(config, "app_env", "production")
+def test_legacy_basic_qa_route_is_not_registered():
+    assert "/v1/qa" not in {getattr(route, "path", None) for route in app.routes}
 
-    with pytest.raises(HTTPException) as exc:
-        await qa(QARequest(query="查询"))
 
-    assert exc.value.status_code == 404
+def test_assistant_response_and_ui_do_not_expose_audit_trail():
+    assert "audit_trail" not in app.openapi()["components"]["schemas"]["AssistantQAResponse"][
+        "properties"
+    ]
+    assert "auditText" not in render_ui_html()
 
 
 @pytest.mark.asyncio
@@ -92,5 +93,6 @@ async def test_assistant_qa_uses_graph_recursion_limit_for_multi_hop_flow(monkey
     )
 
     assert response.answer == "ok"
+    assert "audit_trail" not in response.model_dump()
     assert agent.config["recursion_limit"] == AGENT_RECURSION_LIMIT
     assert AGENT_RECURSION_LIMIT >= 40

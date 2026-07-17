@@ -1,4 +1,4 @@
-"""端到端 Demo 脚本：验证 /v1/qa 与 /v1/assistant/qa 两个接口。
+"""端到端 Demo 脚本：验证带认证与权限控制的 /v1/assistant/qa 接口。
 
 前置条件：
   1. 已完成入库：
@@ -24,7 +24,7 @@ import sys
 
 import httpx
 
-from src.schemas.constants import API_ROUTE_ASSISTANT_QA, API_ROUTE_QA
+from src.schemas.constants import API_ROUTE_ASSISTANT_QA
 
 _SEP = "=" * 70
 DEFAULT_READ_TIMEOUT = 180.0
@@ -38,15 +38,6 @@ def _print_section(title: str) -> None:
     print(f"\n{_SEP}\n{title}\n{_SEP}")
 
 
-def _print_qa_response(data: dict) -> None:
-    print(f"answer: {data['answer'][:200]}")
-    print(f"confidence: {data['confidence']}")
-    print(f"retrieval_path: {data['retrieval_path']}")
-    print(f"citations ({len(data['citations'])} 条):")
-    for c in data["citations"][:3]:
-        print(f"  - {c}")
-
-
 def _print_assistant_response(data: dict) -> None:
     print(f"answer: {data['answer'][:200]}")
     print(f"confidence: {data['confidence']}")
@@ -56,25 +47,11 @@ def _print_assistant_response(data: dict) -> None:
     print(f"citations ({len(data['citations'])} 条):")
     for c in data["citations"][:3]:
         print(f"  - {c}")
-    audit = data["audit_trail"]
-    print(f"audit_trail.request_id: {audit.get('request_id')}")
-    print(f"audit_trail.retrieval.sources: {audit.get('retrieval', {}).get('sources')}")
-
-
-def demo_simple_qa(client: httpx.Client) -> None:
-    """单轮 RAG：/v1/qa，不涉及角色权限，仅演示检索 + 生成 + 引用。"""
-    _print_section("1. /v1/qa —— 单轮 RAG（理财产品风险等级咨询）")
-    resp = client.post(API_ROUTE_QA, json={
-        "query": "这款理财产品风险等级是多少？适合哪类客户？",
-        "top_k": 5,
-    })
-    resp.raise_for_status()
-    _print_qa_response(resp.json())
 
 
 def demo_agent_qa_allowed(client: httpx.Client) -> None:
     """完整 Agent：服务端从 demo token 派生角色。"""
-    _print_section("2. /v1/assistant/qa —— demo-advisor token 查询产品风险")
+    _print_section("1. /v1/assistant/qa —— demo-advisor token 查询产品风险")
     resp = client.post(
         API_ROUTE_ASSISTANT_QA,
         headers={"Authorization": "Bearer demo-advisor"},
@@ -86,7 +63,7 @@ def demo_agent_qa_allowed(client: httpx.Client) -> None:
 
 def demo_agent_qa_denied(client: httpx.Client) -> None:
     """完整 Agent：demo-tech token 只能走其服务端绑定范围。"""
-    _print_section("3. /v1/assistant/qa —— demo-tech token 查询受限资料")
+    _print_section("2. /v1/assistant/qa —— demo-tech token 查询受限资料")
     resp = client.post(
         API_ROUTE_ASSISTANT_QA,
         headers={"Authorization": "Bearer demo-tech"},
@@ -107,7 +84,6 @@ def main() -> None:
         timeout=build_client_timeout(args.read_timeout),
     ) as client:
         try:
-            demo_simple_qa(client)
             demo_agent_qa_allowed(client)
             demo_agent_qa_denied(client)
         except httpx.ConnectError:

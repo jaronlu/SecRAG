@@ -462,10 +462,6 @@
         <ol id="citationList" class="citation-list"></ol>
       </section>
       <details class="output-section">
-        <summary>审计信息</summary>
-        <pre id="auditText"></pre>
-      </details>
-      <details class="output-section">
         <summary>原始响应</summary>
         <pre id="rawJson"></pre>
       </details>
@@ -570,7 +566,6 @@
     const complianceText = document.getElementById("complianceText");
     const citationList = document.getElementById("citationList");
     const messageList = document.getElementById("messageList");
-    const auditText = document.getElementById("auditText");
     const rawJson = document.getElementById("rawJson");
     const qaTab = document.getElementById("qaTab");
     const ingestionTab = document.getElementById("ingestionTab");
@@ -668,7 +663,6 @@
 
       const answer = data.answer || data.detail || data.raw || "";
       const citations = Array.isArray(data.citations) ? data.citations : [];
-      const audit = data.audit_trail || {};
       const compliance = data.compliance || {};
       if (data.thread_id) document.getElementById("threadId").value = data.thread_id;
 
@@ -691,12 +685,10 @@
         }
       }
 
-      auditText.textContent = JSON.stringify(audit, null, 2);
       rawJson.textContent = JSON.stringify(data, null, 2);
       lastResultText = [
         `回答：\n${answer}`,
-        `引用：\n${citations.map((c, i) => `${i + 1}. ${c.doc_title || "未知文档"} — ${c.source || ""}`).join("\n") || "无引用"}`,
-        `审计信息：\n${JSON.stringify(audit, null, 2)}`
+        `引用：\n${citations.map((c, i) => `${i + 1}. ${c.doc_title || "未知文档"} — ${c.source || ""}`).join("\n") || "无引用"}`
       ].join("\n\n");
     }
 

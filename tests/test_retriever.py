@@ -11,15 +11,17 @@ from src.retrieval.product_retriever import ProductRetriever
 from src.retrieval.regulation_retriever import RegulationRetriever
 from src.retrieval.report_retriever import ReportRetriever
 from src.schemas.constants import (
-    DOC_TYPE_FAQ,
     DOC_TYPE_FINANCIAL_DATA,
-    DOC_TYPE_PRODUCT,
     DOC_TYPE_REGULATION,
-    DOC_TYPE_RESEARCH_REPORT,
     META_DOC_TYPE,
+    META_RETRIEVAL_SOURCE,
     RR_CONTENT,
     RR_METADATA,
     RR_SCORE,
+    SOURCE_FAQ,
+    SOURCE_PRODUCT,
+    SOURCE_REGULATION,
+    SOURCE_REPORT,
 )
 
 
@@ -244,15 +246,15 @@ class TestRetrieve:
 
 class TestDomainRetrievers:
     @pytest.mark.parametrize(
-        ("retriever_cls", "doc_type"),
+        ("retriever_cls", "source"),
         [
-            (ProductRetriever, DOC_TYPE_PRODUCT),
-            (RegulationRetriever, DOC_TYPE_REGULATION),
-            (ReportRetriever, DOC_TYPE_RESEARCH_REPORT),
-            (FAQRetriever, DOC_TYPE_FAQ),
+            (ProductRetriever, SOURCE_PRODUCT),
+            (RegulationRetriever, SOURCE_REGULATION),
+            (ReportRetriever, SOURCE_REPORT),
+            (FAQRetriever, SOURCE_FAQ),
         ],
     )
-    def test_adds_required_doc_type_filter(self, retriever_cls, doc_type):
+    def test_adds_required_retrieval_source_filter(self, retriever_cls, source):
         engine = RecordingEngine()
         retriever = retriever_cls(engine=engine)
 
@@ -263,11 +265,11 @@ class TestDomainRetrievers:
             {
                 "query": "适当性",
                 "top_k": 2,
-                "filters": {META_DOC_TYPE: doc_type},
+                "filters": {META_RETRIEVAL_SOURCE: source},
             }
         ]
 
-    def test_extra_filters_cannot_override_required_doc_type(self):
+    def test_extra_filters_cannot_override_required_retrieval_source(self):
         engine = RecordingEngine()
         retriever = ProductRetriever(engine=engine)
 
@@ -278,7 +280,7 @@ class TestDomainRetrievers:
 
         assert engine.calls[0]["filters"] == {
             "$and": [
-                {META_DOC_TYPE: DOC_TYPE_PRODUCT},
+                {META_RETRIEVAL_SOURCE: SOURCE_PRODUCT},
                 {META_DOC_TYPE: DOC_TYPE_REGULATION},
                 {"product_type": "fund"},
             ]

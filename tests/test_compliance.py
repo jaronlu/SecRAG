@@ -7,6 +7,7 @@ from src.utils.compliance import ComplianceChecker
 ADVICE_BUY = "推荐" + "买" + "入"
 SENSITIVE_TEXT = "内" + "幕" + "信息"
 HIGH_RISK_PRODUCT = "私" + "募" + "产品"
+TARGET_PRICE = "目标" + "价"
 
 
 def test_compliance_checker_flags_sensitive_info_and_advice():
@@ -36,6 +37,27 @@ def test_compliance_checker_allows_attributed_research_rating():
 
     assert result["passed"] is True
     assert not any(flag.startswith("advice:") for flag in result["flags"])
+
+
+def test_compliance_checker_allows_verified_attributed_target_price():
+    checker = ComplianceChecker()
+
+    result = checker.check(
+        f"该研报记录的{TARGET_PRICE}为100元。",
+        allow_attributed_target_price=True,
+    )
+
+    assert result["passed"] is True
+    assert not any(flag.startswith("advice:") for flag in result["flags"])
+
+
+def test_compliance_checker_blocks_unattributed_target_price():
+    checker = ComplianceChecker()
+
+    result = checker.check(f"这只标的的{TARGET_PRICE}为100元。")
+
+    assert result["passed"] is False
+    assert any(flag.startswith("advice:") for flag in result["flags"])
 
 
 def test_compliance_checker_requires_article_for_compliance_role():

@@ -4,6 +4,7 @@
 """
 
 import json
+import re
 import time
 from functools import lru_cache
 from typing import Any, Callable, Literal, cast
@@ -82,7 +83,11 @@ from src.schemas.constants import (
     STATE_VERIFICATION,
 )
 from src.schemas.typed_dicts import IntermediateStep, RetrievalPlanStep, ToolCallDict
-from src.utils.compliance import INVESTMENT_ADVICE_PATTERNS, ComplianceChecker
+from src.utils.compliance import (
+    INVESTMENT_ADVICE_PATTERNS,
+    TARGET_PRICE_PATTERN,
+    ComplianceChecker,
+)
 from src.utils.verifier import CitationExtractor, ComprehensiveVerifier
 
 
@@ -480,7 +485,7 @@ def _build_reason_system_prompt(state: AssistantState) -> str:
 4. 不重复输出“字段列表 + 同字段完整表格”，除非用户明确询问字段结构；
 5. 不在正文输出 `Answer:`、`Citations:`、`Audit Trail:`、置信度或内部工具调用细节。
 6. 只回答用户询问的字段，不主动扩展日期等未询问 metadata；`来源日期` 不得改写为报告日期或发布日期。
-{"投顾/销售角色：不得输出" + "买" + "入/" + "卖" + "出/" + "目标" + "价等业务建议，仅提供事实信息。" if role in (ROLE_ADVISOR, ROLE_INSTITUTIONAL_SALES) else ""}
+{"投顾/销售角色：不得主动建议买卖或生成目标价；可以中性引用有 [来源N] 且可验证的历史研报既有目标价。" if role in (ROLE_ADVISOR, ROLE_INSTITUTIONAL_SALES) else ""}
 {"合规角色：引用必须精确到条款/条文号。" if role == ROLE_COMPLIANCE else ""}"""
 
     return system_prompt
@@ -707,9 +712,12 @@ def verify(state: AssistantState) -> dict[str, Any]:
 
     role = state.get(STATE_USER_ROLE)
     issues = list(verification.get("issues", []))
+    attributed_target_price = _has_attributed_target_price(state)
     # 投顾/销售岗额外拦截业务建议关键词，防止越权输出
     if role in (ROLE_ADVISOR, ROLE_INSTITUTIONAL_SALES):
         for pattern in _ADVICE_KEYWORDS:
+            if pattern == TARGET_PRICE_PATTERN and attributed_target_price:
+                continue
             if pattern in state.get(STATE_FINAL_ANSWER, ""):
                 issues.append(f"投顾/销售角色不得输出业务建议: {pattern}")
     if issues:
@@ -722,6 +730,17 @@ def verify(state: AssistantState) -> dict[str, Any]:
 # ══════════════════════════════════════════════════════════════════════
 
 
+def _has_attributed_target_price(state: AssistantState) -> bool:
+    answer = state.get(STATE_FINAL_ANSWER, "")
+    if TARGET_PRICE_PATTERN not in answer or not re.search(r"\[来源\d+\]", answer):
+        return False
+    return any(
+        TARGET_PRICE_PATTERN in result.get(RR_CONTENT, "")
+        for result in state.get(STATE_RETRIEVAL_RESULTS, [])
+        if not result.get(RR_DENIED)
+    )
+
+
 def compliance_check(state: AssistantState) -> dict[str, Any]:
     """合规检查：敏感词、业务建议、风险提示、适当性"""
     # 最终答案 + 角色 + 客户号一起送入，便于做适当性和角色化拦截
@@ -730,6 +749,10 @@ def compliance_check(state: AssistantState) -> dict[str, Any]:
         answer,
         user_role=state.get(STATE_USER_ROLE),
         client_id=state.get(STATE_CLIENT_ID),
+        allow_attributed_target_price=(
+            state.get(STATE_VERIFICATION, {}).get("passed", False)
+            and _has_attributed_target_price(state)
+        ),
     )
 
     return {STATE_COMPLIANCE: compliance}
