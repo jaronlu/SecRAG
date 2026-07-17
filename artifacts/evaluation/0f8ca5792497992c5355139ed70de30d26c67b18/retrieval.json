@@ -1,0 +1,13 @@
+{
+  "commit_sha": "0f8ca5792497992c5355139ed70de30d26c67b18",
+  "dataset": "scripts/evaluate_retrieval.sample.json",
+  "summary": {
+    "coverage": 1.0,
+    "mrr": 0.5083333333333333,
+    "permission_block_accuracy": 1.0,
+    "precision@5": 0.2,
+    "recall@10": 1.0,
+    "recall@5": 1.0,
+    "samples": 5.0
+  }
+}

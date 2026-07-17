@@ -101,17 +101,22 @@ uv run python scripts/evaluate_retrieval.py
 
 基于 `scripts/evaluate_retrieval.sample.json` 中的小样本评估集，输出 recall@5/recall@10/mrr/precision@5/coverage/permission_block_accuracy。样本量很小，仅用于验证评估流程可跑通，不代表生产环境效果。
 
-当前本地小样本结果：
+提交 `0f8ca5792497992c5355139ed70de30d26c67b18` 的可复现产物见
+`artifacts/evaluation/0f8ca5792497992c5355139ed70de30d26c67b18/retrieval.json`：
 
 ```text
 samples: 5
-recall@5: 0.700
-recall@10: 0.800
-mrr: 0.640
-precision@5: 0.240
+recall@5: 1.000
+recall@10: 1.000
+mrr: 0.508
+precision@5: 0.200
 coverage: 1.000
 permission_block_accuracy: 1.000
 ```
+
+权限冒烟检查使用 `uv run python -m scripts.check_permissions`，technical 可见、operations
+与 institutional_sales 拒绝样本均通过。引用准确率与幻觉率仍是系统准入目标，当前小样本
+检索产物不能替代回答级评估。
 
 ### 真实证券数据
 

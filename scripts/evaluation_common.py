@@ -25,6 +25,14 @@ def current_commit_sha() -> str:
     return result.stdout.strip() if result.returncode == 0 else "uncommitted"
 
 
+def portable_dataset_path(path: str | Path) -> str:
+    resolved = Path(path).resolve()
+    try:
+        return resolved.relative_to(Path.cwd().resolve()).as_posix()
+    except ValueError:
+        return str(resolved)
+
+
 def write_artifact(
     *,
     name: str,
@@ -39,7 +47,7 @@ def write_artifact(
         json.dumps(
             {
                 "commit_sha": current_commit_sha(),
-                "dataset": str(dataset_path),
+                "dataset": portable_dataset_path(dataset_path),
                 "summary": summary,
             },
             ensure_ascii=False,

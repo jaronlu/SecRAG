@@ -9,6 +9,7 @@ from scripts.evaluate_compliance import admission_passed as compliance_admission
 from scripts.evaluate_compliance import evaluate_compliance
 from scripts.evaluate_conversations import admission_passed as conversations_admission_passed
 from scripts.evaluate_conversations import evaluate_conversations
+from scripts.evaluation_common import write_artifact
 
 
 def _write(tmp_path: Path, name: str, payload: list[dict]) -> Path:
@@ -80,3 +81,18 @@ def test_conversation_evaluation_requires_every_safety_check(tmp_path):
     summary = evaluate_conversations(dataset)
 
     assert conversations_admission_passed(summary)
+
+
+def test_evaluation_artifact_uses_repository_relative_dataset_path(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    dataset = _write(tmp_path, "dataset.json", [])
+
+    artifact = write_artifact(
+        name="retrieval",
+        dataset_path=dataset,
+        summary={"recall@5": 1.0},
+        output_root=tmp_path / "artifacts",
+    )
+
+    payload = json.loads(artifact.read_text(encoding="utf-8"))
+    assert payload["dataset"] == "dataset.json"
