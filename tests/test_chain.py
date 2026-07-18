@@ -158,3 +158,16 @@ class TestBuildRagChain:
         chain = build_rag_chain()
         result = chain.invoke({"question": ""})
         assert isinstance(result, str)
+
+
+def test_rag_ollama_client_ignores_environment_proxy(monkeypatch):
+    import src.rag.chain as chain_module
+
+    chat_ollama = MagicMock()
+    monkeypatch.setattr(chain_module.config, "llm_provider", "ollama")
+    monkeypatch.setattr("langchain_ollama.ChatOllama", chat_ollama)
+
+    chain_module._build_llm()
+
+    assert chat_ollama.call_args.kwargs["reasoning"] is False
+    assert chat_ollama.call_args.kwargs["client_kwargs"] == {"trust_env": False}

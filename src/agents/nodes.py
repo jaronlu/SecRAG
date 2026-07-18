@@ -109,6 +109,8 @@ def _build_llm():
         base_url=config.llm.base_url,
         model=config.llm.model,
         temperature=config.llm.temperature,
+        reasoning=False,
+        client_kwargs={"trust_env": False},
     )
 
 
@@ -473,7 +475,8 @@ def _build_reason_system_prompt(state: AssistantState) -> str:
 【用户角色】{role}
 
 如果需要计算或查询更多信息，可以使用工具。
-只有当前轮存在文档检索结果时，回答才允许并必须附对应的 [来源N]；纯工具回答不得编造文档引用。
+只有当前轮存在文档检索结果时，回答才允许并必须附对应的数字编号引用，例如 [来源1]；
+必须把编号替换为上方检索结果的实际序号，禁止原样输出 [来源N]。纯工具回答不得编造文档引用。
 数字必须来自检索结果或成功的工具输出，禁止编造。
 纯工具回答只能复述成功工具输出中实际存在的字段和值。不得补充工具未返回的字段含义、
 数据来源、更新频率、覆盖范围、趋势判断或后续能力；优先直接使用字段名和值，保持简洁。
@@ -485,7 +488,7 @@ def _build_reason_system_prompt(state: AssistantState) -> str:
 4. 不重复输出“字段列表 + 同字段完整表格”，除非用户明确询问字段结构；
 5. 不在正文输出 `Answer:`、`Citations:`、`Audit Trail:`、置信度或内部工具调用细节。
 6. 只回答用户询问的字段，不主动扩展日期等未询问 metadata；`来源日期` 不得改写为报告日期或发布日期。
-{"投顾/销售角色：不得主动建议买卖或生成目标价；可以中性引用有 [来源N] 且可验证的历史研报既有目标价。" if role in (ROLE_ADVISOR, ROLE_INSTITUTIONAL_SALES) else ""}
+{"投顾/销售角色：不得主动建议买卖或生成目标价；可以中性引用有数字编号来源且可验证的历史研报既有目标价。" if role in (ROLE_ADVISOR, ROLE_INSTITUTIONAL_SALES) else ""}
 {"合规角色：引用必须精确到条款/条文号。" if role == ROLE_COMPLIANCE else ""}"""
 
     return system_prompt

@@ -105,6 +105,19 @@ from src.utils.audit import SQLiteAuditStore
 from src.utils.verifier import CitationExtractor, SourceVerifier
 
 
+def test_agent_ollama_client_ignores_environment_proxy(monkeypatch):
+    import src.agents.nodes as nodes_module
+
+    chat_ollama = MagicMock()
+    monkeypatch.setattr(nodes_module.config, "llm_provider", "ollama")
+    monkeypatch.setattr("langchain_ollama.ChatOllama", chat_ollama)
+
+    nodes_module._build_llm()
+
+    assert chat_ollama.call_args.kwargs["reasoning"] is False
+    assert chat_ollama.call_args.kwargs["client_kwargs"] == {"trust_env": False}
+
+
 def _result(content: str, score: float = 0.9, meta: dict[str, Any] | None = None) -> dict[str, Any]:
     """快捷构造检索结果 dict"""
     return {
@@ -279,6 +292,17 @@ class TestVerify:
 
         assert result["passed"] is False
         assert any("可见引用未包含" in issue for issue in result["issues"])
+
+    @pytest.mark.parametrize("marker", ["[来源N]", "[来源0]", "[来源]"])
+    def test_source_verifier_rejects_invalid_citation_marker(self, marker):
+        result = SourceVerifier().verify(
+            answer=f"回答 {marker}",
+            citations=[],
+            retrieval_results=[],
+        )
+
+        assert result["passed"] is False
+        assert any("编号无效" in issue for issue in result["issues"])
 
     def test_verification_accepts_whitelisted_metadata_as_grounding_evidence(self):
         retrieval_results = [

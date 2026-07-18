@@ -104,8 +104,10 @@ class SourceVerifier:
         retrieval_results: list[RetrievalResult],
     ) -> dict:
         issues: list[str] = []
-        for cite_id in re.findall(r"\[来源(\d+)\]", answer):
-            if int(cite_id) > len(citations):
+        for cite_id in re.findall(r"\[来源([^\]]*)\]", answer):
+            if not cite_id.isdigit() or int(cite_id) < 1:
+                issues.append(f"引用来源编号无效: {cite_id or '<empty>'}")
+            elif int(cite_id) > len(citations):
                 issues.append(f"引用来源 {cite_id} 不存在")
         if "[来源" in answer and not citations:
             issues.append("答案包含引用标注但无检索结果")

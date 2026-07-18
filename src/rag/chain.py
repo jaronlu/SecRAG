@@ -63,6 +63,8 @@ def _build_llm():
         base_url=config.llm.base_url,
         model=config.llm.model,
         temperature=config.llm.temperature,
+        reasoning=False,
+        client_kwargs={"trust_env": False},
     )
 
 
