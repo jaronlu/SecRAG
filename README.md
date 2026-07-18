@@ -101,8 +101,7 @@ uv run python scripts/evaluate_retrieval.py
 
 基于 `scripts/evaluate_retrieval.sample.json` 中的小样本评估集，输出 recall@5/recall@10/mrr/precision@5/coverage/permission_block_accuracy。样本量很小，仅用于验证评估流程可跑通，不代表生产环境效果。
 
-提交 `0f8ca5792497992c5355139ed70de30d26c67b18` 的可复现产物见
-`artifacts/evaluation/0f8ca5792497992c5355139ed70de30d26c67b18/retrieval.json`：
+一次小样本运行的示例输出：
 
 ```text
 samples: 5
