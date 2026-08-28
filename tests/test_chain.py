@@ -170,4 +170,7 @@ def test_rag_ollama_client_ignores_environment_proxy(monkeypatch):
     chain_module._build_llm()
 
     assert chat_ollama.call_args.kwargs["reasoning"] is False
-    assert chat_ollama.call_args.kwargs["client_kwargs"] == {"trust_env": False}
+    assert chat_ollama.call_args.kwargs["client_kwargs"] == {
+        "trust_env": False,
+        "timeout": 30.0,
+    }

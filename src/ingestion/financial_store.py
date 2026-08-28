@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 
@@ -40,11 +41,10 @@ def import_research_reports_index(
     missing = set(RESEARCH_REPORT_INDEX_COLUMNS) - set(frame.columns)
     if missing:
         raise ValueError(f"研报索引 CSV 缺少字段: {sorted(missing)}")
-    frame = frame[list(RESEARCH_REPORT_INDEX_COLUMNS)].rename(
-        columns=RESEARCH_REPORT_INDEX_COLUMNS
-    )
-    frame["stock_code"] = frame["stock_code"].str.zfill(6)
-    frame["sample_stock_code"] = frame["sample_stock_code"].str.zfill(6)
+    frame = cast(pd.DataFrame, frame[list(RESEARCH_REPORT_INDEX_COLUMNS)])
+    frame.columns = [RESEARCH_REPORT_INDEX_COLUMNS.get(c, c) for c in frame.columns]
+    frame["stock_code"] = frame["stock_code"].map(lambda x: str(x).zfill(6))
+    frame["sample_stock_code"] = frame["sample_stock_code"].map(lambda x: str(x).zfill(6))
 
     db_path = Path(db_path)
     db_path.parent.mkdir(parents=True, exist_ok=True)

@@ -161,11 +161,11 @@ tools = [
 ]
 
 _RETRIEVAL_TOOL_SOURCES = {
-    product_search.name: SOURCE_PRODUCT,
-    regulation_search.name: SOURCE_REGULATION,
-    report_search.name: SOURCE_REPORT,
-    faq_search.name: SOURCE_FAQ,
-    sql_query_tool.name: SOURCE_SQL,
+    getattr(product_search, "name", "product_search"): SOURCE_PRODUCT,
+    getattr(regulation_search, "name", "regulation_search"): SOURCE_REGULATION,
+    getattr(report_search, "name", "report_search"): SOURCE_REPORT,
+    getattr(faq_search, "name", "faq_search"): SOURCE_FAQ,
+    getattr(sql_query_tool, "name", "sql_query_tool"): SOURCE_SQL,
 }
 
 

@@ -3,172 +3,560 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SecRAG</title>
+  <title>SecRAG — 机构投研知识终端</title>
   <style>
+    /* ═══════════════════════════════════════════════════════════════
+       SecRAG Design System — "Research Docket"
+       机构投研终端：深酒红主色 + 暖白纸面 + 衬线研究报告排版
+       ═══════════════════════════════════════════════════════════════ */
     :root {
+      /* Color — named tokens */
+      --ink: #14181F;
+      --ink-soft: #1E242E;
+      --paper: #F7F5F0;
+      --card: #FFFFFF;
+      --rule: #D9D4C8;
+      --rule-soft: #E8E4DA;
+      --muted: #6B6560;
+      --muted-soft: #9A948E;
+      --accent: #8B2635;
+      --accent-hover: #6D1E2A;
+      --accent-soft: #F0E6E8;
+      --accent-line: #C9A0A8;
+      --data: #2C5F5C;
+      --data-soft: #E6EFEE;
+      --success: #2D6A4F;
+      --success-soft: #E8F0EB;
+      --warning: #B8860B;
+      --warning-soft: #FBF3E0;
+      --danger: #9B2226;
+      --danger-soft: #F5E6E7;
+
+      /* Typography */
+      --font-display: "Source Serif Pro", "Noto Serif SC", Georgia, "Songti SC", serif;
+      --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      --font-mono: "SF Mono", "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+
+      /* Spacing */
+      --space-xs: 4px;
+      --space-sm: 8px;
+      --space-md: 16px;
+      --space-lg: 24px;
+      --space-xl: 32px;
+      --space-2xl: 48px;
+
+      /* Radius */
+      --radius-sm: 4px;
+      --radius-md: 6px;
+      --radius-lg: 10px;
+
+      /* Shadows */
+      --shadow-sm: 0 1px 2px rgba(20, 24, 31, 0.06);
+      --shadow-md: 0 2px 8px rgba(20, 24, 31, 0.08);
+      --shadow-lg: 0 4px 24px rgba(20, 24, 31, 0.10);
+
       color-scheme: light;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f6f7f9;
-      color: #1f2937;
+      font-family: var(--font-body);
+      background: var(--paper);
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
+
+    * { box-sizing: border-box; }
+
     body {
       margin: 0;
-      padding: 32px;
+      padding: 0;
+      min-height: 100vh;
+      background: var(--paper);
     }
+
     [hidden] { display: none !important; }
-    main {
-      max-width: 960px;
-      margin: 0 auto;
-    }
-    h1 {
-      margin: 0 0 20px;
-      font-size: 28px;
-      letter-spacing: 0;
-    }
-    .tabs {
+
+    /* ═══════════════════════════════════════════════════════════════
+       Header — dark ink bar with serif wordmark
+       ═══════════════════════════════════════════════════════════════ */
+    .app-header {
+      background: var(--ink);
+      color: #E8E4DA;
+      padding: 0 var(--space-xl);
+      height: 56px;
       display: flex;
-      gap: 4px;
-      border-bottom: 1px solid #d7dce2;
-      margin-bottom: 20px;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 3px solid var(--accent);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .app-brand {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+    .app-brand-name {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #FFFFFF;
+    }
+    .app-brand-tag {
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted-soft);
+      font-weight: 500;
+    }
+    .app-header-right {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+    }
+    .header-role {
+      font-size: 12px;
+      color: var(--muted-soft);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .header-role-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--data);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Tab Navigation — integrated, underline style
+       ═══════════════════════════════════════════════════════════════ */
+    .tab-bar {
+      background: var(--ink-soft);
+      padding: 0 var(--space-xl);
+      display: flex;
+      gap: 0;
     }
     .tab-button {
       background: transparent;
-      color: #4b5563;
-      border-bottom: 3px solid transparent;
-      border-radius: 4px 4px 0 0;
+      border: none;
+      color: var(--muted-soft);
+      padding: 12px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: color 0.15s, border-color 0.15s;
+      font-family: var(--font-body);
+    }
+    .tab-button:hover {
+      color: #D9D4C8;
     }
     .tab-button[aria-selected="true"] {
-      color: #1d4ed8;
-      border-bottom-color: #2563eb;
+      color: #FFFFFF;
+      border-bottom-color: var(--accent);
     }
     .tab-button:disabled {
-      color: #9ca3af;
+      color: #4A4A4A;
+      cursor: not-allowed;
     }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Main Content
+       ═══════════════════════════════════════════════════════════════ */
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: var(--space-xl) var(--space-lg) var(--space-2xl);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Panel / Card
+       ═══════════════════════════════════════════════════════════════ */
     .panel {
-      background: #fff;
-      border: 1px solid #d7dce2;
-      border-radius: 8px;
-      padding: 20px;
+      background: var(--card);
+      border: 1px solid var(--rule);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      box-shadow: var(--shadow-sm);
     }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Form Elements
+       ═══════════════════════════════════════════════════════════════ */
     label {
       display: block;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       font-weight: 600;
-      font-size: 14px;
+      font-size: 12px;
+      letter-spacing: 0.3px;
+      color: var(--muted);
+      text-transform: uppercase;
     }
     textarea,
     select,
     input {
       width: 100%;
-      box-sizing: border-box;
-      border: 1px solid #b9c2cc;
-      border-radius: 6px;
+      border: 1px solid var(--rule);
+      border-radius: var(--radius-md);
       padding: 10px 12px;
       font: inherit;
-      background: #fff;
+      font-size: 14px;
+      background: var(--card);
+      color: var(--ink);
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    textarea:focus,
+    select:focus,
+    input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
     }
     textarea {
-      min-height: 132px;
+      min-height: 100px;
       resize: vertical;
+      line-height: 1.6;
     }
+    select {
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B6560' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 32px;
+    }
+
     .grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-      margin: 16px 0;
+      gap: var(--space-md);
+      margin: var(--space-md) 0;
     }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Buttons
+       ═══════════════════════════════════════════════════════════════ */
     button {
       border: 0;
-      border-radius: 6px;
-      padding: 11px 16px;
-      font-weight: 700;
+      border-radius: var(--radius-md);
+      padding: 10px 18px;
+      font-weight: 600;
+      font-size: 13px;
       cursor: pointer;
-      background: #2563eb;
-      color: #fff;
+      font-family: var(--font-body);
+      transition: background 0.15s, opacity 0.15s, transform 0.05s;
+      letter-spacing: 0.2px;
     }
+    button:active { transform: translateY(1px); }
     button:disabled {
       cursor: not-allowed;
-      opacity: 0.6;
+      opacity: 0.5;
+      transform: none;
     }
-    .secondary-button {
-      background: #e5e7eb;
-      color: #111827;
+    .btn-primary {
+      background: var(--accent);
+      color: #FFFFFF;
     }
-    .table-button {
+    .btn-primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+    .btn-secondary {
+      background: var(--rule-soft);
+      color: var(--ink);
+    }
+    .btn-secondary:hover:not(:disabled) {
+      background: var(--rule);
+    }
+    .btn-danger {
+      background: var(--danger);
+      color: #FFFFFF;
+    }
+    .btn-danger:hover:not(:disabled) {
+      background: #7A1B1F;
+    }
+    .btn-ghost {
       background: transparent;
-      color: #1d4ed8;
-      padding: 4px 0;
-      font-size: 14px;
+      color: var(--accent);
+      padding: 6px 0;
+      font-size: 13px;
     }
-    .danger-button {
-      background: #b42318;
+    .btn-ghost:hover:not(:disabled) {
+      text-decoration: underline;
     }
-    pre {
-      white-space: pre-wrap;
-      word-break: break-word;
-      background: #111827;
-      color: #e5e7eb;
-      border-radius: 8px;
-      padding: 16px;
-      min-height: 180px;
-      overflow: auto;
+    .btn-icon {
+      width: 34px;
+      height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      background: var(--rule-soft);
+      color: var(--muted);
+      border-radius: var(--radius-md);
     }
-    .result-sections {
-      display: grid;
-      gap: 14px;
+    .btn-icon:hover:not(:disabled) {
+      background: var(--rule);
+      color: var(--ink);
     }
-    .output-section {
-      background: #fff;
-      border: 1px solid #d7dce2;
-      border-radius: 8px;
-      padding: 16px;
+    .btn-icon svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
-    .output-section h3 {
-      margin: 0 0 10px;
-      font-size: 16px;
+
+    /* ═══════════════════════════════════════════════════════════════
+       Toolbar
+       ═══════════════════════════════════════════════════════════════ */
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-md);
+      margin-top: var(--space-md);
+      flex-wrap: wrap;
     }
-    .output-section-heading {
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .status-text {
+      font-size: 12px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Section Headings
+       ═══════════════════════════════════════════════════════════════ */
+    .section-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: var(--space-xl) 0 var(--space-md);
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--rule);
+    }
+    .section-heading h2 {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .section-heading-eyebrow {
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted-soft);
+      font-weight: 600;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Answer Card — the signature "research docket" element
+       Left vertical accent bar color-coded by confidence; serif body
+       ═══════════════════════════════════════════════════════════════ */
+    .answer-card {
+      background: var(--card);
+      border: 1px solid var(--rule);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg) var(--space-lg) var(--space-lg) calc(var(--space-lg) + 4px);
+      box-shadow: var(--shadow-sm);
+      position: relative;
+      overflow: hidden;
+    }
+    .answer-card::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: var(--muted-soft);
+      transition: background 0.3s;
+    }
+    .answer-card.confidence-high::before { background: var(--success); }
+    .answer-card.confidence-medium::before { background: var(--warning); }
+    .answer-card.confidence-low::before { background: var(--danger); }
+
+    .answer-header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      gap: 12px;
-      margin-bottom: 12px;
+      gap: var(--space-md);
+      margin-bottom: var(--space-md);
+      padding-bottom: var(--space-md);
+      border-bottom: 1px solid var(--rule-soft);
     }
-    .output-section-heading h3 { margin: 0; }
-    .output-section-heading .meta-row { margin-top: 0; }
-    .answer-text {
+    .answer-header-title {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .answer-body {
+      font-family: var(--font-display);
+      font-size: 15px;
+      line-height: 1.8;
+      color: var(--ink);
       white-space: pre-wrap;
-      line-height: 1.65;
+      overflow-wrap: anywhere;
     }
-    .meta-row {
+    .answer-body h2 {
+      font-family: var(--font-display);
+      font-size: 16px;
+      font-weight: 700;
+      margin: 1.2em 0 0.5em;
+      color: var(--ink);
+    }
+    .answer-body h2:first-child { margin-top: 0; }
+    .answer-body table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 13px;
+      font-family: var(--font-body);
+    }
+    .answer-body th, .answer-body td {
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--rule-soft);
+    }
+    .answer-body th {
+      background: var(--paper);
+      font-weight: 600;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .answer-body code {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      background: var(--paper);
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+    .answer-body ol, .answer-body ul {
+      padding-left: 1.5em;
+      margin: 8px 0;
+    }
+    .answer-body li { margin-bottom: 4px; }
+
+    /* Citations as footnotes */
+    .citations-footnote {
+      margin-top: var(--space-lg);
+      padding-top: var(--space-md);
+      border-top: 1px solid var(--rule);
+    }
+    .citations-footnote-title {
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted-soft);
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .citation-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      counter-reset: citation;
+    }
+    .citation-item {
+      display: flex;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--rule-soft);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .citation-item:last-child { border-bottom: none; }
+    .citation-num {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent);
+      min-width: 20px;
+      flex-shrink: 0;
+    }
+    .citation-body { flex: 1; min-width: 0; }
+    .citation-title {
+      font-weight: 600;
+      color: var(--ink);
+      margin-bottom: 2px;
+    }
+    .citation-source {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 4px;
+      overflow-wrap: anywhere;
+    }
+    .citation-quote {
+      color: var(--muted);
+      font-style: italic;
+      border-left: 2px solid var(--rule);
+      padding-left: 8px;
+      margin-top: 4px;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Pills / Badges
+       ═══════════════════════════════════════════════════════════════ */
+    .pill-row {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 12px;
+      gap: 6px;
     }
     .pill {
-      border: 1px solid #c8d0da;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border: 1px solid var(--rule);
       border-radius: 999px;
-      padding: 4px 10px;
-      font-size: 13px;
-      color: #374151;
-      background: #f8fafc;
+      padding: 3px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      background: var(--paper);
+      letter-spacing: 0.2px;
     }
     .pill-success {
-      color: #047857;
-      border-color: #a7d7c5;
-      background: #ecfdf5;
+      color: var(--success);
+      border-color: var(--success);
+      background: var(--success-soft);
     }
     .pill-warning {
-      color: #92400e;
-      border-color: #f5d08a;
-      background: #fffbeb;
+      color: var(--warning);
+      border-color: var(--warning);
+      background: var(--warning-soft);
     }
     .pill-danger {
-      color: #b42318;
-      border-color: #efb4ae;
-      background: #fff1f0;
+      color: var(--danger);
+      border-color: var(--danger);
+      background: var(--danger-soft);
     }
+    .pill-data {
+      color: var(--data);
+      border-color: var(--data);
+      background: var(--data-soft);
+      font-family: var(--font-mono);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Message List (conversation history)
+       ═══════════════════════════════════════════════════════════════ */
     .message-list {
       list-style: none;
       margin: 0;
@@ -176,298 +564,455 @@
     }
     .message-item {
       display: grid;
-      grid-template-columns: 56px minmax(0, 1fr);
-      gap: 12px;
+      grid-template-columns: 48px minmax(0, 1fr);
+      gap: 10px;
       padding: 10px 0;
-      border-bottom: 1px solid #e5e7eb;
+      border-bottom: 1px solid var(--rule-soft);
     }
     .message-item:last-child { border-bottom: 0; }
     .message-role {
       font-weight: 700;
-      color: #374151;
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding-top: 2px;
     }
+    .message-role.user { color: var(--accent); }
+    .message-role.assistant { color: var(--data); }
     .message-content {
       white-space: pre-wrap;
       overflow-wrap: anywhere;
       line-height: 1.6;
+      font-size: 13px;
+      color: var(--ink);
     }
     .message-empty {
-      color: #6b7280;
-      padding: 8px 0;
+      color: var(--muted-soft);
+      padding: 12px 0;
+      font-size: 13px;
+      font-style: italic;
     }
-    .citation-list {
-      margin: 0;
-      padding-left: 20px;
+
+    /* ═══════════════════════════════════════════════════════════════
+       Raw JSON / Debug
+       ═══════════════════════════════════════════════════════════════ */
+    details.raw-panel {
+      margin-top: var(--space-md);
     }
-    .citation-list li {
-      margin-bottom: 10px;
-    }
-    details summary {
+    details.raw-panel summary {
       cursor: pointer;
-      font-weight: 700;
-    }
-    .toolbar {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      padding: 8px 0;
+      list-style: none;
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      gap: 12px;
-      margin-top: 16px;
+      gap: 6px;
     }
-    .result-heading {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      margin-top: 24px;
+    details.raw-panel summary::before {
+      content: "▸";
+      font-size: 10px;
+      transition: transform 0.15s;
     }
-    .result-heading h2 {
+    details.raw-panel[open] summary::before {
+      transform: rotate(90deg);
+    }
+    pre.raw-json {
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: var(--ink);
+      color: #C8C4BC;
+      border-radius: var(--radius-md);
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.6;
+      overflow: auto;
+      max-height: 400px;
       margin: 0;
     }
-    .copy-tools {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .icon-button {
-      width: 36px;
-      height: 36px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0;
-    }
-    .icon-button svg {
-      width: 18px;
-      height: 18px;
-      stroke: currentColor;
-    }
-    .status {
-      font-size: 14px;
-      color: #4b5563;
-    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Ingestion View
+       ═══════════════════════════════════════════════════════════════ */
     .ingestion-form {
       display: grid;
-      grid-template-columns: minmax(260px, 1fr) minmax(220px, 1fr) auto;
+      grid-template-columns: minmax(260px, 1fr) minmax(200px, 1fr) auto;
       align-items: end;
-      gap: 14px;
+      gap: var(--space-md);
     }
-    .summary-list {
+    .summary-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-      margin-top: 16px;
+      gap: var(--space-md);
+      margin-top: var(--space-lg);
     }
     .summary-item {
-      border-left: 3px solid #9ca3af;
-      padding-left: 10px;
+      border-left: 3px solid var(--muted-soft);
+      padding-left: 12px;
       min-width: 0;
     }
-    .summary-item strong,
-    .summary-item span {
-      display: block;
-      overflow-wrap: anywhere;
-    }
-    .summary-item strong {
-      font-size: 13px;
-      color: #6b7280;
+    .summary-item.ready { border-left-color: var(--success); }
+    .summary-item.error { border-left-color: var(--danger); }
+    .summary-item-label {
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted-soft);
+      font-weight: 600;
       margin-bottom: 4px;
     }
+    .summary-item-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ink);
+      overflow-wrap: anywhere;
+    }
+
+    /* Tables */
     .table-wrap {
       overflow-x: auto;
-      margin-top: 14px;
-      border: 1px solid #d7dce2;
-      border-radius: 6px;
+      border: 1px solid var(--rule);
+      border-radius: var(--radius-md);
+      background: var(--card);
     }
     table {
       width: 100%;
-      min-width: 760px;
+      min-width: 700px;
       border-collapse: collapse;
-      font-size: 14px;
+      font-size: 13px;
     }
     th, td {
       padding: 10px 12px;
       text-align: left;
-      border-bottom: 1px solid #e5e7eb;
+      border-bottom: 1px solid var(--rule-soft);
       vertical-align: top;
     }
     th {
-      background: #f3f4f6;
-      color: #374151;
-      font-weight: 700;
+      background: var(--paper);
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
     tbody tr:last-child td { border-bottom: 0; }
+    tbody tr:hover { background: var(--paper); }
+
+    /* Progress */
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: var(--rule-soft);
+      border-radius: 999px;
+      overflow: hidden;
+      margin: 8px 0;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 999px;
+      transition: width 0.3s;
+    }
     progress {
       width: 100%;
-      height: 10px;
-      accent-color: #2563eb;
+      height: 8px;
+      accent-color: var(--accent);
     }
-    .section-heading {
-      margin: 24px 0 10px;
-      font-size: 18px;
-    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Chunk Inspector
+       ═══════════════════════════════════════════════════════════════ */
     .chunk-inspector {
-      border-top: 1px solid #d7dce2;
-      border-bottom: 1px solid #d7dce2;
-      min-height: 132px;
+      border-top: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule);
+      background: var(--card);
+      border-radius: 0 0 var(--radius-lg) var(--radius-lg);
     }
     .chunk-toolbar {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      gap: 16px;
-      padding: 14px 0;
+      gap: var(--space-md);
+      padding: 14px var(--space-lg);
+      border-bottom: 1px solid var(--rule-soft);
     }
-    .chunk-toolbar strong,
-    .chunk-toolbar span {
+    .chunk-doc-name {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink);
       overflow-wrap: anywhere;
     }
-    .pipeline-summary {
-      margin-top: 5px;
-      color: #4b5563;
-      font-size: 13px;
+    .chunk-pipeline {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      font-family: var(--font-mono);
+    }
+    .chunk-count {
+      font-size: 12px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      white-space: nowrap;
     }
     .chunk-list {
       list-style: none;
       margin: 0;
       padding: 0;
-      border-top: 1px solid #e5e7eb;
     }
     .chunk-row {
       display: grid;
-      grid-template-columns: 64px minmax(0, 1fr);
+      grid-template-columns: 52px minmax(0, 1fr);
       gap: 14px;
-      padding: 16px 0;
-      border-bottom: 1px solid #e5e7eb;
+      padding: 14px var(--space-lg);
+      border-bottom: 1px solid var(--rule-soft);
     }
     .chunk-row:last-child { border-bottom: 0; }
     .chunk-index {
-      color: #1d4ed8;
+      color: var(--accent);
       font-weight: 800;
+      font-size: 13px;
+      font-family: var(--font-mono);
       font-variant-numeric: tabular-nums;
     }
     .chunk-meta {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px 12px;
-      color: #6b7280;
-      font-size: 13px;
-      margin-bottom: 8px;
+      gap: 4px 12px;
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 6px;
+      font-family: var(--font-mono);
     }
     .chunk-content {
       white-space: pre-wrap;
       overflow-wrap: anywhere;
       line-height: 1.65;
-      color: #111827;
+      color: var(--ink);
+      font-size: 13px;
     }
     .chunk-details {
-      margin-top: 10px;
-      color: #4b5563;
-      font-size: 13px;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .chunk-details summary {
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 11px;
+      color: var(--muted);
     }
     .chunk-details code {
       display: block;
       margin-top: 6px;
       white-space: pre-wrap;
       overflow-wrap: anywhere;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: var(--paper);
+      padding: 8px;
+      border-radius: var(--radius-sm);
     }
     .chunk-message {
-      padding: 18px 0;
-      color: #6b7280;
+      padding: 20px var(--space-lg);
+      color: var(--muted-soft);
+      font-size: 13px;
+      font-style: italic;
     }
     .chunk-load-more {
-      padding: 14px 0;
+      padding: 12px;
       text-align: center;
     }
-    .error-text { color: #b42318; }
-    .success-text { color: #047857; }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Empty / Error States
+       ═══════════════════════════════════════════════════════════════ */
+    .empty-state {
+      text-align: center;
+      padding: var(--space-xl) var(--space-lg);
+      color: var(--muted-soft);
+    }
+    .empty-state-icon {
+      font-size: 32px;
+      margin-bottom: 8px;
+      opacity: 0.4;
+    }
+    .empty-state-text {
+      font-size: 14px;
+      font-family: var(--font-display);
+      font-style: italic;
+    }
+    .error-text { color: var(--danger); }
+    .success-text { color: var(--success); }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Result sections grid
+       ═══════════════════════════════════════════════════════════════ */
+    .result-sections {
+      display: grid;
+      gap: var(--space-md);
+    }
+    .output-section {
+      background: var(--card);
+      border: 1px solid var(--rule);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      box-shadow: var(--shadow-sm);
+    }
+    .output-section h3 {
+      margin: 0 0 12px;
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    /* Fade-in animation */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in {
+      animation: fadeInUp 0.3s ease-out;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       Responsive
+       ═══════════════════════════════════════════════════════════════ */
     @media (max-width: 760px) {
-      body { padding: 18px; }
+      .app-header { padding: 0 var(--space-md); height: 48px; }
+      .app-brand-name { font-size: 18px; }
+      .app-brand-tag { display: none; }
+      .tab-bar { padding: 0 var(--space-md); }
+      main { padding: var(--space-md); }
       .grid { grid-template-columns: 1fr; }
       .ingestion-form { grid-template-columns: 1fr; }
-      .summary-list { grid-template-columns: 1fr; }
+      .summary-grid { grid-template-columns: 1fr; }
       .chunk-toolbar { display: block; }
-      .chunk-row { grid-template-columns: 44px minmax(0, 1fr); gap: 10px; }
-      .output-section-heading { display: block; }
-      .output-section-heading .meta-row { margin-top: 10px; }
+      .chunk-row { grid-template-columns: 36px minmax(0, 1fr); gap: 10px; }
+      .answer-header { display: block; }
+      .answer-header .pill-row { margin-top: 8px; }
+      .toolbar { flex-direction: column; align-items: stretch; }
+      .toolbar-group { justify-content: flex-start; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; transition: none !important; }
     }
   </style>
 </head>
 <body>
+  <!-- ═══════════════════ Header ═══════════════════ -->
+  <header class="app-header">
+    <div class="app-brand">
+      <span class="app-brand-name">SecRAG</span>
+      <span class="app-brand-tag">Research Docket</span>
+    </div>
+    <div class="app-header-right">
+      <span class="header-role">
+        <span class="header-role-dot"></span>
+        <span id="headerRoleText">技术支持</span>
+      </span>
+    </div>
+  </header>
+
+  <!-- ═══════════════════ Tab Bar ═══════════════════ -->
+  <nav class="tab-bar" role="tablist" aria-label="页面模式">
+    <button id="qaTab" class="tab-button" type="button" role="tab" aria-selected="true" aria-controls="qaView">问答检索</button>
+    <button id="ingestionTab" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="ingestionView">文档入库</button>
+  </nav>
+
   <main>
-    <h1>SecRAG</h1>
-    <div class="tabs" role="tablist" aria-label="页面模式">
-      <button id="qaTab" class="tab-button" type="button" role="tab" aria-selected="true" aria-controls="qaView">问答</button>
-      <button id="ingestionTab" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="ingestionView">文档入库</button>
-    </div>
+    <!-- ═══════════════════ QA View ═══════════════════ -->
     <div id="qaView" role="tabpanel" aria-labelledby="qaTab">
-    <section class="panel">
-      <label for="query">查询问题</label>
-      <textarea id="query" placeholder="输入你的问题，例如：系统操作流程怎么查？"></textarea>
-      <div class="grid">
-        <div>
-          <label for="token">身份</label>
-          <select id="token">
-            __IDENTITY_OPTIONS__
-          </select>
-          <div id="roleBinding" class="status"></div>
-        </div>
-        <div>
-          <label for="clientId">客户 ID（可选）</label>
-          <input id="clientId" placeholder="client id" />
-        </div>
-        <div>
-          <label for="threadId">会话 ID（可选）</label>
-          <input id="threadId" placeholder="thread id" />
-        </div>
-      </div>
-      <div class="toolbar">
-        <div class="copy-tools">
-          <button id="submit" type="button">提交查询</button>
-          <button id="newThread" class="secondary-button" type="button">新会话</button>
-          <button id="deleteThread" class="danger-button" type="button">删除会话</button>
-        </div>
-        <span id="status" class="status">Ready</span>
-      </div>
-    </section>
-    <div class="result-heading">
-      <h2>结果</h2>
-      <div class="copy-tools">
-        <span id="copyStatus" class="status"></span>
-        <button id="copyResult" class="icon-button" type="button" aria-label="复制结果" title="复制结果">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect x="8" y="8" width="12" height="12" rx="2"></rect>
-            <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path>
-          </svg>
-        </button>
-      </div>
-    </div>
-    <section id="emptyResult" class="output-section">等待查询...</section>
-    <div id="resultSections" class="result-sections" hidden>
-      <section class="output-section">
-        <h3>会话记录</h3>
-        <ol id="messageList" class="message-list"><li class="message-empty">暂无会话消息</li></ol>
-      </section>
-      <section class="output-section">
-        <div class="output-section-heading">
-          <h3>回答</h3>
-          <div class="meta-row" aria-label="回答状态">
-            <span id="confidenceText" class="pill">置信度：未评估</span>
-            <span id="complianceText" class="pill">合规：未评估</span>
+      <!-- Query Panel -->
+      <section class="panel">
+        <label for="query">查询问题</label>
+        <textarea id="query" placeholder="输入你的问题，例如：系统操作流程怎么查？或：宁德时代2024年毛利率变化"></textarea>
+        <div class="grid">
+          <div>
+            <label for="token">身份</label>
+            <select id="token">
+              __IDENTITY_OPTIONS__
+            </select>
+            <div id="roleBinding" class="status-text" style="margin-top:4px;"></div>
+          </div>
+          <div>
+            <label for="clientId">客户 ID（可选）</label>
+            <input id="clientId" placeholder="client id" />
+          </div>
+          <div>
+            <label for="threadId">会话 ID（可选）</label>
+            <input id="threadId" placeholder="thread id" />
           </div>
         </div>
-        <div id="answerText" class="answer-text"></div>
+        <div class="toolbar">
+          <div class="toolbar-group">
+            <button id="submit" class="btn-primary" type="button">提交查询</button>
+            <button id="newThread" class="btn-secondary" type="button">新会话</button>
+            <button id="deleteThread" class="btn-danger" type="button">删除会话</button>
+          </div>
+          <span id="status" class="status-text">Ready</span>
+        </div>
       </section>
-      <section class="output-section">
-        <h3>引用</h3>
-        <ol id="citationList" class="citation-list"></ol>
+
+      <!-- Results -->
+      <div class="section-heading">
+        <div>
+          <div class="section-heading-eyebrow">Query Result</div>
+          <h2>检索结果</h2>
+        </div>
+        <div class="toolbar-group">
+          <span id="copyStatus" class="status-text"></span>
+          <button id="copyResult" class="btn-icon" type="button" aria-label="复制结果" title="复制结果">
+            <svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg>
+          </button>
+        </div>
+      </div>
+
+      <section id="emptyResult" class="output-section">
+        <div class="empty-state">
+          <div class="empty-state-icon">⌕</div>
+          <div class="empty-state-text">等待查询…</div>
+        </div>
       </section>
-      <details class="output-section">
-        <summary>原始响应</summary>
-        <pre id="rawJson"></pre>
-      </details>
-    </div>
+
+      <div id="resultSections" class="result-sections" hidden>
+        <!-- Conversation History -->
+        <section class="output-section">
+          <h3>会话记录</h3>
+          <ol id="messageList" class="message-list"><li class="message-empty">暂无会话消息</li></ol>
+        </section>
+
+        <!-- Answer — signature research docket card -->
+        <section id="answerCard" class="answer-card confidence-medium">
+          <div class="answer-header">
+            <span class="answer-header-title">研究回答</span>
+            <div class="pill-row" aria-label="回答状态">
+              <span id="confidenceText" class="pill">置信度：未评估</span>
+              <span id="complianceText" class="pill">合规：未评估</span>
+            </div>
+          </div>
+          <div id="answerText" class="answer-body"></div>
+          <!-- Citations as footnotes -->
+          <div class="citations-footnote">
+            <div class="citations-footnote-title">引用来源</div>
+            <ol id="citationList" class="citation-list"></ol>
+          </div>
+        </section>
+
+        <!-- Raw Response -->
+        <details class="raw-panel">
+          <summary>原始响应</summary>
+          <pre id="rawJson" class="raw-json"></pre>
+        </details>
+      </div>
     </div>
 
+    <!-- ═══════════════════ Ingestion View ═══════════════════ -->
     <div id="ingestionView" role="tabpanel" aria-labelledby="ingestionTab" hidden>
       <section class="panel">
         <div class="ingestion-form">
@@ -479,25 +1024,27 @@
             <label for="ingestionPath">目录</label>
             <input id="ingestionPath" readonly value="等待选择分类" />
           </div>
-          <button id="startIngestion" type="button" disabled>开始增量入库</button>
+          <button id="startIngestion" class="btn-primary" type="button" disabled>开始增量入库</button>
         </div>
-        <div class="summary-list">
-          <div class="summary-item">
-            <strong>文件</strong>
-            <span id="ingestionFileCount">0 个业务文件</span>
+        <div class="summary-grid">
+          <div class="summary-item" id="summaryFiles">
+            <div class="summary-item-label">文件</div>
+            <div class="summary-item-value" id="ingestionFileCount">0 个业务文件</div>
           </div>
-          <div class="summary-item">
-            <strong>Manifest</strong>
-            <span id="ingestionManifestCount">0 个</span>
+          <div class="summary-item" id="summaryManifest">
+            <div class="summary-item-label">Manifest</div>
+            <div class="summary-item-value" id="ingestionManifestCount">0 个</div>
           </div>
-          <div class="summary-item">
-            <strong>状态</strong>
-            <span id="ingestionReadiness">等待选择分类</span>
+          <div class="summary-item" id="summaryReadiness">
+            <div class="summary-item-label">状态</div>
+            <div class="summary-item-value" id="ingestionReadiness">等待选择分类</div>
           </div>
         </div>
       </section>
 
-      <h2 class="section-heading">文件清单</h2>
+      <div class="section-heading">
+        <div><div class="section-heading-eyebrow">File Inventory</div><h2>文件清单</h2></div>
+      </div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>文件</th><th>格式</th><th>doc_type</th><th>权限级别</th><th>Manifest</th></tr></thead>
@@ -505,43 +1052,49 @@
         </table>
       </div>
 
-      <h2 class="section-heading">当前任务</h2>
+      <div class="section-heading">
+        <div><div class="section-heading-eyebrow">Active Run</div><h2>当前任务</h2></div>
+      </div>
       <section class="panel">
         <div class="toolbar">
-          <span id="ingestionRunStatus" class="status">暂无任务</span>
-          <span id="ingestionProgressText" class="status">0 / 0</span>
+          <span id="ingestionRunStatus" class="status-text">暂无任务</span>
+          <span id="ingestionProgressText" class="status-text">0 / 0</span>
         </div>
         <progress id="ingestionProgress" max="1" value="0"></progress>
-        <div class="meta-row">
-          <span id="createdCount" class="pill">created 0</span>
-          <span id="replacedCount" class="pill">replaced 0</span>
+        <div class="pill-row" style="margin-top:8px;">
+          <span id="createdCount" class="pill pill-data">created 0</span>
+          <span id="replacedCount" class="pill pill-data">replaced 0</span>
           <span id="skippedCount" class="pill">skipped 0</span>
-          <span id="failedCount" class="pill">failed 0</span>
+          <span id="failedCount" class="pill pill-danger">failed 0</span>
         </div>
       </section>
-      <div class="table-wrap">
+      <div class="table-wrap" style="margin-top:12px;">
         <table>
           <thead><tr><th>#</th><th>文件</th><th>动作</th><th>Chunks</th><th>结果</th><th>查看</th></tr></thead>
           <tbody id="ingestionItemsBody"><tr><td colspan="6">暂无结果</td></tr></tbody>
         </table>
       </div>
 
-      <h2 class="section-heading">Embedding Chunks</h2>
+      <div class="section-heading">
+        <div><div class="section-heading-eyebrow">Embedding Chunks</div><h2>Embedding Chunks</h2></div>
+      </div>
       <section class="chunk-inspector" aria-live="polite">
         <div class="chunk-toolbar">
           <div>
-            <strong id="chunkDocumentName">尚未选择文档</strong>
-            <div id="chunkPipelineSummary" class="pipeline-summary">文档 -> Embedding -> ChromaDB</div>
+            <div class="chunk-doc-name" id="chunkDocumentName">尚未选择文档</div>
+            <div class="chunk-pipeline" id="chunkPipelineSummary">文档 → Embedding → ChromaDB</div>
           </div>
-          <span id="chunkDisplayCount" class="status">0 Chunks</span>
+          <span class="chunk-count" id="chunkDisplayCount">0 Chunks</span>
         </div>
         <ol id="chunkList" class="chunk-list"><li class="chunk-message">尚未选择文档</li></ol>
         <div class="chunk-load-more">
-          <button id="loadMoreChunks" class="secondary-button" type="button" hidden>加载更多</button>
+          <button id="loadMoreChunks" class="btn-secondary" type="button" hidden>加载更多</button>
         </div>
       </section>
 
-      <h2 class="section-heading">最近任务</h2>
+      <div class="section-heading">
+        <div><div class="section-heading-eyebrow">Recent Runs</div><h2>最近任务</h2></div>
+      </div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>任务</th><th>分类</th><th>状态</th><th>进度</th><th>排队时间</th><th>查看</th></tr></thead>
@@ -550,17 +1103,23 @@
       </div>
     </div>
   </main>
+
   <script>
+    /* ═══════════════════════════════════════════════════════════════
+       SecRAG — Application Logic
+       ═══════════════════════════════════════════════════════════════ */
     const submit = document.getElementById("submit");
     const copyResult = document.getElementById("copyResult");
     const newThread = document.getElementById("newThread");
     const deleteThread = document.getElementById("deleteThread");
     const tokenSelect = document.getElementById("token");
     const roleBinding = document.getElementById("roleBinding");
+    const headerRoleText = document.getElementById("headerRoleText");
     const statusEl = document.getElementById("status");
     const copyStatusEl = document.getElementById("copyStatus");
     const emptyResult = document.getElementById("emptyResult");
     const resultSections = document.getElementById("resultSections");
+    const answerCard = document.getElementById("answerCard");
     const answerText = document.getElementById("answerText");
     const confidenceText = document.getElementById("confidenceText");
     const complianceText = document.getElementById("complianceText");
@@ -576,6 +1135,7 @@
     const ingestionFileCount = document.getElementById("ingestionFileCount");
     const ingestionManifestCount = document.getElementById("ingestionManifestCount");
     const ingestionReadiness = document.getElementById("ingestionReadiness");
+    const summaryReadiness = document.getElementById("summaryReadiness");
     const ingestionFilesBody = document.getElementById("ingestionFilesBody");
     const startIngestion = document.getElementById("startIngestion");
     const ingestionRunStatus = document.getElementById("ingestionRunStatus");
@@ -588,6 +1148,7 @@
     const chunkDisplayCount = document.getElementById("chunkDisplayCount");
     const chunkList = document.getElementById("chunkList");
     const loadMoreChunks = document.getElementById("loadMoreChunks");
+
     let lastResultText = "";
     let ingestionCategories = [];
     let activeRunId = null;
@@ -597,10 +1158,20 @@
     let chunkOffset = 0;
     let chunkTotal = 0;
 
+    const ROLE_LABELS = {
+      technical: "技术支持",
+      advisor: "投顾",
+      institutional_sales: "机构销售",
+      compliance: "合规",
+      operations: "运营"
+    };
+
     function updateRoleBinding() {
       const selected = tokenSelect.options[tokenSelect.selectedIndex];
-      roleBinding.textContent = `绑定 user_role: ${selected.dataset.role}`;
-      const technical = selected.dataset.role === "technical";
+      const role = selected.dataset.role;
+      roleBinding.textContent = `绑定 user_role: ${role}`;
+      headerRoleText.textContent = ROLE_LABELS[role] || role;
+      const technical = role === "technical";
       ingestionTab.disabled = !technical;
       if (!technical && !ingestionView.hidden) setActiveTab("qa");
     }
@@ -655,34 +1226,57 @@
         : compliance.passed === false
           ? "pill pill-danger"
           : "pill";
+
+      // Update answer card confidence bar
+      answerCard.classList.remove("confidence-high", "confidence-medium", "confidence-low");
+      if (confidence === "high") answerCard.classList.add("confidence-high");
+      else if (confidence === "medium") answerCard.classList.add("confidence-medium");
+      else if (confidence === "low") answerCard.classList.add("confidence-low");
     }
 
     function renderResult(data) {
       emptyResult.hidden = true;
       resultSections.hidden = false;
+      resultSections.classList.remove("fade-in");
+      void resultSections.offsetWidth; // reflow to restart animation
+      resultSections.classList.add("fade-in");
 
       const answer = data.answer || data.detail || data.raw || "";
       const citations = Array.isArray(data.citations) ? data.citations : [];
       const compliance = data.compliance || {};
       if (data.thread_id) document.getElementById("threadId").value = data.thread_id;
 
-      answerText.textContent = answer || "无回答内容";
+      // Render answer as HTML if it contains markdown, otherwise plain text
+      answerText.innerHTML = formatAnswerHTML(answer || "无回答内容");
       renderAnswerStatus(data.confidence, compliance);
 
+      // Render citations as footnotes
       citationList.replaceChildren();
       if (citations.length === 0) {
         const item = document.createElement("li");
-        item.textContent = "无引用";
+        item.className = "citation-item";
+        item.innerHTML = '<span class="citation-num">—</span><span class="citation-body" style="color:var(--muted-soft);font-style:italic;">无引用来源</span>';
         citationList.appendChild(item);
       } else {
-        for (const citation of citations) {
+        citations.forEach((citation, idx) => {
           const item = document.createElement("li");
+          item.className = "citation-item";
           const title = citation.doc_title || "未知文档";
           const source = citation.source || "";
           const quote = citation.quote || "";
-          item.textContent = `${title} — ${source}\n${quote}`;
+          item.innerHTML = `
+            <span class="citation-num">${idx + 1}</span>
+            <span class="citation-body">
+              <div class="citation-title"></div>
+              <div class="citation-source"></div>
+              ${quote ? '<div class="citation-quote"></div>' : ''}
+            </span>
+          `;
+          item.querySelector(".citation-title").textContent = title;
+          item.querySelector(".citation-source").textContent = source;
+          if (quote) item.querySelector(".citation-quote").textContent = quote;
           citationList.appendChild(item);
-        }
+        });
       }
 
       rawJson.textContent = JSON.stringify(data, null, 2);
@@ -690,6 +1284,58 @@
         `回答：\n${answer}`,
         `引用：\n${citations.map((c, i) => `${i + 1}. ${c.doc_title || "未知文档"} — ${c.source || ""}`).join("\n") || "无引用"}`
       ].join("\n\n");
+    }
+
+    // Minimal markdown-to-HTML for answer rendering
+    function formatAnswerHTML(text) {
+      if (!text) return "";
+      // Escape HTML first
+      let html = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      // Headers
+      html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+      // Bold
+      html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      // Inline code
+      html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+      // Tables (simple pipe tables)
+      html = html.replace(/((?:^\|.+\|$\n?)+)/gm, function(match) {
+        const lines = match.trim().split("\n").filter(l => l.trim());
+        if (lines.length < 2) return match;
+        const separator = lines[1];
+        if (!/^\|[\s:|-]+\|$/.test(separator.trim())) return match;
+        const headerCells = lines[0].split("|").filter(c => c.trim()).map(c => c.trim());
+        const bodyLines = lines.slice(2);
+        let table = "<table><thead><tr>";
+        headerCells.forEach(c => table += `<th>${c}</th>`);
+        table += "</tr></thead><tbody>";
+        bodyLines.forEach(line => {
+          const cells = line.split("|").filter(c => c.trim()).map(c => c.trim());
+          table += "<tr>";
+          cells.forEach(c => table += `<td>${c}</td>`);
+          table += "</tr>";
+        });
+        table += "</tbody></table>";
+        return table;
+      });
+      // Ordered lists
+      html = html.replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>');
+      html = html.replace(/(<li>.+<\/li>\n?)+/g, function(match) {
+        return "<ol>" + match + "</ol>";
+      });
+      // Unordered lists
+      html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+      html = html.replace(/(<li>.+<\/li>\n?)+/g, function(match) {
+        if (match.includes("<ol>")) return match;
+        return "<ul>" + match + "</ul>";
+      });
+      // Paragraphs (double newlines)
+      html = html.replace(/\n\n/g, "</p><p>");
+      // Single newlines within paragraphs
+      html = html.replace(/\n/g, "<br>");
+      return `<p>${html}</p>`;
     }
 
     async function loadMessages() {
@@ -717,7 +1363,7 @@
           const item = document.createElement("li");
           item.className = "message-item";
           const role = document.createElement("span");
-          role.className = "message-role";
+          role.className = "message-role " + (message.role === "user" ? "user" : message.role === "assistant" ? "assistant" : "");
           role.textContent = message.role === "user"
             ? "用户"
             : message.role === "assistant"
@@ -815,7 +1461,8 @@
       const selected = tokenSelect.options[tokenSelect.selectedIndex];
       if (selected.dataset.role !== "technical") return;
       ingestionReadiness.textContent = "正在检查文件...";
-      ingestionReadiness.className = "";
+      ingestionReadiness.className = "summary-item-value";
+      summaryReadiness.className = "summary-item";
       const previousCategory = ingestionCategory.value;
       try {
         const response = await fetch("__INGESTION_CATEGORIES_PATH__", {
@@ -830,7 +1477,8 @@
         if (activeRunId) await pollIngestionRun();
       } catch (error) {
         ingestionReadiness.textContent = requestErrorMessage(error);
-        ingestionReadiness.className = "error-text";
+        ingestionReadiness.className = "summary-item-value error-text";
+        summaryReadiness.classList.add("error");
         setTableMessage(ingestionFilesBody, 5, "分类加载失败");
       } finally {
         updateStartIngestionState();
@@ -850,7 +1498,8 @@
       ingestionReadiness.textContent = category.ready
         ? "可以入库"
         : category.error || `存在 ${category.invalid_manifest_count} 个 manifest 错误`;
-      ingestionReadiness.className = category.ready ? "success-text" : "error-text";
+      ingestionReadiness.className = "summary-item-value" + (category.ready ? " success-text" : " error-text");
+      summaryReadiness.className = "summary-item " + (category.ready ? "ready" : "error");
       setTableMessage(ingestionFilesBody, 5, "正在检查文件...");
       try {
         const response = await fetch(
@@ -890,7 +1539,7 @@
       ingestionRunStatus.textContent = run.error
         ? `${run.status}: ${run.error}`
         : run.status;
-      ingestionRunStatus.className = run.status === "failed" ? "status error-text" : "status";
+      ingestionRunStatus.className = "status-text" + (run.status === "failed" ? " error-text" : "");
       ingestionProgressText.textContent = `${processed} / ${total}`;
       ingestionProgress.max = Math.max(total, 1);
       ingestionProgress.value = processed;
@@ -902,7 +1551,7 @@
 
     function setChunkMessage(message, error = false) {
       const item = document.createElement("li");
-      item.className = error ? "chunk-message error-text" : "chunk-message";
+      item.className = "chunk-message" + (error ? " error-text" : "");
       item.textContent = message;
       chunkList.replaceChildren(item);
     }
@@ -912,7 +1561,7 @@
       chunkOffset = 0;
       chunkTotal = 0;
       chunkDocumentName.textContent = "尚未选择文档";
-      chunkPipelineSummary.textContent = "文档 -> Embedding -> ChromaDB";
+      chunkPipelineSummary.textContent = "文档 → Embedding → ChromaDB";
       chunkDisplayCount.textContent = "0 Chunks";
       loadMoreChunks.hidden = true;
       setChunkMessage("尚未选择文档");
@@ -972,7 +1621,7 @@
         chunkOffset = 0;
         chunkTotal = Number(item.chunk_count || 0);
         chunkDocumentName.textContent = item.relative_path || item.doc_id;
-        chunkPipelineSummary.textContent = "文档 -> Embedding -> ChromaDB";
+        chunkPipelineSummary.textContent = "文档 → Embedding → ChromaDB";
         chunkDisplayCount.textContent = `0 / ${chunkTotal} Chunks`;
         loadMoreChunks.hidden = true;
         setChunkMessage("正在读取 Chroma Chunks...");
@@ -995,7 +1644,7 @@
         chunkTotal = Number(payload.total_chunks || 0);
         const model = chunks[0]?.embedding_model || "未记录模型";
         chunkPipelineSummary.textContent =
-          `文档 -> Embedding (${model}) -> ChromaDB / ${chunkTotal} Chunks`;
+          `文档 → Embedding (${model}) → ChromaDB / ${chunkTotal} Chunks`;
         chunkDisplayCount.textContent = `${chunkOffset} / ${chunkTotal} Chunks`;
         loadMoreChunks.hidden = chunks.length === 0 || chunkOffset >= chunkTotal;
         if (chunkTotal === 0) setChunkMessage("该文档没有可用 Chunks");
@@ -1031,7 +1680,7 @@
           && Boolean(item.doc_id)
           && Number(item.chunk_count || 0) > 0;
         inspectButton.type = "button";
-        inspectButton.className = "table-button";
+        inspectButton.className = "btn-ghost";
         inspectButton.textContent = "查看";
         inspectButton.disabled = !inspectable;
         inspectButton.title = inspectable ? "查看已入库 Chunks" : "没有可查看的 Chunks";
@@ -1064,7 +1713,7 @@
         }
       } catch (error) {
         ingestionRunStatus.textContent = `轮询失败：${requestErrorMessage(error)}`;
-        ingestionRunStatus.className = "status error-text";
+        ingestionRunStatus.className = "status-text error-text";
         scheduleIngestionPoll();
       }
       updateStartIngestionState();
@@ -1093,7 +1742,7 @@
         const actionCell = document.createElement("td");
         const viewButton = document.createElement("button");
         viewButton.type = "button";
-        viewButton.className = "table-button";
+        viewButton.className = "btn-ghost";
         viewButton.textContent = "查看";
         viewButton.addEventListener("click", async () => {
           const response = await fetch(
@@ -1146,7 +1795,7 @@
         scheduleIngestionPoll();
       } catch (error) {
         ingestionRunStatus.textContent = requestErrorMessage(error);
-        ingestionRunStatus.className = "status error-text";
+        ingestionRunStatus.className = "status-text error-text";
         if (activeRunId) scheduleIngestionPoll();
       } finally {
         ingestionSubmitting = false;
@@ -1172,7 +1821,7 @@
       submit.disabled = true;
       statusEl.textContent = "查询中...";
       emptyResult.hidden = false;
-      emptyResult.textContent = "查询中...";
+      emptyResult.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⌕</div><div class="empty-state-text">检索中…</div></div>';
       resultSections.hidden = true;
       lastResultText = "";
 
@@ -1195,7 +1844,7 @@
         if (!response.ok) {
           resultSections.hidden = true;
           emptyResult.hidden = false;
-          emptyResult.textContent = responseError(data, `请求失败：${response.status}`);
+          emptyResult.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠</div><div class="empty-state-text error-text">${responseError(data, `请求失败：${response.status}`)}</div></div>`;
           statusEl.textContent = `请求失败：${response.status}`;
           return;
         }
@@ -1205,10 +1854,10 @@
       } catch (error) {
         resultSections.hidden = true;
         emptyResult.hidden = false;
-        emptyResult.textContent = requestErrorMessage(
+        emptyResult.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠</div><div class="empty-state-text error-text">${requestErrorMessage(
           error,
           "连接中断，请重试；较复杂查询可能仍在后台完成"
-        );
+        )}</div></div>`;
         statusEl.textContent = "请求失败";
       } finally {
         submit.disabled = false;
@@ -1221,7 +1870,7 @@
       setMessageListState("暂无会话消息");
       resultSections.hidden = true;
       emptyResult.hidden = false;
-      emptyResult.textContent = "等待查询...";
+      emptyResult.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⌕</div><div class="empty-state-text">等待查询…</div></div>';
       statusEl.textContent = "已开始新会话";
     });
 
@@ -1249,7 +1898,6 @@
         copyStatusEl.textContent = "暂无可复制内容";
         return;
       }
-
       try {
         await navigator.clipboard.writeText(text);
         copyStatusEl.textContent = "已复制";

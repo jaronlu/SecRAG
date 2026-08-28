@@ -59,3 +59,10 @@ testpaths = ["tests"]
 venvPath = "."
 venv = ".venv"
 typeCheckingMode = "standard"
+
+[tool.pyright]
+# VSCode Pylance / pyright 读取此配置节
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "standard"
+exclude = [".venv", "data", "node_modules"]

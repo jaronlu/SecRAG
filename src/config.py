@@ -26,6 +26,7 @@ class LLMConfig(BaseModel):
     base_url: str
     model: str
     temperature: float
+    timeout: float = 30.0
     api_key: SecretStr = SecretStr("")
 
 
@@ -42,6 +43,7 @@ class Settings(BaseSettings):
     app_host: str = "0.0.0.0"
     app_port: int = 8000
     allowed_origins: list[str] = ["*"]
+    api_request_timeout_seconds: float = 60.0
 
     # LLM — provider switch
     #   "ollama": uses ChatOllama
@@ -52,13 +54,17 @@ class Settings(BaseSettings):
     ollama_base_url: str = OLLAMA_DEFAULT_BASE_URL
     llm_model: str = OLLAMA_DEFAULT_MODEL
     llm_temperature: float = LLM_DEFAULT_TEMPERATURE
+    llm_timeout_seconds: float = 30.0
 
     # OpenAI-compatible 配置（llm_provider = "openai" 时生效）
     openai_api_base: str = OPENAI_DEFAULT_API_BASE
     openai_model: str = OPENAI_DEFAULT_MODEL
     openai_api_key: str = ""
 
-    # Embedding：DEFAULT_EMBEDDING_MODEL
+    # Embedding：入库与检索必须使用同一模型，否则向量空间不匹配导致检索失效。
+    # PRD §6.1 选型为 BGE-M3，但当前生产数据（28388 chunks）以 bge-small-zh-v1.5 入库。
+    # 切换到 M3 需全量重新入库。Chroma collection metadata 已记录模型名，
+    # 不一致时 vector_retriever 和 embedder 会抛出 RuntimeError 阻止启动。
     embedding_model: str = "BAAI/bge-small-zh-v1.5"
 
     # Chroma
@@ -86,6 +92,7 @@ class Settings(BaseSettings):
                 base_url=self.openai_api_base,
                 model=self.openai_model,
                 temperature=self.llm_temperature,
+                timeout=self.llm_timeout_seconds,
                 api_key=SecretStr(self.openai_api_key),
             )
         return LLMConfig(
@@ -93,6 +100,7 @@ class Settings(BaseSettings):
             base_url=self.ollama_base_url,
             model=self.llm_model,
             temperature=self.llm_temperature,
+            timeout=self.llm_timeout_seconds,
         )
 
     @property

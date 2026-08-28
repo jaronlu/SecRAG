@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 from src.agents.state import AssistantState
 from src.schemas.constants import (
@@ -213,6 +213,50 @@ class SQLiteConversationStore:
             )
             for row in rows
         ]
+
+    def query_stats(self, *, days: int = 7) -> dict[str, Any]:
+        """P2-9: 查询统计——总查询数、无引用查询数、日均查询量。
+
+        无引用查询（citations_json 为空数组）视为检索未命中，用于发现知识库缺口。
+        """
+        with sqlite3.connect(str(self.db_path), timeout=5) as conn:
+            conn.row_factory = sqlite3.Row
+            self._ensure_schema(conn)
+            # 最近 N 天的查询（created_at 是 ISO 字符串，用日期字符串比较）
+            cutoff_dt = datetime.now(timezone.utc) - timedelta(days=days)
+            cutoff_iso = cutoff_dt.isoformat()
+            row = conn.execute(
+                """
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN citations_json = '[]' OR citations_json IS NULL THEN 1 ELSE 0 END) as no_citation
+                FROM conversation_turns
+                WHERE created_at >= ?
+                """,
+                (cutoff_iso,),
+            ).fetchone()
+            total = row["total"] if row else 0
+            no_citation = row["no_citation"] if row else 0
+            # 最近无引用查询示例（最多 10 条）
+            no_cite_rows = conn.execute(
+                """
+                SELECT user_query, created_at FROM conversation_turns
+                WHERE (citations_json = '[]' OR citations_json IS NULL) AND created_at >= ?
+                ORDER BY created_at DESC LIMIT 10
+                """,
+                (cutoff_iso,),
+            ).fetchall()
+        return {
+            "period_days": days,
+            "total_queries": total,
+            "no_citation_queries": no_citation,
+            "hit_rate": round((1 - no_citation / total) * 100, 1) if total > 0 else 0,
+            "avg_daily": round(total / days, 1) if days > 0 else 0,
+            "recent_no_citation": [
+                {"query": r["user_query"], "created_at": r["created_at"]}
+                for r in no_cite_rows
+            ],
+        }
 
     def insert_turn(self, state: AssistantState) -> None:
         audit_trail = state.get(STATE_AUDIT_TRAIL, {})

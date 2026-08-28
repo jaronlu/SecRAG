@@ -195,6 +195,8 @@ class AuditTrail(TypedDict, total=False):
     compliance: ComplianceResult
     response: AuditResponse
     total_duration_ms: float
+    audit_write_failed: bool
+    audit_write_error: str
 
 
 class IngestionCategoryConfig(TypedDict):

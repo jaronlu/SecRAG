@@ -1,3 +1,5 @@
+import asyncio
+import json
 import logging
 import uuid
 from typing import cast
@@ -5,7 +7,7 @@ from typing import cast
 import httpx
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from langchain_core.runnables.config import RunnableConfig
 from openai import APIConnectionError, APIStatusError, APITimeoutError
 
@@ -20,6 +22,7 @@ from src.config import config
 from src.schemas.constants import (
     AGENT_RECURSION_LIMIT,
     API_ROUTE_ASSISTANT_QA,
+    API_ROUTE_ASSISTANT_QA_STREAM,
     API_ROUTE_ASSISTANT_THREAD,
     API_ROUTE_ASSISTANT_THREAD_MESSAGES,
     API_ROUTE_ASSISTANT_THREADS,
@@ -38,6 +41,7 @@ from src.schemas.request_response import (
     ConversationThreadCreate,
     ConversationThreadResponse,
 )
+from src.utils.rate_limit import check_rate_limit, get_rate_limit_key
 
 app = FastAPI(title="机构内部投研知识平台", version="0.1.0")
 app.include_router(ingestion_router)
@@ -64,6 +68,59 @@ async def favicon():
 @app.get("/.well-known/appspecific/com.chrome.devtools.json", include_in_schema=False)
 async def chrome_devtools_probe():
     return {}
+
+
+@app.get("/health")
+async def health_check():
+    """P2-4: 健康检查端点——检查 ChromaDB 连通性和文档计数。
+
+    返回 200 表示服务存活；chroma 字段为 "error" 时不影响整体 200，
+    避免 ChromaDB 短暂不可用导致负载均衡器摘除节点。
+    """
+    import time
+
+    status = {"status": "ok", "timestamp": time.time()}
+    try:
+        from src.retrieval.vector_retriever import ChromaVectorRetriever
+
+        engine = ChromaVectorRetriever()
+        count = engine.collection.count()
+        status["chroma"] = {"status": "ok", "doc_count": count}
+    except Exception as exc:
+        status["chroma"] = {"status": "error", "error": str(exc)[:200]}
+    return status
+
+
+@app.get("/v1/admin/stats/queries")
+async def query_stats(
+    days: int = 7,
+    user: AuthenticatedUser = Depends(authenticate_user),
+):
+    """P2-9: 查询统计端点——返回查询量、命中率、无引用查询示例。
+
+    仅 admin 角色可访问。
+    """
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="仅管理员可访问统计数据")
+    return _get_conversation_store().query_stats(days=days)
+
+
+@app.delete("/v1/admin/documents")
+async def delete_document(
+    source: str,
+    user: AuthenticatedUser = Depends(authenticate_user),
+):
+    """P2-7: 文档删除端点——按 source 路径删除该文档的所有 chunk。
+
+    仅 admin 角色可访问。用于文档版本管理：删除旧版本后重新入库。
+    """
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="仅管理员可删除文档")
+    from src.retrieval.vector_retriever import ChromaVectorRetriever
+
+    engine = ChromaVectorRetriever()
+    deleted = engine.delete_by_source(source)
+    return {"source": source, "deleted_chunks": deleted}
 
 
 # 追踪日志记录器（结构化 JSON，可对接 ELK / Loki）
@@ -167,7 +224,10 @@ def _is_provider_unavailable(exc: Exception) -> bool:
         return True
 
     if isinstance(exc, APIStatusError):
-        return exc.status_code in {401, 403, 408, 409, 429} or exc.status_code >= 500
+        status_code = getattr(exc, "status_code", None)
+        return status_code in {401, 403, 408, 409, 429} or (
+            status_code is not None and status_code >= 500
+        )
 
     return False
 
@@ -177,6 +237,15 @@ async def assistant_qa(
     request: AssistantQARequest,
     user: AuthenticatedUser = Depends(authenticate_user),
 ):
+    # P2-2: 限流——按 user_id 滑动窗口，每分钟 30 次
+    rate_key = get_rate_limit_key(user_id=user.user_id)
+    allowed, _ = check_rate_limit(rate_key)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="请求过于频繁，请稍后再试（每分钟最多 30 次）。",
+            headers={"Retry-After": "60"},
+        )
     try:
         thread = _get_conversation_store().ensure_thread_for_qa(
             thread_id=request.thread_id,
@@ -198,13 +267,26 @@ async def assistant_qa(
         turn_index=thread.get("turn_count", 0),
     )
 
-    app = _get_agent_app()
-    config: RunnableConfig = {
+    agent = _get_agent_app()
+    runnable_config: RunnableConfig = {
         "configurable": {"thread_id": thread_id},
         "recursion_limit": AGENT_RECURSION_LIMIT,
     }
     try:
-        result = app.invoke(initial_state, config=config)
+        result = await asyncio.wait_for(
+            asyncio.to_thread(agent.invoke, initial_state, runnable_config),
+            timeout=config.api_request_timeout_seconds,
+        )
+    except asyncio.TimeoutError:
+        audit_logger.warning(
+            "Assistant QA timed out after %.1fs: thread_id=%s",
+            config.api_request_timeout_seconds,
+            thread_id,
+        )
+        raise HTTPException(
+            status_code=504,
+            detail=f"请求处理超时（{config.api_request_timeout_seconds:.0f}s），请简化问题或稍后重试。",
+        )
     except Exception as exc:
         if _is_provider_unavailable(exc):
             audit_logger.warning(
@@ -231,4 +313,93 @@ async def assistant_qa(
         citations=result[STATE_CITATIONS],
         confidence=result[STATE_CONFIDENCE],
         compliance=result[STATE_COMPLIANCE],
+    )
+
+
+@app.post(API_ROUTE_ASSISTANT_QA_STREAM)
+async def assistant_qa_stream(
+    request: AssistantQARequest,
+    user: AuthenticatedUser = Depends(authenticate_user),
+):
+    """P2-1: 流式输出端点——SSE 逐事件返回 Agent 执行进度和最终回答。
+
+    事件格式：
+    - event: progress, data: {"node": "...", "status": "done"}
+    - event: answer, data: {"answer": "...", "citations": [...], "confidence": "..."}
+    - event: error, data: {"detail": "..."}
+    - event: done
+    """
+    # P2-2: 限流
+    rate_key = get_rate_limit_key(user_id=user.user_id)
+    allowed, _ = check_rate_limit(rate_key)
+    if not allowed:
+        return StreamingResponse(
+            iter([f"event: error\ndata: {json.dumps({'detail': '请求过于频繁'})}\n\n"]),
+            media_type="text/event-stream",
+            status_code=429,
+        )
+
+    async def event_generator():
+        try:
+            thread = _get_conversation_store().ensure_thread_for_qa(
+                thread_id=request.thread_id,
+                user_id=user.user_id,
+                user_role=user.role,
+                client_id=request.client_id,
+                title=request.query[:100],
+            )
+        except Exception as exc:
+            yield f"event: error\ndata: {json.dumps({'detail': str(exc)})}\n\n"
+            return
+
+        thread_id = thread.get("thread_id", request.thread_id)
+        turn_id = str(uuid.uuid4())
+        initial_state = build_assistant_initial_state(
+            request,
+            user,
+            thread_id=thread_id,
+            turn_id=turn_id,
+            turn_index=thread.get("turn_count", 0),
+        )
+
+        agent = _get_agent_app()
+        runnable_config: RunnableConfig = {
+            "configurable": {"thread_id": thread_id},
+            "recursion_limit": AGENT_RECURSION_LIMIT,
+        }
+
+        try:
+            # 流式获取每个节点的状态更新
+            async for state_update in agent.astream(
+                initial_state, runnable_config, stream_mode="updates"
+            ):
+                for node_name, node_output in state_update.items():
+                    # 只发送关键节点的进度，避免事件过多
+                    if node_name in ("query_understand", "planner", "retrieve", "grade_and_filter", "reason", "verify", "compose"):
+                        yield f"event: progress\ndata: {json.dumps({'node': node_name, 'status': 'done'})}\n\n"
+                    # compose 节点输出包含最终回答
+                    if node_name == "compose" and STATE_FINAL_ANSWER in node_output:
+                        answer_data = json.dumps({
+                            "answer": node_output[STATE_FINAL_ANSWER],
+                            "citations": node_output.get(STATE_CITATIONS, []),
+                            "confidence": node_output.get(STATE_CONFIDENCE, "unknown"),
+                            "thread_id": thread_id,
+                            "turn_id": turn_id,
+                        }, ensure_ascii=False)
+                        yield f"event: answer\ndata: {answer_data}\n\n"
+        except asyncio.TimeoutError:
+            yield f"event: error\ndata: {json.dumps({'detail': '请求处理超时'})}\n\n"
+        except Exception as exc:
+            yield f"event: error\ndata: {json.dumps({'detail': str(exc)[:200]})}\n\n"
+
+        yield "event: done\ndata: {}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )

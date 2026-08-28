@@ -11,6 +11,7 @@ from src.agents.nodes import (
     audit_log,
     authorize_reason_tool_call,
     call_reason_model,
+    clarify,
     compliance_check,
     compose,
     extract_citations,
@@ -35,6 +36,7 @@ from src.schemas.constants import (
     CONFIDENCE_HIGH_MIN_RESULTS,
     DEFAULT_MAX_HOPS,
     MAX_REASON_ATTEMPTS,
+    STATE_AMBIGUITY,
     STATE_COMPLIANCE,
     STATE_INTERMEDIATE_STEPS,
     STATE_REASON_ATTEMPTS,
@@ -112,6 +114,17 @@ def is_compliant(state: AssistantState) -> Literal["pass", "block"]:
     return "block"
 
 
+def should_clarify(state: AssistantState) -> Literal["clarify", "continue"]:
+    """P1-8: 判断查询是否存在歧义，需要用户澄清。
+
+    仅当 ambiguity 非空时触发澄清；LLM 被指示仅在歧义显著时返回。
+    """
+    ambiguities = state.get(STATE_AMBIGUITY, [])
+    if ambiguities and len(ambiguities) > 0:
+        return "clarify"
+    return "continue"
+
+
 # ══════════════════════════════════════════════════════════════════════
 # 5.2 Graph 定义
 # ══════════════════════════════════════════════════════════════════════
@@ -187,6 +200,8 @@ def build_agent_graph() -> StateGraph[AssistantState]:
     )
     # 查询理解
     graph.add_node("query_understand", _traced_node("query_understand", query_understand))
+    # P1-8: 歧义澄清节点
+    graph.add_node("clarify", _traced_node("clarify", clarify))
     # 生成检索计划
     graph.add_node("planner", _traced_node("planner", planner))
     # 执行检索
@@ -221,7 +236,15 @@ def build_agent_graph() -> StateGraph[AssistantState]:
     graph.add_edge(START, "load_conversation_context")
     graph.add_edge("load_conversation_context", "resolve_followup_query")
     graph.add_edge("resolve_followup_query", "query_understand")
-    graph.add_edge("query_understand", "planner")
+    # P1-8: 歧义检测——有歧义则澄清，否则继续检索计划
+    graph.add_conditional_edges(
+        "query_understand",
+        should_clarify,
+        {
+            "continue": "planner",
+            "clarify": "clarify",
+        },
+    )
     graph.add_edge("planner", "retrieve")
     graph.add_edge("retrieve", "grade_and_filter")
 
@@ -237,6 +260,8 @@ def build_agent_graph() -> StateGraph[AssistantState]:
     )
 
     graph.add_edge("permission_denied_response", "persist_conversation_turn")
+    # P1-8: 澄清节点直接进入会话保存（跳过检索/推理/验证）
+    graph.add_edge("clarify", "persist_conversation_turn")
     graph.add_edge("reason", "extract_citations")
     graph.add_edge("extract_citations", "verify")
 

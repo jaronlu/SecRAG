@@ -1,6 +1,7 @@
 """ChromaDB 向量检索器"""
 
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, Dict, List, Optional, cast
 
 import chromadb
@@ -15,6 +16,7 @@ from src.config import config
 from src.retrieval.base import BaseRetriever
 from src.schemas.constants import (
     CHROMA_COLLECTION_NAME,
+    CHROMA_EMBEDDING_MODEL_KEY,
     CHROMA_HNSW_SPACE_KEY,
     CHROMA_SPACE,
     DEFAULT_TOP_K,
@@ -29,11 +31,49 @@ class ChromaVectorRetriever(BaseRetriever):
         self.client = chromadb.PersistentClient(
             path=persist_directory,
         )
+        expected_model = config.embedding.model
         self.collection = self.client.get_or_create_collection(
             name=CHROMA_COLLECTION_NAME,
-            metadata={CHROMA_HNSW_SPACE_KEY: CHROMA_SPACE},
+            metadata={
+                CHROMA_HNSW_SPACE_KEY: CHROMA_SPACE,
+                CHROMA_EMBEDDING_MODEL_KEY: expected_model,
+            },
         )
+        self._verify_embedding_model(expected_model)
         self._model = None
+
+    def _verify_embedding_model(self, expected_model: str) -> None:
+        """校验 collection 记录的 embedding 模型与当前配置一致。
+
+        Legacy 数据（无 metadata）补写并告警；不匹配则抛出 RuntimeError。
+        """
+        import warnings
+
+        metadata = self.collection.metadata or {}
+        stored_model = metadata.get(CHROMA_EMBEDDING_MODEL_KEY)
+        # 非字符串值（如 None 或 mock 对象）视为未设置
+        if not isinstance(stored_model, str):
+            warnings.warn(
+                f"Chroma collection '{CHROMA_COLLECTION_NAME}' 未记录 embedding_model，"
+                f"补写为 '{expected_model}'。若实际入库模型不同，检索结果将不可靠。",
+                stacklevel=2,
+            )
+            try:
+                self.collection.modify(
+                    metadata={
+                        CHROMA_HNSW_SPACE_KEY: CHROMA_SPACE,
+                        CHROMA_EMBEDDING_MODEL_KEY: expected_model,
+                    }
+                )
+            except Exception:
+                warnings.warn("无法更新 collection metadata。", stacklevel=2)
+            return
+        if stored_model != expected_model:
+            raise RuntimeError(
+                f"Embedding 模型不匹配：Chroma collection 记录为 '{stored_model}'，"
+                f"当前配置为 '{expected_model}'。入库与检索必须使用同一模型，"
+                f"否则向量空间不匹配将导致检索完全失效。请重新入库或修正配置。"
+            )
 
     def retrieve(
         self,
@@ -48,6 +88,20 @@ class ChromaVectorRetriever(BaseRetriever):
             where=filters or None,
         )
         return self._format(results)
+
+    def delete_by_source(self, source: str) -> int:
+        """P2-7: 按 source 路径删除文档的所有 chunk，返回删除数量。
+
+        用于文档版本管理：重新入库前先删除旧版本，避免重复 chunk。
+        """
+        from src.schemas.constants import META_SOURCE
+
+        # 先查匹配的 ID
+        existing = self.collection.get(where={META_SOURCE: source}, include=[])
+        ids = existing.get("ids", [])
+        if ids:
+            self.collection.delete(ids=ids)
+        return len(ids)
 
     def _embed(self, text: str) -> List[float]:
         """调用配置的 embedding 模型（懒加载，首次使用时加载，之后复用）"""

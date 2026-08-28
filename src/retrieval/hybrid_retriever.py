@@ -3,6 +3,7 @@
 from typing import Callable, Optional
 
 from src.retrieval.base import BaseRetriever
+from src.retrieval.bm25_retriever import BM25Retriever, rrf_fuse
 from src.retrieval.faq_retriever import FAQRetriever
 from src.retrieval.product_retriever import ProductRetriever
 from src.retrieval.regulation_retriever import RegulationRetriever
@@ -50,6 +51,7 @@ class HybridRetriever:
         self.data_permissions = set(data_permissions or [PERMISSION_PUBLIC])
         self._retriever_cache: dict[str, BaseRetriever] = {}
         self._vector_engine: Optional[ChromaVectorRetriever] = None
+        self._bm25_retriever: Optional[BM25Retriever] = None
 
     def retrieve(self, plan: list[RetrievalPlanStep]) -> list[RetrievalResult]:
         """按角色过滤并执行一轮检索计划。
@@ -75,6 +77,30 @@ class HybridRetriever:
                     top_k=step.get(PLAN_TOP_K, DEFAULT_TOP_K),
                     filters=step.get(PLAN_FILTERS),
                 )
+                # P1-1: BM25 关键词检索 + RRF 融合（失败时静默降级为纯向量）
+                bm25 = self._get_bm25_retriever()
+                if bm25 is not None:
+                    try:
+                        bm25_results = bm25.retrieve(
+                            query=step.get(PLAN_QUERY, ""),
+                            top_k=step.get(PLAN_TOP_K, DEFAULT_TOP_K) * 2,
+                            filters=step.get(PLAN_FILTERS),
+                        )
+                        # BM25 结果按 source 过滤，只保留当前检索源
+                        source_filter = source or ""
+                        bm25_filtered = [
+                            r
+                            for r in bm25_results
+                            if source_filter in r.get(RR_METADATA, {}).get(META_SOURCE, "")
+                        ]
+                        if bm25_filtered:
+                            retrieved = rrf_fuse(
+                                retrieved,
+                                bm25_filtered,
+                                top_k=step.get(PLAN_TOP_K, DEFAULT_TOP_K),
+                            )
+                    except Exception:
+                        pass  # BM25 失败时静默降级
                 results.extend(self._filter_results_by_role(retrieved))
             except Exception as exc:
                 results.append(self._error_result(source, "检索失败", str(exc)))
@@ -118,6 +144,18 @@ class HybridRetriever:
         if self._vector_engine is None:
             self._vector_engine = ChromaVectorRetriever()
         return self._vector_engine
+
+    def _get_bm25_retriever(self) -> Optional[BM25Retriever]:
+        """懒加载 BM25 检索器；构建失败时返回 None（降级为纯向量检索）。"""
+        if self._bm25_retriever is not None:
+            return self._bm25_retriever
+        try:
+            self._bm25_retriever = BM25Retriever(self._get_vector_engine())
+            return self._bm25_retriever
+        except Exception:
+            # BM25 索引构建失败（如 ChromaDB 为空或依赖缺失），降级
+            self._bm25_retriever = None
+            return None
 
     def _filter_results_by_role(self, results: list[RetrievalResult]) -> list[RetrievalResult]:
         """按结果级 metadata 过滤：先看 permission_level，再看 allowed_roles。"""

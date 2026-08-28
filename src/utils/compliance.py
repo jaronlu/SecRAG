@@ -1,4 +1,9 @@
-"""合规检查工具。"""
+"""合规检查工具。
+
+两层防护：
+1. 正则模糊匹配层（fast-path）：允许关键词中间插入 0-3 个字符，覆盖"推荐你买入"等改写。
+2. 模式变体扩展：目标价格、TP、给予买入评级、可以考虑买入等常见绕过写法。
+"""
 
 import re
 from collections.abc import Iterable
@@ -7,6 +12,7 @@ from src.schemas.constants import ROLE_ADVISOR, ROLE_COMPLIANCE
 from src.schemas.typed_dicts import ComplianceResult
 
 TARGET_PRICE_PATTERN = "目标" + "价"
+# 显示用模式名（保持向后兼容，用于 flag 标识和 nodes.py 的 verify 层）
 INVESTMENT_ADVICE_PATTERNS: tuple[str, ...] = (
     "推荐" + "买" + "入",
     "建议" + "买" + "入",
@@ -15,11 +21,73 @@ INVESTMENT_ADVICE_PATTERNS: tuple[str, ...] = (
     "建议" + "减" + "持",
     TARGET_PRICE_PATTERN,
 )
+
+# ══════════════════════════════════════════════════════════════════════
+# 正则模式：允许关键词中间插入 0-3 个字符，覆盖常见改写绕过
+# 注意：不匹配"评级为买入"等研报引用句式（给予+评级组合易与引用混淆，不纳入）
+# ══════════════════════════════════════════════════════════════════════
+# 推荐买入：推荐买入 / 推荐你买入 / 推荐可以买入
+_RECOMMEND_BUY = (re.compile(r"推[荐议].{0,3}买[入进]"),)
+# 建议买入：建议买入 / 建议你买入 / 建议可以买入 / 可以考虑买入
+_ADVISE_BUY = (
+    re.compile(r"建[议].{0,3}买[入进]"),
+    re.compile(r"可以考虑.{0,3}买[入进]"),
+)
+# 建议卖出：建议卖出 / 建议你卖出 / 可以考虑卖出
+_ADVISE_SELL = (
+    re.compile(r"建[议].{0,3}卖[出]"),
+    re.compile(r"推[荐议].{0,3}卖[出]"),
+    re.compile(r"可以考虑.{0,3}卖[出]"),
+)
+# 建议增持：建议增持 / 建议你增持
+_ADVISE_INCREASE = (
+    re.compile(r"建[议].{0,3}增[持]"),
+    re.compile(r"推[荐议].{0,3}增[持]"),
+)
+# 建议减持：建议减持 / 建议你减持
+_ADVISE_DECREASE = (
+    re.compile(r"建[议].{0,3}减[持]"),
+    re.compile(r"推[荐议].{0,3}减[持]"),
+)
+# 目标价：目标价 / 目标价格 / TP / target price
+_TARGET_PRICE_REGEXES = (
+    re.compile(r"目标[价]"),
+    re.compile(r"目标价格"),
+    re.compile(r"\bTP\b", re.IGNORECASE),
+    re.compile(r"target\s*price", re.IGNORECASE),
+)
+
+# 模式名 → 正则列表 的映射，每个模式名独立匹配
+ADVICE_REGEX_MAP: dict[str, tuple[re.Pattern[str], ...]] = {
+    "推荐买入": _RECOMMEND_BUY,
+    "建议买入": _ADVISE_BUY,
+    "建议卖出": _ADVISE_SELL,
+    "建议增持": _ADVISE_INCREASE,
+    "建议减持": _ADVISE_DECREASE,
+    TARGET_PRICE_PATTERN: _TARGET_PRICE_REGEXES,
+}
+
 SENSITIVE_KEYWORDS: tuple[str, ...] = ("内" + "幕" + "信息", "未" + "公开", "业绩" + "预测")
 HIGH_RISK_PRODUCTS: tuple[str, ...] = ("标的型" + "产品", "混合型" + "产品", "私" + "募" + "产品")
 ARTICLE_REFERENCE_PATTERN = r"第[一二三四五六七八九十百千]+条|第\d+条|Article\s+\d+"
 RISK_DISCLOSURE = "\n\n【风险提示】本回答仅供参考，不构成业务建议。市场有风险，业务需谨慎。"
 SUITABILITY_WARNING = "\n\n【适当性提示】该产品风险等级较高，请确认客户风险承受能力是否匹配。"
+
+
+def matches_investment_advice(text: str) -> list[str]:
+    """用正则模糊匹配检测投资建议，返回命中的模式名列表。
+
+    允许关键词中间插入 0-3 个字符，覆盖"推荐你买入"、"可以考虑买入"等改写。
+    """
+    matched: list[str] = []
+    seen: set[str] = set()
+    for pattern_name, regexes in ADVICE_REGEX_MAP.items():
+        if pattern_name in seen:
+            continue
+        if any(rx.search(text) for rx in regexes):
+            matched.append(pattern_name)
+            seen.add(pattern_name)
+    return matched
 
 
 class ComplianceChecker:
@@ -88,7 +156,8 @@ class ComplianceChecker:
         return [keyword for keyword in self.sensitive_keywords if keyword in text]
 
     def _matched_investment_advice_patterns(self, text: str) -> list[str]:
-        return [pattern for pattern in self.investment_advice_patterns if pattern in text]
+        """用正则模糊匹配替代原始子串匹配，覆盖改写绕过。"""
+        return matches_investment_advice(text)
 
     def _has_article_reference(self, text: str) -> bool:
         return re.search(ARTICLE_REFERENCE_PATTERN, text) is not None

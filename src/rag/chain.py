@@ -47,6 +47,7 @@ def _retrieve_by_question(x: Dict[str, Any]) -> list[RetrievalResult]:
 
 def _build_llm():
     """根据 config.llm.provider 选择 LLM 后端"""
+    timeout = config.llm.timeout
     if config.llm.provider == LLM_PROVIDER_OPENAI:
         from langchain_openai import ChatOpenAI
 
@@ -55,6 +56,7 @@ def _build_llm():
             model=config.llm.model,
             temperature=config.llm.temperature,
             api_key=config.llm.api_key,
+            timeout=timeout,
         )
     # fallback: ollama
     from langchain_ollama import ChatOllama
@@ -64,7 +66,7 @@ def _build_llm():
         model=config.llm.model,
         temperature=config.llm.temperature,
         reasoning=False,
-        client_kwargs={"trust_env": False},
+        client_kwargs={"trust_env": False, "timeout": timeout},
     )
 
 

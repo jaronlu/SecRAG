@@ -7,12 +7,57 @@ from langchain_huggingface import HuggingFaceEmbeddings
 # ⚡ 字段统一：配置常量见 src/schemas/constants.py
 from src.schemas.constants import (
     CHROMA_COLLECTION_NAME,
+    CHROMA_EMBEDDING_MODEL_KEY,
     CHROMA_HNSW_SPACE_KEY,
     CHROMA_SPACE,
     CHROMA_UPSERT_BATCH_SIZE,
     DEFAULT_EMBEDDING_MODEL,
     META_DOC_ID,
 )
+
+
+def _collection_metadata(embedding_model_name: str) -> dict[str, str]:
+    """构建 Chroma collection metadata，记录 embedding 模型名用于一致性校验。"""
+    return {
+        CHROMA_HNSW_SPACE_KEY: CHROMA_SPACE,
+        CHROMA_EMBEDDING_MODEL_KEY: embedding_model_name,
+    }
+
+
+def verify_embedding_model_consistency(vectorstore: Chroma, expected_model: str) -> None:
+    """校验 Chroma collection 中记录的 embedding 模型与当前配置一致。
+
+    - 若 collection metadata 无 embedding_model（legacy 数据）：写入当前模型名并告警。
+    - 若记录的模型与预期不一致：抛出 RuntimeError，阻止向量空间不匹配导致的检索失效。
+    - 若 vectorstore 无 _collection 属性（如 mock 对象）：跳过校验。
+    """
+    collection = getattr(vectorstore, "_collection", None)
+    if collection is None:
+        return
+    stored_model = (
+        collection.metadata.get(CHROMA_EMBEDDING_MODEL_KEY) if collection.metadata else None
+    )
+    # 非字符串值（如 None 或 mock 对象）视为未设置
+    if not isinstance(stored_model, str):
+        # Legacy 数据：补写 metadata，不阻断
+        warnings.warn(
+            f"Chroma collection '{CHROMA_COLLECTION_NAME}' 未记录 embedding_model，"
+            f"补写为 '{expected_model}'。若实际入库模型不同，检索结果将不可靠。",
+            stacklevel=2,
+        )
+        try:
+            collection.modify(metadata=_collection_metadata(expected_model))
+        except Exception:
+            warnings.warn(
+                "无法更新 collection metadata（Chroma 版本可能不支持 modify）。", stacklevel=2
+            )
+        return
+    if stored_model != expected_model:
+        raise RuntimeError(
+            f"Embedding 模型不匹配：Chroma collection 记录为 '{stored_model}'，"
+            f"当前配置为 '{expected_model}'。入库与检索必须使用同一模型，"
+            f"否则向量空间不匹配将导致检索完全失效。请重新入库或修正配置。"
+        )
 
 
 def _detect_device() -> str:
@@ -56,6 +101,11 @@ def get_embedding_model(
         )
 
 
+def _model_name(embedding_model: HuggingFaceEmbeddings) -> str:
+    """从 HuggingFaceEmbeddings 实例提取模型名。"""
+    return getattr(embedding_model, "model_name", None) or DEFAULT_EMBEDDING_MODEL
+
+
 def embed_and_store(
     chunks: list[
         Document
@@ -64,36 +114,31 @@ def embed_and_store(
     embedding_model: HuggingFaceEmbeddings,  # 上面 get_embedding_model() 返回的转换器实例；≈ 传给 NSPersistentContainer 的 NSValueTransformer
 ) -> Chroma:  # 返回 Chroma 向量库实例；≈ NSPersistentContainer，之后可用来做 similarity_search（≈ fetch request）
     """将 chunks 向量化并存入 ChromaDB"""
-    # Chroma.from_documents() 是一个类工厂方法
-    # 类比：[NSPersistentContainer performFetch:request withTransformer:transformer]
-    # 1. 遍历 chunks，用 embedding_model 把每条 page_content 转成 float 向量
-    # 2. 向量 + 原文 + metadata 写入 Chroma 集合
-    # 3. 持久化到 persist_directory
+    model_name = _model_name(embedding_model)
     vectorstore = Chroma.from_documents(
         documents=chunks,
         embedding=embedding_model,
         persist_directory=persist_directory,
         collection_name=CHROMA_COLLECTION_NAME,
-        collection_metadata={
-            CHROMA_HNSW_SPACE_KEY: CHROMA_SPACE,
-        },
+        collection_metadata=_collection_metadata(model_name),
     )
-    return vectorstore  # 返回 Chroma 实例；≈ 返回 NSPersistentContainer，后续可用 .similarity_search() 做检索
+    return vectorstore
 
 
 def get_vectorstore(
     persist_directory: str,
     embedding_model: HuggingFaceEmbeddings,
 ) -> Chroma:
-    """打开既有 Chroma 集合，不隐式写入文档。"""
-    return Chroma(
+    """打开既有 Chroma 集合，不隐式写入文档，并校验 embedding 模型一致性。"""
+    model_name = _model_name(embedding_model)
+    vectorstore = Chroma(
         embedding_function=embedding_model,
         persist_directory=persist_directory,
         collection_name=CHROMA_COLLECTION_NAME,
-        collection_metadata={
-            CHROMA_HNSW_SPACE_KEY: CHROMA_SPACE,
-        },
+        collection_metadata=_collection_metadata(model_name),
     )
+    verify_embedding_model_consistency(vectorstore, model_name)
+    return vectorstore
 
 
 def upsert_chunks(

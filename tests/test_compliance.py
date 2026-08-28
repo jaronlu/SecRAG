@@ -1,5 +1,7 @@
 """合规检查工具测试。"""
 
+import pytest
+
 from src.schemas.constants import ROLE_ADVISOR, ROLE_COMPLIANCE
 from src.utils.compliance import ComplianceChecker
 
@@ -80,3 +82,34 @@ def test_compliance_checker_adds_suitability_warning_for_advisor_client():
 
     assert result["passed"] is True
     assert "适当性" in result["suitability_warning"]
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 改写绕过测试：验证正则模糊匹配能拦截关键词中间插入字符的情况
+# ══════════════════════════════════════════════════════════════════════
+
+@pytest.mark.parametrize("text", [
+    "推荐你买入这只股票",
+    "推荐可以买入",
+    "建议你买入",
+    "建议可以买入",
+    "可以考虑买入",
+    "建议你卖出",
+    "可以考虑卖出",
+    "建议你增持",
+    "建议你减持",
+    "目标价格为100元",
+])
+def test_compliance_blocks_paraphrased_advice(text):
+    """关键词中间插入字符的改写应被正则拦截。"""
+    checker = ComplianceChecker()
+    result = checker.check(text)
+    assert result["passed"] is False, f"应拦截: {text}"
+    assert any(flag.startswith("advice:") for flag in result["flags"])
+
+
+def test_compliance_allows_neutral_buy_mention():
+    """中性提及'买入'但非建议句式不应被拦截。"""
+    checker = ComplianceChecker()
+    result = checker.check("该报告中提到了买入和卖出两种操作策略。")
+    assert result["passed"] is True

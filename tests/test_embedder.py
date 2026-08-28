@@ -5,7 +5,12 @@ from typing import Any
 from langchain_core.documents import Document
 
 from src.ingestion import embedder
-from src.schemas.constants import CHROMA_HNSW_SPACE_KEY, CHROMA_SPACE
+from src.schemas.constants import (
+    CHROMA_EMBEDDING_MODEL_KEY,
+    CHROMA_HNSW_SPACE_KEY,
+    CHROMA_SPACE,
+    DEFAULT_EMBEDDING_MODEL,
+)
 
 
 def test_detect_device_prefers_cuda(monkeypatch):
@@ -87,7 +92,10 @@ def test_embed_and_store_uses_provided_embedding_model(monkeypatch, tmp_path):
         "embedding": embedding_model,
         "persist_directory": str(tmp_path),
         "collection_name": "securities_docs",
-        "collection_metadata": {CHROMA_HNSW_SPACE_KEY: CHROMA_SPACE},
+        "collection_metadata": {
+            CHROMA_HNSW_SPACE_KEY: CHROMA_SPACE,
+            CHROMA_EMBEDDING_MODEL_KEY: DEFAULT_EMBEDDING_MODEL,
+        },
     }
 
 
