@@ -27,3 +27,5 @@ artifacts/evaluation/
 
 # 本地设计文档软链接不提交
 docs/design
+# zcode hooks
+.mimosa/
