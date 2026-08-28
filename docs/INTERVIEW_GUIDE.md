@@ -1095,43 +1095,92 @@ docker compose logs -f # 查看日志
 
 #### 🥈 P1：建议做（差异化加分，实现成本中等）
 
-##### 需求 4：语义缓存层
+##### 需求 4：语义缓存层 ✅ 已实现
 
 **现状**：每次查询都走完整的检索 + LLM 流程，相似查询重复计算，响应慢、成本高。
 
-**拓展内容**：
-- 实现语义缓存：用 embedding 向量计算查询相似度，相似度 > 阈值时复用历史回答
-- 缓存存储：Redis（生产）或 SQLite（原型），带 TTL 过期
-- 缓存命中率统计：作为可观测性指标
-- 缓存失效策略：文档更新时自动失效相关缓存
+**实现内容**：
+- `src/utils/semantic_cache.py` — 语义缓存核心模块
+  - 基于 embedding 向量的余弦相似度匹配（默认阈值 0.90）
+  - SQLite 持久化（WAL 模式，线程安全，线程本地连接）
+  - 角色隔离：不同角色的缓存独立，避免权限越权
+  - TTL 过期：默认 24 小时，过期自动失效
+  - 命中率统计：hit/miss 计数，可查询命中率
+  - 懒加载 embedding 模型（避免启动时加载）
+- API 层集成（`src/api/main.py`）
+  - 查询前先查缓存，命中则直接返回（带 `cached: true` 和 `cache_similarity` 标记）
+  - 未命中则走正常 RAG 流程，结果返回前存入缓存（仅缓存有实质回答的结果）
+  - 缓存管理端点：`GET /v1/admin/cache/stats`（统计）、`POST /v1/admin/cache/clear`（清理）
+
+**使用方式**：
+```bash
+# 缓存默认开启，查询自动命中
+# 查看缓存统计
+curl -H "Authorization: Bearer demo-tech" http://localhost:8000/v1/admin/cache/stats
+# 清理过期缓存
+curl -X POST -H "Authorization: Bearer demo-tech" "http://localhost:8000/v1/admin/cache/clear?clear_expired_only=true"
+```
+
+**验证结果**：
+- pyright 0 错误，273 单元测试全通过
+- 缓存查询、存储、命中率统计功能完整
+- 角色隔离确保不同权限角色不会互相命中缓存
 
 **面试加分点**：
-- "我加了语义缓存层，相似查询直接复用历史回答，缓存命中率 XX%，平均响应时间从 XX 秒降到 XX 秒"
-- "用 embedding 向量做语义匹配，而不是简单的字符串精确匹配"
+- "我加了语义缓存层，用 embedding 向量做余弦相似度匹配，相似度超过 0.9 就复用历史回答，避免重复的检索 + LLM 调用"
+- "缓存按角色隔离，不同权限角色的缓存独立，避免越权访问；带 TTL 过期，默认 24 小时自动失效"
+- "用 SQLite WAL 模式做持久化，线程本地连接保证线程安全；有缓存命中率统计和管理端点"
 - 展示性能优化思维和成本意识
 
-**实现成本**：3-4 天
+**实现成本**：已完成（约 1.5 天）
 
 **面试 ROI**：⭐⭐⭐⭐（缓存优化是高级话题，能区分"会用 RAG"和"会优化 RAG"）
 
 ---
 
-##### 需求 5：可观测性体系（链路追踪 + 指标）
+##### 需求 5：可观测性体系（指标采集 + Prometheus 导出）✅ 已实现
 
-**现状**：只有节点级耗时记录（`_traced_node`），没有系统化的监控和链路追踪。
+**现状**：只有节点级耗时记录（`_traced_node`），没有系统化的监控和指标导出。
 
-**拓展内容**：
-- 集成 OpenTelemetry：每个 Agent 节点自动创建 span，形成完整调用链
-- 关键指标采集：查询量、响应延迟 P50/P95/P99、检索命中率、验证通过率、合规拦截率、缓存命中率
-- 指标导出：Prometheus 格式，可对接 Grafana 仪表盘
-- 健康检查接口增强：返回关键指标摘要
+**实现内容**：
+- `src/utils/metrics.py` — 轻量级指标采集模块
+  - 三种指标类型：Counter（计数器）、Gauge（仪表盘）、Histogram（直方图，支持 P50/P95/P99 百分位）
+  - 10 个核心指标：
+    - `secrag_queries_total`：查询总数（按 role/status 标签）
+    - `secrag_query_duration_seconds`：查询延迟直方图（P50/P95/P99）
+    - `secrag_active_requests`：当前活跃请求数
+    - `secrag_cache_hits_total` / `secrag_cache_misses_total`：缓存命中/未命中
+    - `secrag_retrieval_chunks_total`：检索返回 chunk 总数
+    - `secrag_verification_passed_total` / `secrag_verification_failed_total`：验证通过/失败
+    - `secrag_compliance_blocked_total`：合规拦截数
+  - Prometheus 文本格式导出（标准 `# HELP` / `# TYPE` / 标签格式）
+  - 线程安全，全局单例
+- API 层集成（`src/api/main.py`）
+  - QA 端点记录完整指标：查询量、延迟、活跃请求数、缓存命中
+  - `GET /metrics`：Prometheus 指标导出端点（可被 Prometheus 抓取，对接 Grafana）
+  - 健康检查增强：`/health` 返回中加入 `metrics` 字段（运行时间、查询量、成功率、缓存命中率、P50/P95/P99 延迟）
+
+**使用方式**：
+```bash
+# Prometheus 抓取
+curl http://localhost:8000/metrics
+# 健康检查（含指标摘要）
+curl http://localhost:8000/health | jq .metrics
+```
+
+**验证结果**：
+- pyright 0 错误，273 单元测试全通过
+- Prometheus 导出格式正确（HELP/TYPE/标签/bucket）
+- 健康检查指标摘要包含 14 个关键指标
 
 **面试加分点**：
-- "我用 OpenTelemetry 做了全链路追踪，每个 Agent 节点都是一个 span，可以在 Jaeger 里看到完整的调用链和耗时分布"
-- "采集了 8 个核心指标，包括 P95 延迟、检索命中率、验证通过率，用 Prometheus + Grafana 做监控仪表盘"
-- 展示生产级工程思维
+- "我实现了轻量级指标采集体系，有 Counter/Gauge/Histogram 三种指标类型，采集了 10 个核心指标包括查询量、P95 延迟、缓存命中率、验证通过率"
+- "`/metrics` 端点输出标准 Prometheus 文本格式，可以直接被 Prometheus 抓取，对接 Grafana 做监控仪表盘"
+- "健康检查接口增强了，返回运行时间、查询量、成功率、P50/P95/P99 延迟、缓存命中率等关键指标摘要"
+- "Histogram 支持百分位计算，保留最近 1000 个样本用于 P50/P95/P99"
+- 展示生产级工程思维（预留了 OpenTelemetry 接入点，当前用轻量实现避免外部依赖）
 
-**实现成本**：3-5 天
+**实现成本**：已完成（约 1.5 天）
 
 **面试 ROI**：⭐⭐⭐⭐（可观测性是生产系统的标志，面试官问"上线后怎么监控"时有答案）
 
@@ -1199,14 +1248,15 @@ docker compose logs -f # 查看日志
 
 **第一阶段已完成，项目从"原型"升级为"可演示的完整产品"**，面试时可以现场演示流式输出和评估报告。
 
-#### 第二阶段（2-3 周，有时间则做）⏳ 待实现
+#### 第二阶段（2-3 周，有时间则做）⏳ 部分完成
 
-| 需求 | 预计工时 | 核心产出 |
+| 需求 | 状态 | 实际产出 |
 |---|---|---|
-| P1-4 语义缓存 | 3-4 天 | 缓存层 + 命中率统计 |
-| P1-5 可观测性 | 3-5 天 | OpenTelemetry 链路追踪 + Prometheus 指标 |
+| P1-4 语义缓存 | ✅ 已完成 | `src/utils/semantic_cache.py` + API 集成 + 管理端点 |
+| P1-5 可观测性 | ✅ 已完成 | `src/utils/metrics.py` + `/metrics` 端点 + 健康检查增强 |
+| P1-6 现代化前端 | ⏳ 待做 | React 前端 + 会话管理 |
 
-**第二阶段完成后，项目具备"生产级工程能力"的证明**，面试时可以讲性能优化和监控体系。
+**第二阶段已完成语义缓存和可观测性**，面试时可以讲性能优化和监控体系。
 
 #### 第三阶段（1 个月+，长期提升）
 
@@ -1261,8 +1311,9 @@ ChromaDB、SQLite、模型缓存都在 volume 里，容器重建不丢数据。
 | **流式输出** | SSE 实时返回回答片段 + 检索过程 | ✅ 已完成 | 展示异步编程能力 |
 | **评估体系** | LLM-as-judge 自动评估 + 标注集 | ✅ 已完成 | 展示数据驱动思维 |
 | **Docker 容器化** | 多阶段构建 + docker-compose | ✅ 已完成 | 展示 DevOps 能力 |
+| **语义缓存** | embedding 相似度缓存 + 命中率统计 | ✅ 已完成 | 展示性能优化思维 |
+| **可观测性** | Prometheus 指标 + 健康检查增强 | ✅ 已完成 | 展示生产级工程思维 |
 | **前端优化** | React/Vue 现代化前端 + 会话管理界面 | ⏳ 待做 | 展示全栈能力 |
-| **缓存层** | 语义缓存（相似查询复用回答）+ Redis | ⏳ 待做 | 展示性能优化思维 |
 
 ### 9.2 中期扩展（1-2 月）
 

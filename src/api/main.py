@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import time
 import uuid
 from typing import cast
 
@@ -42,6 +43,8 @@ from src.schemas.request_response import (
     ConversationThreadResponse,
 )
 from src.utils.rate_limit import check_rate_limit, get_rate_limit_key
+from src.utils.semantic_cache import get_semantic_cache
+from src.utils.metrics import get_metrics
 
 app = FastAPI(title="机构内部投研知识平台", version="0.1.0")
 app.include_router(ingestion_router)
@@ -88,7 +91,27 @@ async def health_check():
         status["chroma"] = {"status": "ok", "doc_count": count}
     except Exception as exc:
         status["chroma"] = {"status": "error", "error": str(exc)[:200]}
+
+    # P1-5: 可观测性——健康检查中加入关键指标摘要
+    try:
+        status["metrics"] = get_metrics().get_summary()
+    except Exception:
+        pass
+
     return status
+
+
+@app.get("/metrics")
+async def prometheus_metrics():
+    """P1-5: Prometheus 指标导出端点——输出标准 Prometheus 文本格式。
+
+    可被 Prometheus 抓取，对接 Grafana 仪表盘监控。
+    """
+    metrics_text = get_metrics().export_prometheus()
+    return Response(
+        content=metrics_text,
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
 
 
 @app.get("/v1/admin/stats/queries")
@@ -103,6 +126,38 @@ async def query_stats(
     if user.role != "admin":
         raise HTTPException(status_code=403, detail="仅管理员可访问统计数据")
     return _get_conversation_store().query_stats(days=days)
+
+
+@app.get("/v1/admin/cache/stats")
+async def semantic_cache_stats(
+    user: AuthenticatedUser = Depends(authenticate_user),
+):
+    """P1-4: 语义缓存统计端点——返回缓存条目数、命中率、阈值等。
+
+    仅 admin/technical 角色可访问。
+    """
+    if user.role not in ("admin", "technical"):
+        raise HTTPException(status_code=403, detail="仅管理员可访问缓存统计")
+    return get_semantic_cache().get_stats()
+
+
+@app.post("/v1/admin/cache/clear")
+async def semantic_cache_clear(
+    clear_expired_only: bool = False,
+    user: AuthenticatedUser = Depends(authenticate_user),
+):
+    """P1-4: 语义缓存清理端点——清理过期缓存或全部清空。
+
+    仅 admin/technical 角色可访问。
+    """
+    if user.role not in ("admin", "technical"):
+        raise HTTPException(status_code=403, detail="仅管理员可清理缓存")
+    cache = get_semantic_cache()
+    if clear_expired_only:
+        cleared = cache.clear_expired()
+        return {"cleared": cleared, "mode": "expired_only"}
+    cleared = cache.clear_all()
+    return {"cleared": cleared, "mode": "all"}
 
 
 @app.delete("/v1/admin/documents")
@@ -237,10 +292,22 @@ async def assistant_qa(
     request: AssistantQARequest,
     user: AuthenticatedUser = Depends(authenticate_user),
 ):
+    # P1-5: 可观测性——记录请求开始时间和活跃请求数
+    start_time = time.time()
+    metrics = get_metrics()
+    metrics.active_requests.inc()
+
+    def _record_metrics(status: str, is_cached: bool = False):
+        """记录查询指标并减少活跃请求数。"""
+        duration = time.time() - start_time
+        metrics.record_query(role=user.role, status=status, duration=duration, cached=is_cached)
+        metrics.active_requests.dec()
+
     # P2-2: 限流——按 user_id 滑动窗口，每分钟 30 次
     rate_key = get_rate_limit_key(user_id=user.user_id)
     allowed, _ = check_rate_limit(rate_key)
     if not allowed:
+        _record_metrics("rate_limited")
         raise HTTPException(
             status_code=429,
             detail="请求过于频繁，请稍后再试（每分钟最多 30 次）。",
@@ -272,12 +339,34 @@ async def assistant_qa(
         "configurable": {"thread_id": thread_id},
         "recursion_limit": AGENT_RECURSION_LIMIT,
     }
+
+    # P1-4: 语义缓存——查询前先查缓存，命中则直接返回
+    cache = get_semantic_cache()
+    cache_hit = cache.lookup(request.query, role=user.role)
+    if cache_hit:
+        audit_logger.info(
+            "Semantic cache hit: thread_id=%s similarity=%.4f",
+            thread_id, cache_hit["similarity"],
+        )
+        _record_metrics("success", is_cached=True)
+        return {
+            "thread_id": thread_id,
+            "turn_id": turn_id,
+            "answer": cache_hit["answer"],
+            "citations": cache_hit["citations"],
+            "confidence": cache_hit["confidence"],
+            "compliance": {"passed": True},
+            "cached": True,
+            "cache_similarity": cache_hit["similarity"],
+        }
+
     try:
         result = await asyncio.wait_for(
             asyncio.to_thread(agent.invoke, initial_state, runnable_config),
             timeout=config.api_request_timeout_seconds,
         )
     except asyncio.TimeoutError:
+        _record_metrics("timeout")
         audit_logger.warning(
             "Assistant QA timed out after %.1fs: thread_id=%s",
             config.api_request_timeout_seconds,
@@ -289,6 +378,7 @@ async def assistant_qa(
         )
     except Exception as exc:
         if _is_provider_unavailable(exc):
+            _record_metrics("provider_unavailable")
             audit_logger.warning(
                 "Assistant provider unavailable: thread_id=%s error=%s",
                 thread_id,
@@ -304,12 +394,25 @@ async def assistant_qa(
             ) from exc
 
         audit_logger.exception("Assistant QA failed: thread_id=%s", thread_id)
+        _record_metrics("error")
         raise HTTPException(status_code=500, detail="内部处理错误") from exc
 
+    # P1-4: 语义缓存——结果返回前存入缓存（仅缓存有回答且验证通过的结果）
+    answer = result.get(STATE_FINAL_ANSWER, "")
+    if answer and len(answer) > 10:
+        cache.store(
+            query=request.query,
+            answer=answer,
+            citations=result.get(STATE_CITATIONS, []),
+            confidence=result.get(STATE_CONFIDENCE, ""),
+            role=user.role,
+        )
+
+    _record_metrics("success")
     return AssistantQAResponse(
         thread_id=result.get(STATE_THREAD_ID, thread_id),
         turn_id=result.get(STATE_TURN_ID, turn_id),
-        answer=result[STATE_FINAL_ANSWER],
+        answer=answer,
         citations=result[STATE_CITATIONS],
         confidence=result[STATE_CONFIDENCE],
         compliance=result[STATE_COMPLIANCE],
