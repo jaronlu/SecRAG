@@ -4,6 +4,7 @@ from pathlib import Path
 from src.api.auth import TOKEN_USER_BINDINGS
 from src.schemas.constants import (
     API_ROUTE_ASSISTANT_QA,
+    API_ROUTE_ASSISTANT_QA_STREAM,
     API_ROUTE_ASSISTANT_THREADS,
     API_ROUTE_INGESTION_CATEGORIES,
     API_ROUTE_INGESTION_CHUNKS,
@@ -63,6 +64,9 @@ def render_ui_html() -> str:
     ).replace(
         "__ASSISTANT_QA_PATH__",
         API_ROUTE_ASSISTANT_QA,
+    ).replace(
+        "__ASSISTANT_QA_STREAM_PATH__",
+        API_ROUTE_ASSISTANT_QA_STREAM,
     ).replace(
         "__THREADS_PATH__",
         API_ROUTE_ASSISTANT_THREADS,
