@@ -3,12 +3,14 @@ import json
 import logging
 import time
 import uuid
+from pathlib import Path
 from typing import cast
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from langchain_core.runnables.config import RunnableConfig
 from openai import APIConnectionError, APIStatusError, APITimeoutError
 
@@ -20,6 +22,9 @@ from src.api.auth import (
 from src.api.ingestion import router as ingestion_router
 from src.api.ui import render_ui_html
 from src.config import config
+
+# 追踪日志记录器（结构化 JSON，可对接 ELK / Loki）
+audit_logger = logging.getLogger("secrag.audit")
 from src.schemas.constants import (
     AGENT_RECURSION_LIMIT,
     API_ROUTE_ASSISTANT_QA,
@@ -57,10 +62,48 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# P1-6: React 前端静态文件挂载（如果 frontend/dist 存在）
+_FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+if _FRONTEND_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=str(_FRONTEND_DIST / "assets")), name="assets")
+    audit_logger.info("React frontend mounted from %s", _FRONTEND_DIST)
+else:
+    audit_logger.info("React frontend not found at %s, using legacy HTML UI", _FRONTEND_DIST)
+
 
 @app.get("/", response_class=HTMLResponse)
 async def ui():
+    # P1-6: 如果 React 前端构建产物存在，优先服务 React 前端
+    if _FRONTEND_DIST.exists():
+        return FileResponse(str(_FRONTEND_DIST / "index.html"))
     return render_ui_html()
+
+
+@app.get("/legacy", response_class=HTMLResponse)
+async def legacy_ui():
+    """旧版 HTML UI（React 前端启用时可通过 /legacy 访问）。"""
+    return render_ui_html()
+
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_ui():
+    """P2: 知识库管理后台页面。"""
+    # P1-6: 如果 React 前端存在，React 路由处理 /admin
+    if _FRONTEND_DIST.exists():
+        return FileResponse(str(_FRONTEND_DIST / "index.html"))
+    admin_html = Path(__file__).parent / "admin.html"
+    return HTMLResponse(content=admin_html.read_text(encoding="utf-8"))
+
+
+@app.get("/{full_path:path}", response_class=HTMLResponse)
+async def spa_catch_all(full_path: str):
+    """React Router catch-all——非 API 路径返回 index.html。"""
+    # API 路径由具体路由处理，不会走到这里
+    if _FRONTEND_DIST.exists() and not full_path.startswith(("v1/", "health", "metrics", "docs", "openapi.json")):
+        index_file = _FRONTEND_DIST / "index.html"
+        if index_file.exists():
+            return FileResponse(str(index_file))
+    raise HTTPException(status_code=404, detail="Not Found")
 
 
 @app.get("/favicon.ico", include_in_schema=False)
@@ -178,8 +221,72 @@ async def delete_document(
     return {"source": source, "deleted_chunks": deleted}
 
 
-# 追踪日志记录器（结构化 JSON，可对接 ELK / Loki）
-audit_logger = logging.getLogger("secrag.audit")
+@app.get("/v1/admin/documents")
+async def list_documents(
+    doc_type: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+    user: AuthenticatedUser = Depends(authenticate_user),
+):
+    """P2: 知识库文档列表——列出所有已入库文档（按 source 分组）。
+
+    仅 admin/technical 角色可访问。支持按 doc_type 筛选、分页。
+    """
+    if user.role not in ("admin", "technical"):
+        raise HTTPException(status_code=403, detail="仅管理员可查看文档列表")
+    from src.utils.knowledge_base import get_kb_manager
+
+    return get_kb_manager().list_documents(doc_type=doc_type, limit=limit, offset=offset)
+
+
+@app.get("/v1/admin/documents/stats")
+async def knowledge_base_stats(
+    user: AuthenticatedUser = Depends(authenticate_user),
+):
+    """P2: 知识库统计——返回文档数、chunk 数、按类型分布。
+
+    仅 admin/technical 角色可访问。
+    """
+    if user.role not in ("admin", "technical"):
+        raise HTTPException(status_code=403, detail="仅管理员可查看统计")
+    from src.utils.knowledge_base import get_kb_manager
+
+    return get_kb_manager().get_stats()
+
+
+@app.get("/v1/admin/documents/chunks")
+async def get_document_chunks(
+    source: str,
+    limit: int = 50,
+    offset: int = 0,
+    user: AuthenticatedUser = Depends(authenticate_user),
+):
+    """P2: 文档 chunk 详情——查看某文档的所有 chunk 内容和元数据。
+
+    仅 admin/technical 角色可访问。用于排查检索质量问题。
+    """
+    if user.role not in ("admin", "technical"):
+        raise HTTPException(status_code=403, detail="仅管理员可查看 chunk 详情")
+    from src.utils.knowledge_base import get_kb_manager
+
+    return get_kb_manager().get_document_chunks(source=source, limit=limit, offset=offset)
+
+
+@app.post("/v1/admin/documents/search")
+async def search_knowledge_base(
+    query: str,
+    top_k: int = 5,
+    user: AuthenticatedUser = Depends(authenticate_user),
+):
+    """P2: 知识库语义搜索——直接在向量库中搜索，用于预览检索效果。
+
+    仅 admin/technical 角色可访问。不经过 Agent 流程，直接返回检索结果。
+    """
+    if user.role not in ("admin", "technical"):
+        raise HTTPException(status_code=403, detail="仅管理员可搜索知识库")
+    from src.utils.knowledge_base import get_kb_manager
+
+    return {"query": query, "results": get_kb_manager().search_documents(query=query, top_k=top_k)}
 
 
 # ══════════════════════════════════════════════════════════════════════

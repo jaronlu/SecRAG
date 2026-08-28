@@ -5,6 +5,14 @@ HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-8001}"
 LOG_FILE="${LOG_FILE:-/tmp/secrag-${PORT}.log}"
 KILL_EXISTING="${KILL_EXISTING:-1}"
+BUILD_FRONTEND="${BUILD_FRONTEND:-auto}"  # auto|always|never
+
+# P1-6: 可选构建 React 前端
+if [ "${BUILD_FRONTEND}" = "always" ] || { [ "${BUILD_FRONTEND}" = "auto" ] && [ ! -d "frontend/dist" ] && command -v npm >/dev/null 2>&1 && [ -d "frontend" ]; }; then
+  echo "Building React frontend..."
+  (cd frontend && npm install --silent && npm run build)
+  echo "Frontend built successfully."
+fi
 
 if ! command -v uv >/dev/null 2>&1; then
   echo "uv is required. Install uv first: https://docs.astral.sh/uv/"
@@ -42,8 +50,12 @@ fi
 echo "Starting SecRAG on http://${HOST}:${PORT}"
 echo "Logs: ${LOG_FILE}"
 echo
-echo "UI:   http://${HOST}:${PORT}/"
-echo "Docs: http://${HOST}:${PORT}/docs"
+echo "UI:      http://${HOST}:${PORT}/"
+echo "Admin:   http://${HOST}:${PORT}/admin"
+echo "Legacy:  http://${HOST}:${PORT}/legacy"
+echo "Docs:    http://${HOST}:${PORT}/docs"
+echo "Health:  http://${HOST}:${PORT}/health"
+echo "Metrics: http://${HOST}:${PORT}/metrics"
 echo
 
 exec uv run uvicorn src.api.main:app --host "${HOST}" --port "${PORT}" 2>&1 | tee "${LOG_FILE}"
