@@ -25,18 +25,35 @@ PII_PATTERNS = [
 
 
 def detect_pii(text: str) -> list[dict[str, str]]:
-    """检测文本中的 PII，返回 [{type, match, position}] 列表。"""
+    """检测文本中的 PII，返回 [{type, match, position}] 列表。
+
+    按优先级处理：身份证 > 银行卡 > 手机号 > 邮箱。
+    避免 18 位身份证号被同时匹配为银行卡（16-19 位数字模式）。
+    """
     findings: list[dict[str, str]] = []
     if not text:
         return findings
-    for pii_type, pattern, _ in PII_PATTERNS:
+    # 已匹配的字符区间，用于去重（高优先级模式先匹配，低优先级跳过重叠）
+    occupied_spans: list[tuple[int, int]] = []
+    # 优先级顺序：身份证先于银行卡
+    priority_order = ["id_card", "bank_card", "phone", "email"]
+    patterns_by_type = {p[0]: (p[1], p[2]) for p in PII_PATTERNS}
+    for pii_type in priority_order:
+        pattern, _ = patterns_by_type[pii_type]
         for match in pattern.finditer(text):
-            findings.append({
-                "type": pii_type,
-                "match": match.group(),
-                "start": str(match.start()),
-                "end": str(match.end()),
-            })
+            start, end = match.start(), match.end()
+            # 检查是否与已匹配区间重叠
+            if any(s < end and e > start for s, e in occupied_spans):
+                continue
+            occupied_spans.append((start, end))
+            findings.append(
+                {
+                    "type": pii_type,
+                    "match": match.group(),
+                    "start": str(start),
+                    "end": str(end),
+                }
+            )
     return findings
 
 

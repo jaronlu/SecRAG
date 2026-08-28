@@ -78,13 +78,16 @@ def matches_investment_advice(text: str) -> list[str]:
     """用正则模糊匹配检测投资建议，返回命中的模式名列表。
 
     允许关键词中间插入 0-3 个字符，覆盖"推荐你买入"、"可以考虑买入"等改写。
+    匹配前去除空白字符，防止"推 荐 你 买 入"等空格分隔绕过。
     """
     matched: list[str] = []
     seen: set[str] = set()
+    # 去除所有空白字符，防止空格/制表符分隔绕过
+    normalized = re.sub(r"\s+", "", text)
     for pattern_name, regexes in ADVICE_REGEX_MAP.items():
         if pattern_name in seen:
             continue
-        if any(rx.search(text) for rx in regexes):
+        if any(rx.search(normalized) for rx in regexes):
             matched.append(pattern_name)
             seen.add(pattern_name)
     return matched

@@ -222,19 +222,46 @@ def _cached_retrieve(
 # Prompt Injection 防护（P1-5）
 # ══════════════════════════════════════════════════════════════════════
 # 已知注入模式：用户或文档中试图覆盖系统指令的表述
+# 红队测试驱动：覆盖直接指令、角色越权、分隔符注入、间接注入、编码绕过
 _INJECTION_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"忽略(以上|之前|前面|上述).{0,10}(指令|提示|系统|规则)", re.IGNORECASE),
-    re.compile(r"ignore\s+(previous|above|prior|all).{0,10}(instructions?|prompts?|rules?)", re.IGNORECASE),
-    re.compile(r"你现在是|you\s+are\s+now", re.IGNORECASE),
+    # 直接忽略指令（中文）
+    re.compile(r"忽略(以上|之前|前面|上述|所有).{0,10}(指令|提示|系统|规则|约束)", re.IGNORECASE),
+    # 直接忽略指令（英文）
+    re.compile(r"ignore\s+(previous|above|prior|all|every).{0,10}(instructions?|prompts?|rules?|constraints?)", re.IGNORECASE),
+    # 角色越权 / DAN 模式
+    re.compile(r"你现在是|从现在开始你是|you\s+are\s+now|act\s+as\s+(dan|aipgm|developer)", re.IGNORECASE),
+    re.compile(r"没有任何限制|不受任何限制|no\s+restrictions?|no\s+limits?|bypass\s+(all\s+)?restrictions?", re.IGNORECASE),
+    # 系统提示词窃取
     re.compile(r"系统提示|system\s*prompt|system\s*:", re.IGNORECASE),
-    re.compile(r"输出(你的|系统|完整).{0,5}(提示|指令|prompt)", re.IGNORECASE),
-    re.compile(r"reveal\s+(your|the)\s+(system\s+)?prompt", re.IGNORECASE),
+    re.compile(r"输出(你的|系统|完整|初始).{0,5}(提示|指令|prompt|配置)", re.IGNORECASE),
+    re.compile(r"reveal\s+(your|the)\s+(system\s+)?prompt|print\s+(your|the)\s+system\s+prompt", re.IGNORECASE),
+    # 分隔符注入：试图用标记分隔用户输入和新指令
+    re.compile(r"(人类|用户).{0,5}(提问|输入|消息).{0,5}(结束|完毕|完成).{0,10}(新的|新)?(指令|提示|命令|开始)", re.IGNORECASE),
+    re.compile(r"={3,}|\*{3,}|-{5,}", re.IGNORECASE),  # 大量分隔符
+    # 间接注入伪装：假装是文档/系统消息
+    re.compile(r"【(文档|系统|重要|通知)】.{0,20}(更新|解除|取消|绕过).{0,10}(限制|安全|约束)", re.IGNORECASE),
+    # 编码绕过：要求解码并执行
+    re.compile(r"(解码|解密|decode|decrypt|base64|hex).{0,10}(并|然后|then)?(执行|运行|execute|run|follow)", re.IGNORECASE),
+    # 重复指令词（英文）
+    re.compile(r"\b(ignore|disregard|forget)\s+(ignore|disregard|forget)\b", re.IGNORECASE),
+    # 越狱关键词
+    re.compile(r"\b(DAN|AIPGM|jailbreak|developer\s+mode|god\s+mode)\b", re.IGNORECASE),
 )
+
+# Unicode 零宽字符和控制字符，用于混淆检测
+_INJECTION_NORMALIZE_RE = re.compile(r"[\u200b-\u200f\u202a-\u202e\ufeff]")
 
 
 def _detect_injection(text: str) -> bool:
-    """检测文本中是否包含 Prompt Injection 模式。"""
-    return any(pat.search(text) for pat in _INJECTION_PATTERNS)
+    """检测文本中是否包含 Prompt Injection 模式。
+
+    先归一化（去除零宽字符），再匹配已知模式。
+    """
+    if not text:
+        return False
+    # 去除零宽字符，防止 Unicode 混淆绕过
+    normalized = _INJECTION_NORMALIZE_RE.sub("", text)
+    return any(pat.search(normalized) for pat in _INJECTION_PATTERNS)
 
 
 def sanitize_query(query: str) -> tuple[str, bool]:
@@ -420,9 +447,14 @@ def query_understand(state: AssistantState) -> dict[str, Any]:
   "query_type": "product_inquiry | rule_inquiry | regulation_inquiry | report_inquiry | faq_inquiry | technical_inquiry",
   "entities": {{"product_name": "", "product_type": "", "stock_code": "", "regulation_name": "", "client_segment": "", "time_range": {{"start": "", "end": ""}}}},
   "rewritten_query": "优化后的结构化查询",
-  "ambiguity": ["是指开放式产品还是封闭式产品？"]
+  "ambiguity": []
 }}
 
+ambiguity 填写规则（严格遵守）：
+- 仅当查询缺少关键信息、导致无法给出任何有意义回答时，才填入澄清问题
+- 通用/宽泛问题（如"货币基金的风险等级是什么"）可以给出通用回答，不算歧义，ambiguity 留空
+- 只有指向特定产品但未指定产品名、或涉及具体时间但未给时间范围等情况，才视为歧义
+- 绝大多数查询 ambiguity 应为空数组 []
 time_range 说明：如果查询涉及时间范围（如"最近3个月"、"2024年"、"去年"），填入 ISO 日期 start/end；否则留空字符串。
 只返回 JSON，不要其他内容。"""
 

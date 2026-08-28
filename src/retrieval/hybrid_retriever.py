@@ -163,7 +163,8 @@ class HybridRetriever:
         for result in results:
             metadata = result.get(RR_METADATA, {})
             # 先看 permission_level：是否在用户允许的权限范围内
-            permission_level = metadata.get(META_PERMISSION_LEVEL, PERMISSION_PUBLIC)
+            # metadata 中缺少该字段或值为 None/空时，默认为 public（安全默认）
+            permission_level = metadata.get(META_PERMISSION_LEVEL) or PERMISSION_PUBLIC
             if permission_level not in self.data_permissions:
                 # 用户无权访问该权限级别的数据
                 filtered.append(
