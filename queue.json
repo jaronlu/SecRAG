@@ -137,7 +137,7 @@
       "id": "T-003",
       "phase": "P1-trigger",
       "title": "每日增量扫描 Job 与事件分级",
-      "status": "pending",
+      "status": "done",
       "risk": "medium",
       "size": "L",
       "deps": [
@@ -165,12 +165,12 @@
         "uv run pytest tests/test_event_grading.py -q",
         "uv run ruff check src/jobs"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "max_attempts": 3,
       "last_error": null,
-      "notes": "分级规则初版可用启发式（公告类型 + 评级变动 + 涨跌幅阈值），但阈值必须外置为可配置项，不写死在代码里。",
+      "notes": "分级规则初版可用启发式（公告类型 + 评级变动 + 涨跌幅阈值），但阈值必须外置为可配置项，不写死在代码里。\n\n已完成（2026-09-14）：新增 src/jobs/event_grading.py 与 daily_scan.py。分级为纯规则实现（非模型），阈值全部集中在 GradingThresholds dataclass，默认值是待校正的启发式起点而非标定值；每条判定都携带 reasons + matched_rules + evidence，P2 也必须说明「比对了多少条关键词 / 幅度差多少」才能被滤除。\n\n幂等键 dedupe_key 由事件本体身份（user_id|stock_code|source_kind|source_ref|title|date）哈希而来，刻意不含 scan_date——这样不仅同一交易日重跑不重复，隔天重跑也不会让同一事件第二次出现在晨报里（隔天重复比漏报更糟）。UNIQUE 索引 + INSERT OR IGNORE 实现，rowcount 区分 inserted 与 skipped。\n\n扫描输入来自 T-001 的真实产物结构：分散的 *.meta.json 旁路清单、financials/efinance_{code}_quote_history.csv（列名已重命名为 pct_change/date/code）、financials/research_reports_index.csv（列名沿用 akshare 原始中文键 + sample_stock_code）。三者分别对应 grade_document / grade_quote_move / grade_research_report。\n\n验证：tests/test_event_grading.py 19 passed；全量 pytest 312 passed 无回归；ruff check + format 通过。\n\n变异测试（防空测试）：1) 给 dedupe_key 追加 uuid4 令其失效 -> 恰好 2 个幂等测试变红，其余 17 个保持通过（含隔日重跑那条）；2) list_events 的 WHERE 放开 user_id 过滤 -> 恰好 2 个越权/隔离测试变红，其余 17 个保持通过。\n\n偏差说明：task.files 原列 daily_scan.py 与 event_grading.py，实际另需 src/jobs/__init__.py 才能作为包导入（与前两个 Store 模块的包约定一致）。未改动 config.py，阈值靠构造函数注入。\n\n未验证：真实 provider 产出的 CSV 列名大小写与空值形态未真机核对（依赖未安装且未联网），读取侧统一用 dtype=str + fillna(\"\") 兜住，异常值一律降级为 P2 并在 reasons 中记录原因而非抛错。",
       "created_at": "2026-09-14T21:15:00+08:00",
-      "updated_at": "2026-09-14T21:15:00+08:00"
+      "updated_at": "2026-09-14T22:58:21+08:00"
     }
   ]
 }
