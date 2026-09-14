@@ -2,7 +2,7 @@
   "version": 1,
   "project": "SecRAG",
   "goal": "把 SecRAG 从「被动问答的架构验证原型」重做成「持仓驱动的投研情报 Agent」：绑定持仓/关注池，每日增量扫描五路数据源，产出可直接外发的晨报（影响判断 + 原文引用 + 合规预检）。",
-  "updated_at": "2026-09-14T22:36:00+08:00",
+  "updated_at": "2026-09-14T23:57:51+08:00",
   "conventions": {
     "env": "uv",
     "test": "uv run python -m pytest",
@@ -19,7 +19,8 @@
       ".venv 内脚本 shebang 停留在迁移前路径，uv run <tool> 不可用，统一用 uv run python -m <tool>",
       "jieba 与 rank_bm25 被 src/retrieval/bm25_retriever.py 引用，但既不在 pyproject 也不在 uv.lock；uv sync 会卸载它们，需 uv pip install 补回",
       "若 pytest 报 mkdir EEXIST 且路径为系统临时目录，改用 --basetemp=/tmp/<name> 规避残留",
-      "Bash 里的 grep 在本沙箱静默返回空（exit 0 但无输出），核验代码事实必须用专用检索工具，不可用 shell grep 下结论"
+      "Bash 里的 grep 在本沙箱静默返回空（exit 0 但无输出），核验代码事实必须用专用检索工具，不可用 shell grep 下结论",
+      "uv sync 会卸载任何未写入 pyproject 的手工安装包：本轮它移走了 en-core-web-sm，导致 tests/test_loader.py 两个测试失败（unstructured 需要该 spacy 模型）"
     ]
   },
   "enums": {
@@ -174,13 +175,13 @@
       "updated_at": "2026-09-14T22:58:21+08:00"
     },
     {
-      "status": "pending",
-      "attempts": 0,
+      "status": "done",
+      "attempts": 1,
       "max_attempts": 3,
       "last_error": null,
-      "notes": "",
+      "notes": "\n\n已完成（2026-09-14）：写入 pyproject.toml 主依赖 jieba>=0.42.1、rank-bm25>=0.2.2，uv lock 重解后仅新增这两个包（lock +22 行，无既有包版本变动，无包被移除）。\n\n为何是主依赖而非 extra：bm25_retriever 参与混合检索的每一个检索步骤（hybrid_retriever.py:82-101），缺失时链路会在 103 行静默降级为纯向量——是核心能力退化，不是可选增强，因此不放在 extra 里。\n\n验证：三条 verify 全部 exit 0。acceptance 1 用「先 uv pip uninstall 再 uv sync」做了等价验证：仅凭声明即自动装回（jieba 0.42.1 / rank-bm25 0.2.2），uv tree --depth 1 确认两者均为一级依赖。\n\n反向对照实验（防空绿）：临时从 pyproject 移除这两行 -> uv lock 报 Removed -> uv sync 卸载 -> import jieba 抛 ModuleNotFoundError。证明 verify 的通过确实归因于本次改动，而非先前手工安装的残留。对照结束后已恢复并提交前复核。\n\n遗留副作用（必须交代）：执行 uv sync 时它顺带卸载了未声明的 en-core-web-sm==3.8.0，导致全量回归中 tests/test_loader.py::test_load_pdf 与 ::test_word 失败（根因：src/ingestion/loaders.py:10 的 UnstructuredLoader 间接依赖该 spacy 模型，卸载后 unstructured 尝试联网下载并在沙箱内失败）。已尝试恢复：PyPI 无此包，官方 GitHub wheel 下载被沙箱阻断（SIGTERM），本机其他环境与缓存均无副本，故当前环境未能复原。这不是代码回归，且揭示了另一个真实缺陷，已单开 T-014。\n\n同时被 sync 卸载的 pytest-asyncio 与 ruff 已用 uv sync --extra dev 复原。注意：项目 dev 工具在 optional-dependencies 而非 dependency-groups，裸跑 uv sync 会卸掉它们——README 的「开发验证」段用的是 uv run ruff/pytest，与此存在落差，未在本 task 内改动。",
       "created_at": "2026-09-14T22:36:00+08:00",
-      "updated_at": "2026-09-14T22:36:00+08:00",
+      "updated_at": "2026-09-14T23:57:51+08:00",
       "id": "T-004",
       "phase": "P3-harden",
       "title": "固化缺失的第三方依赖声明",
@@ -548,6 +549,43 @@
         "uv run python -m pytest tests/test_provider_contract_probe.py -q",
         "uv run python -m ruff check scripts/provider_contract_probe.py"
       ]
+    },
+    {
+      "id": "T-014",
+      "phase": "P3-harden",
+      "title": "声明 test_loader 所需的 spacy 模型依赖",
+      "status": "pending",
+      "risk": "medium",
+      "size": "S",
+      "deps": [],
+      "context": [
+        "src/ingestion/loaders.py",
+        "tests/test_loader.py",
+        "pyproject.toml",
+        "uv.lock"
+      ],
+      "files": [
+        "pyproject.toml",
+        "uv.lock",
+        "tests/test_loader.py"
+      ],
+      "desc": "src/ingestion/loaders.py:10 使用 langchain_unstructured.UnstructuredLoader，运行时依赖 spacy 模型 en_core_web_sm。该模型既不在 pyproject.toml 也不在 uv.lock 中，是纯手工安装的环境残留。实证：一次 uv sync 即将其卸载，随后 tests/test_loader.py::test_load_pdf 报 assert 0 > 0、::test_word 报 Failed to download spaCy model，且之后无法在本环境复原（PyPI 无此包，GitHub wheel 下载被网络策略阻断）。修复方向是把模型固化为可解析的依赖（spacy 官方 wheel URL 写在依赖里，或改用不依赖模型的解析策略并在测试中显式标注跳过条件），确保 fresh clone + uv sync 后全量测试可通过。若所处环境确实无法获取该模型，如实置 blocked 并写清缺失条件，禁止用 mock 或跳过策略把失败藏起来。",
+      "acceptance": [
+        "fresh 环境下 uv sync 后 import en_core_web_sm 成功",
+        "tests/test_loader.py 两个测试在同一环境通过",
+        "依赖声明可被 uv lock 解析，无需手工安装步骤",
+        "若选择让测试跳过，必须在 notes 写明不可获取的环境条件，而不是静默 skip"
+      ],
+      "verify": [
+        "uv run python -c \"import en_core_web_sm\"",
+        "uv run python -m pytest tests/test_loader.py -q"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "last_error": null,
+      "notes": "由 T-004 执行过程中的环境副作用暴露：uv sync 卸载了未声明的 en-core-web-sm，进而导致全量回归出现 2 个失败。与 T-004 的 jieba/rank-bm25 属同一类缺陷，但该文件只在测试中被动触发，容易被忽略。",
+      "created_at": "2026-09-14T23:57:51+08:00",
+      "updated_at": "2026-09-14T23:57:51+08:00"
     }
   ]
 }

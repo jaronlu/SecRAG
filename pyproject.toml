@@ -31,6 +31,10 @@ dependencies = [
     "sqlglot>=30.12.0",
     "openpyxl>=3.1.5",
     "xlrd>=2.0.2",
+    # 混合检索链路的每个检索步骤都叠加 BM25 + RRF，缺失只会静默降级为纯向量，
+    # 因此列为主依赖而非 extra。
+    "jieba>=0.42.1",
+    "rank-bm25>=0.2.2",
 ]
 
 [project.optional-dependencies]

@@ -232,13 +232,14 @@ tests/          自动化测试
 ## 当前边界
 
 - 标准检索链路是角色感知的多源向量检索，并在每个检索步骤叠加 BM25 与 RRF 融合；BM25 索引构建失败时静默降级为纯向量结果，降级过程不记录原因。
-- BM25 依赖的 `jieba` 与 `rank-bm25` 尚未写入 `pyproject.toml`，`uv sync` 会将其卸载并使 `bm25_retriever` 导入失败，需要手动 `uv pip install jieba rank-bm25`。
 - Reranker 作为 Agent 工具提供，是否调用由推理过程决定，不是标准检索阶段的固定步骤。
 - LangGraph checkpointer 使用内存存储；服务重启后不会恢复图执行状态。
 - 会话、审计和入库任务使用本地 SQLite，后台入库基于单机进程，不支持多实例任务调度。
 - demo token、样例数据和小规模评估集只能证明流程，不能证明生产安全性、吞吐量或回答质量。
 - OpenAI-compatible provider 和公开数据抓取依赖外部服务；Ollama 模式仍需本地模型与 embedding 模型。
 - 事件分级阈值的默认值是启发式起点，未经真实标注数据标定，不应直接当作生产判据使用。
+- `uv sync` 会卸载任何未写入 `pyproject.toml` 的包。开发所需的 `pytest-asyncio` 与 `ruff` 位于 optional-dependencies，需要 `uv sync --extra dev` 才会安装，裸跑 `uv sync` 会把它们移除。
+- `src/ingestion/loaders.py` 经 langchain-unstructured 间接依赖 spacy 模型 `en_core_web_sm`，该模型尚未纳入依赖声明；`uv sync` 之后 `tests/test_loader.py` 需要另行安装它。
 - 抓取脚本依赖的三个 provider 契约（akshare 成分股列名、cninfo orgId 解析、efinance 与 baostock 返回值）未在联网环境实机核对；不符之处体现为失败清单，不会提前报错。
 
 ## License
