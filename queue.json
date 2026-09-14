@@ -1,0 +1,176 @@
+{
+  "version": 1,
+  "project": "SecRAG",
+  "goal": "把 SecRAG 从「被动问答的架构验证原型」重做成「持仓驱动的投研情报 Agent」：绑定持仓/关注池，每日增量扫描五路数据源，产出可直接外发的晨报（影响判断 + 原文引用 + 合规预检）。",
+  "updated_at": "2026-09-14T21:15:00+08:00",
+  "conventions": {
+    "env": "uv",
+    "test": "uv run python -m pytest",
+    "lint": "uv run python -m ruff check .",
+    "format_check": "uv run python -m ruff format --check .",
+    "rules": [
+      "一个 task 一次原子提交，提交信息英文，格式 type(scope): imperative summary",
+      "不用降级行为冒充完成：能力未实现就返回未实现或标记 blocked，不得 silent fallback",
+      "禁止新增依赖 / 改架构边界 / 改公开接口，除非 task.desc 明确授权",
+      "删除数据、破坏性 git 操作、处理密钥必须先人工确认"
+    ],
+    "env_notes": [
+      "uv 位于 ~/.local/bin，未进 PATH，执行前 export PATH=\"$HOME/.local/bin:$PATH\"",
+      ".venv 内脚本 shebang 停留在迁移前路径，uv run <tool> 不可用，统一用 uv run python -m <tool>",
+      "jieba 与 rank_bm25 被 src/retrieval/bm25_retriever.py 引用，但既不在 pyproject 也不在 uv.lock；uv sync 会卸载它们，需 uv pip install 补回",
+      "若 pytest 报 mkdir EEXIST 且路径为系统临时目录，改用 --basetemp=/tmp/<name> 规避残留"
+    ]
+  },
+  "enums": {
+    "status": {
+      "pending": "未开始，可被领取",
+      "in_progress": "执行中",
+      "done": "verify 全通过且 acceptance 逐条满足",
+      "failed": "attempts 达到 max_attempts 仍未通过",
+      "blocked": "需人工介入：缺权限/缺密钥/需决策/verify 无法执行",
+      "cancelled": "已废弃，不再执行"
+    },
+    "risk": {
+      "low": "可逆，仅本地代码与测试",
+      "medium": "改动数据模型、脚本或外部依赖调用",
+      "high": "不可逆、涉及外部系统、密钥或生产数据，执行前须人工确认"
+    },
+    "phase": {
+      "P0-data-pipeline": "数据层：唯一硬门槛，沪深300 覆盖 + 增量幂等",
+      "P1-trigger": "触发层：持仓绑定 + 每日 Job + 事件分级",
+      "P2-delivery": "交付层：晨报生成 + 合规预检 + 推送归档",
+      "P3-harden": "加固：评估集、权限审查、性能与可运维"
+    }
+  },
+  "protocol": {
+    "pick": "取第一个 status=pending 且 deps 全部 done 的 task；不存在则队列结束",
+    "before": [
+      "读 task.context 列出的全部文件",
+      "status 置 in_progress，attempts += 1，updated_at 刷新"
+    ],
+    "execute": "只做 task.desc 范围内的最小改动，不顺手重构或格式化无关代码",
+    "after": [
+      "按序执行 task.verify 全部命令，要求全部 exit 0",
+      "逐条核对 task.acceptance，全部满足才置 done",
+      "任一不通过：写入 last_error，attempts >= max_attempts 则 failed，否则回 pending 重试"
+    ],
+    "stop_conditions": [
+      "risk=high 且未获人工确认 -> blocked，写明需要的确认项",
+      "verify 命令无法执行（缺依赖/缺数据/缺密钥）-> blocked，不得标记 done",
+      "发现 task 前提错误或设计冲突 -> blocked，并在 notes 写明冲突点"
+    ],
+    "report": "输出 结论 -> 改动文件 -> verify 结果 -> 残余风险"
+  },
+  "tasks": [
+    {
+      "id": "T-001",
+      "phase": "P0-data-pipeline",
+      "title": "批量抓取脚本覆盖沪深300成分股近12个月数据",
+      "status": "done",
+      "risk": "medium",
+      "size": "L",
+      "deps": [],
+      "context": [
+        "scripts/fetch_real_securities_data.py",
+        "data/raw/real_securities_data/metadata.json"
+      ],
+      "files": [
+        "scripts/fetch_real_securities_data.py",
+        "tests/test_fetch_real_securities_data.py"
+      ],
+      "desc": "扩展 scripts/fetch_real_securities_data.py：从当前单只股票抓取改为按沪深300成分股批量抓取公告、研报索引、评级、行情四类数据，时间范围近12个月，输出到 data/raw/real_securities_data/。成分股列表必须由脚本运行时获取，不得硬编码代码表。抓取需支持增量（记录上次水位，不重复拉取已入库区间）与幂等（同一区间重复执行不产生重复记录）。单只标的失败写入失败清单并继续，不中断整体任务。数据源限流与断连需重试并记录。",
+      "acceptance": [
+        "成分股列表来自运行时数据源，代码中无硬编码股票代码表",
+        "同一区间连续执行两次，产出文件记录数一致（幂等）",
+        "单只标的抓取失败时进入失败清单，其余标的照常完成",
+        "产出目录结构与现有 data/raw/real_securities_data/ 保持一致",
+        "新增 tests/test_fetch_real_securities_data.py，覆盖幂等性与失败隔离"
+      ],
+      "verify": [
+        "uv run pytest tests/test_fetch_real_securities_data.py -q",
+        "uv run ruff check scripts/fetch_real_securities_data.py"
+      ],
+      "attempts": 1,
+      "max_attempts": 3,
+      "last_error": null,
+      "notes": "当前真实数据仅 17 个文件、研报索引 10 行且全为 000001，此 task 是整条链路的硬门槛。抓取依赖 akshare / efinance / baostock 为临时依赖，需确认是否固化进 pyproject 的可选 extras。\n\n已完成（2026-09-14）：改造脚本为运行时 index 成分股驱动的批量编排，新增 load_index_constituents（provider 运行时获取，列名漂移则 fail loud）、collect_target（单标的失败隔离进 journal）、load_cached_record（sha256 命中则跳过，保证幂等）、download_file 重试、state + failure journal 落盘。\n\n验证：tests/test_fetch_real_securities_data.py 7 passed；全量 uv run python -m pytest 280 passed 无回归；ruff check + format 通过。\n\n变异测试（防空测试）：1) 令 load_cached_record 恒返回 None -> 仅幂等测试变红；2) 令 collect_target 不捕获异常 -> 仅两个失败隔离测试变红。证明测试确有鉴别力。\n\n未验证（须真机确认）：akshare.index_stock_cons 列名、cninfo topSearch orgId 解析、efinance/baostock 调用契约均未在本环境实跑（依赖不在 lock 且未联网），第三方 provider 契约若有漂移会在 FAILURES_FILENAME 中落案而非崩溃。",
+      "created_at": "2026-09-14T21:15:00+08:00",
+      "updated_at": "2026-09-14T22:16:59+08:00"
+    },
+    {
+      "id": "T-002",
+      "phase": "P1-trigger",
+      "title": "建立持仓/关注池数据模型与读写接口",
+      "status": "pending",
+      "risk": "medium",
+      "size": "M",
+      "deps": [],
+      "context": [
+        "~/llm-wiki/workshop/SecRAG/raw/SCHEMA-REFERENCE.md",
+        "src/utils/conversation.py",
+        "src/ingestion/registry.py"
+      ],
+      "files": [
+        "src/portfolio/models.py",
+        "src/portfolio/store.py",
+        "tests/test_portfolio_store.py"
+      ],
+      "desc": "新增持仓/关注池能力：定义 Holding（user_id, stock_code, position_side, weight, source）与 Watchlist 的持久化模型，基于现有 SQLite 存储层实现增删改查。持仓与关注池是个人化情报的前提，必须与角色权限打通——用户只能读写自己的持仓。需先读 SCHEMA-REFERENCE.md 确认现有表结构与命名约定后再落表。",
+      "acceptance": [
+        "表结构与命名符合 SCHEMA-REFERENCE.md 现有约定，不另起一套",
+        "用户 A 无法读取或写入用户 B 的持仓记录（有测试覆盖）",
+        "CRUD 接口有类型标注与 docstring，跨模块传递结构用 TypedDict",
+        "tests/test_portfolio_store.py 覆盖增删改查与越权拦截"
+      ],
+      "verify": [
+        "uv run pytest tests/test_portfolio_store.py -q",
+        "uv run ruff check src/portfolio"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "last_error": null,
+      "notes": "需先核对 SCHEMA-REFERENCE.md 现有表命名，避免与会话/审计表冲突。若现有存储层不支持独立模块注册，先在 notes 记录冲突并置 blocked。",
+      "created_at": "2026-09-14T21:15:00+08:00",
+      "updated_at": "2026-09-14T21:15:00+08:00"
+    },
+    {
+      "id": "T-003",
+      "phase": "P1-trigger",
+      "title": "每日增量扫描 Job 与事件分级",
+      "status": "pending",
+      "risk": "medium",
+      "size": "L",
+      "deps": [
+        "T-001",
+        "T-002"
+      ],
+      "context": [
+        "src/agents/graph.py",
+        "src/agents/nodes.py",
+        "src/retrieval/hybrid_retriever.py"
+      ],
+      "files": [
+        "src/jobs/daily_scan.py",
+        "src/jobs/event_grading.py",
+        "tests/test_event_grading.py"
+      ],
+      "desc": "实现每日扫描 Job：对每位用户的持仓/关注池标的，从 T-001 产出的数据中取当日增量，生成事件卡片并按 P0 必看 / P1 关注 / P2 滤除三级分类。分级需给出判定依据字段，不得只给结论。仅 P0/P1 进入下游晨报。Job 需可重复执行（同一日重跑不产生重复事件），并记录每次运行的水位与统计。",
+      "acceptance": [
+        "同一交易日重复执行不产生重复事件卡片（幂等，有测试）",
+        "每条事件卡片含分级判定依据字段，不是裸结论",
+        "P2 事件被明确滤除且可追溯（记录被滤除的原因）",
+        "Job 运行状态与水位持久化，可查询历史执行记录"
+      ],
+      "verify": [
+        "uv run pytest tests/test_event_grading.py -q",
+        "uv run ruff check src/jobs"
+      ],
+      "attempts": 0,
+      "max_attempts": 3,
+      "last_error": null,
+      "notes": "分级规则初版可用启发式（公告类型 + 评级变动 + 涨跌幅阈值），但阈值必须外置为可配置项，不写死在代码里。",
+      "created_at": "2026-09-14T21:15:00+08:00",
+      "updated_at": "2026-09-14T21:15:00+08:00"
+    }
+  ]
+}
