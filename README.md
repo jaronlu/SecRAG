@@ -14,6 +14,8 @@
 - **可信输出**：回答依次经过引用提取、来源与数字验证、合规检查，再生成最终响应。
 - **会话与审计**：SQLite 保存会话、审计记录和入库任务状态。
 - **增量入库**：支持稳定文档 ID、内容哈希、版本管理、更新跳过和旧 chunk 清理。
+- **持仓与关注池**：每位用户维护自己的持仓与关注标的，所有读写按 `user_id` 隔离，越权按不存在处理。
+- **每日增量扫描与事件分级**：对持仓标的扫描抓取产物生成事件卡片，按 P0 / P1 / P2 分级，每张卡片保留判定依据。
 
 ## 工作流
 
@@ -170,7 +172,35 @@ uv run --with akshare --with efinance --with baostock \
   python scripts/fetch_real_securities_data.py
 ```
 
+抓取脚本的行为：成分股列表在运行时从数据源解析，代码中没有硬编码股票代码表；按内容哈希跳过
+已入库记录，重复执行不重复下载；单只标的失败只写入 `.fetch_failures.json` 而不中断整批；批次
+结束后在产物目录留下 `.fetch_state.json` 水位。
+
 外部数据接口可能限流、断连或变更，仓库中的固定样本用于保证本地解析与入库验证不依赖实时抓取。
+
+### 每日扫描与分级
+
+对每位用户的持仓与关注标的扫描上述产物，生成事件卡片并分级。目前只有 Python 调用入口，尚未
+提供 CLI 或 HTTP 接口。
+
+```python
+from pathlib import Path
+
+from src.jobs.daily_scan import SQLiteDailyScanStore, run_daily_scan
+from src.portfolio.store import SQLitePortfolioStore
+
+summary = run_daily_scan(
+    output_dir=Path("data/raw/real_securities_data"),
+    portfolio_store=SQLitePortfolioStore("data/portfolio.db"),
+    scan_store=SQLiteDailyScanStore("data/scan.db"),
+    user_ids=["u1"],
+)
+print(summary["events_inserted"], summary["grade_counts"])
+```
+
+同一交易日重复调用不会重复生成卡片：幂等键由事件本身计算，不包含运行日期，因此在之后的日子
+重跑也不会让同一事件第二次出现。P2 卡片同样入库但标记为 `filtered`，保留被滤除的原因；只有
+P0 / P1 供下游消费。每次运行在 `scan.db` 留下一条按用户记录的水位。
 
 ## 开发验证
 
@@ -179,7 +209,8 @@ uv run ruff check .
 uv run pytest
 ```
 
-当前测试覆盖 Agent 节点与路由、身份和权限、检索、数据摄入、会话、合规、工具以及 API。
+当前测试覆盖 Agent 节点与路由、身份和权限、检索、数据摄入、会话、合规、工具、API、持仓存储
+以及每日扫描与事件分级。
 
 ## 项目结构
 
@@ -188,6 +219,8 @@ src/
   agents/       LangGraph 工作流、状态和 Agent 工具
   api/          FastAPI 路由、身份绑定和 Web UI
   ingestion/    文档解析、切片、增量入库和任务状态
+  jobs/         每日增量扫描与事件分级
+  portfolio/    持仓与关注池持久化
   rag/          基础 RAG 链
   retrieval/    多源向量检索和权限过滤
   tools/        计算、行情、SQL、财务指标与重排工具
@@ -198,12 +231,15 @@ tests/          自动化测试
 
 ## 当前边界
 
-- 标准检索链路是角色感知的多源向量检索，不包含 BM25、RRF 等稀疏检索融合。
+- 标准检索链路是角色感知的多源向量检索，并在每个检索步骤叠加 BM25 与 RRF 融合；BM25 索引构建失败时静默降级为纯向量结果，降级过程不记录原因。
+- BM25 依赖的 `jieba` 与 `rank-bm25` 尚未写入 `pyproject.toml`，`uv sync` 会将其卸载并使 `bm25_retriever` 导入失败，需要手动 `uv pip install jieba rank-bm25`。
 - Reranker 作为 Agent 工具提供，是否调用由推理过程决定，不是标准检索阶段的固定步骤。
 - LangGraph checkpointer 使用内存存储；服务重启后不会恢复图执行状态。
 - 会话、审计和入库任务使用本地 SQLite，后台入库基于单机进程，不支持多实例任务调度。
 - demo token、样例数据和小规模评估集只能证明流程，不能证明生产安全性、吞吐量或回答质量。
 - OpenAI-compatible provider 和公开数据抓取依赖外部服务；Ollama 模式仍需本地模型与 embedding 模型。
+- 事件分级阈值的默认值是启发式起点，未经真实标注数据标定，不应直接当作生产判据使用。
+- 抓取脚本依赖的三个 provider 契约（akshare 成分股列名、cninfo orgId 解析、efinance 与 baostock 返回值）未在联网环境实机核对；不符之处体现为失败清单，不会提前报错。
 
 ## License
 
