@@ -101,7 +101,7 @@
       "id": "T-002",
       "phase": "P1-trigger",
       "title": "建立持仓/关注池数据模型与读写接口",
-      "status": "pending",
+      "status": "done",
       "risk": "medium",
       "size": "M",
       "deps": [],
@@ -126,12 +126,12 @@
         "uv run pytest tests/test_portfolio_store.py -q",
         "uv run ruff check src/portfolio"
       ],
-      "attempts": 0,
+      "attempts": 1,
       "max_attempts": 3,
       "last_error": null,
-      "notes": "需先核对 SCHEMA-REFERENCE.md 现有表命名，避免与会话/审计表冲突。若现有存储层不支持独立模块注册，先在 notes 记录冲突并置 blocked。",
+      "notes": "需先核对 SCHEMA-REFERENCE.md 现有表命名，避免与会话/审计表冲突。若现有存储层不支持独立模块注册，先在 notes 记录冲突并置 blocked。\n\n已完成（2026-09-14）：新增 src/portfolio/models.py 与 store.py，以 portfolio_positions 单表 + position_side 区分持仓与关注池（避免两张近乎重复的表漂移）。存储完全对齐 conversation.py 既有约定：snake_case 复数表名、ISO-8601 *_at 文本时间戳、deleted_at 软删除、每次操作前的 CREATE TABLE IF NOT EXISTS。对外提供 add/get/list/update/remove 与 list_symbols_for_user（供 T-003 每日扫描取标的）。所有读写均按 user_id 过滤，越权一律抛 PortfolioNotFoundError，不泄露记录是否存在。\n\n验证：tests/test_portfolio_store.py 13 passed；全量 pytest 293 passed 无回归；ruff check + format 通过。\n\n变异测试（防空测试）：在 _find_row 的 WHERE 中追加 OR 1=1 令 user_id 过滤失效 -> 恰好 3 个越权测试变红（读/改/删），其余 10 个保持通过，证明隔离断言真实生效。\n\n偏差说明：SCHEMA-REFERENCE.md 是字段键名与枚举的参考文档，不含 DDL，因此表结构实际以 conversation.py 的持久化约定为准；db 路径由调用方注入，未改动 config.py。",
       "created_at": "2026-09-14T21:15:00+08:00",
-      "updated_at": "2026-09-14T21:15:00+08:00"
+      "updated_at": "2026-09-14T22:33:44+08:00"
     },
     {
       "id": "T-003",

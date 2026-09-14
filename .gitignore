@@ -29,3 +29,4 @@ artifacts/evaluation/
 docs/design
 # zcode hooks
 .mimosa/
+.workbuddy/
