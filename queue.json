@@ -2,7 +2,7 @@
   "version": 1,
   "project": "SecRAG",
   "goal": "把 SecRAG 从「被动问答的架构验证原型」重做成「持仓驱动的投研情报 Agent」：绑定持仓/关注池，每日增量扫描五路数据源，产出可直接外发的晨报（影响判断 + 原文引用 + 合规预检）。",
-  "updated_at": "2026-09-14T21:15:00+08:00",
+  "updated_at": "2026-09-14T22:36:00+08:00",
   "conventions": {
     "env": "uv",
     "test": "uv run python -m pytest",
@@ -18,7 +18,8 @@
       "uv 位于 ~/.local/bin，未进 PATH，执行前 export PATH=\"$HOME/.local/bin:$PATH\"",
       ".venv 内脚本 shebang 停留在迁移前路径，uv run <tool> 不可用，统一用 uv run python -m <tool>",
       "jieba 与 rank_bm25 被 src/retrieval/bm25_retriever.py 引用，但既不在 pyproject 也不在 uv.lock；uv sync 会卸载它们，需 uv pip install 补回",
-      "若 pytest 报 mkdir EEXIST 且路径为系统临时目录，改用 --basetemp=/tmp/<name> 规避残留"
+      "若 pytest 报 mkdir EEXIST 且路径为系统临时目录，改用 --basetemp=/tmp/<name> 规避残留",
+      "Bash 里的 grep 在本沙箱静默返回空（exit 0 但无输出），核验代码事实必须用专用检索工具，不可用 shell grep 下结论"
     ]
   },
   "enums": {
@@ -171,6 +172,382 @@
       "notes": "分级规则初版可用启发式（公告类型 + 评级变动 + 涨跌幅阈值），但阈值必须外置为可配置项，不写死在代码里。\n\n已完成（2026-09-14）：新增 src/jobs/event_grading.py 与 daily_scan.py。分级为纯规则实现（非模型），阈值全部集中在 GradingThresholds dataclass，默认值是待校正的启发式起点而非标定值；每条判定都携带 reasons + matched_rules + evidence，P2 也必须说明「比对了多少条关键词 / 幅度差多少」才能被滤除。\n\n幂等键 dedupe_key 由事件本体身份（user_id|stock_code|source_kind|source_ref|title|date）哈希而来，刻意不含 scan_date——这样不仅同一交易日重跑不重复，隔天重跑也不会让同一事件第二次出现在晨报里（隔天重复比漏报更糟）。UNIQUE 索引 + INSERT OR IGNORE 实现，rowcount 区分 inserted 与 skipped。\n\n扫描输入来自 T-001 的真实产物结构：分散的 *.meta.json 旁路清单、financials/efinance_{code}_quote_history.csv（列名已重命名为 pct_change/date/code）、financials/research_reports_index.csv（列名沿用 akshare 原始中文键 + sample_stock_code）。三者分别对应 grade_document / grade_quote_move / grade_research_report。\n\n验证：tests/test_event_grading.py 19 passed；全量 pytest 312 passed 无回归；ruff check + format 通过。\n\n变异测试（防空测试）：1) 给 dedupe_key 追加 uuid4 令其失效 -> 恰好 2 个幂等测试变红，其余 17 个保持通过（含隔日重跑那条）；2) list_events 的 WHERE 放开 user_id 过滤 -> 恰好 2 个越权/隔离测试变红，其余 17 个保持通过。\n\n偏差说明：task.files 原列 daily_scan.py 与 event_grading.py，实际另需 src/jobs/__init__.py 才能作为包导入（与前两个 Store 模块的包约定一致）。未改动 config.py，阈值靠构造函数注入。\n\n未验证：真实 provider 产出的 CSV 列名大小写与空值形态未真机核对（依赖未安装且未联网），读取侧统一用 dtype=str + fillna(\"\") 兜住，异常值一律降级为 P2 并在 reasons 中记录原因而非抛错。",
       "created_at": "2026-09-14T21:15:00+08:00",
       "updated_at": "2026-09-14T22:58:21+08:00"
+    },
+    {
+      "status": "pending",
+      "attempts": 0,
+      "max_attempts": 3,
+      "last_error": null,
+      "notes": "",
+      "created_at": "2026-09-14T22:36:00+08:00",
+      "updated_at": "2026-09-14T22:36:00+08:00",
+      "id": "T-004",
+      "phase": "P3-harden",
+      "title": "固化缺失的第三方依赖声明",
+      "risk": "medium",
+      "size": "S",
+      "deps": [],
+      "context": [
+        "pyproject.toml",
+        "uv.lock",
+        "src/retrieval/bm25_retriever.py"
+      ],
+      "files": [
+        "pyproject.toml",
+        "uv.lock"
+      ],
+      "desc": "src/retrieval/bm25_retriever.py 顶层 from rank_bm25 import BM25Okapi（第 11 行）并在第 34 行 import jieba，但两者既不在 pyproject.toml 也不在 uv.lock 中。后果：任何一次 uv sync 都会静默卸载它们，之后导入 bm25_retriever 直接失败，且失败点在运行时而非安装时。把这两个包正式写入 pyproject 的依赖（可选 extra 亦可，但必须能被 uv sync --extra <name> 复现），重新生成 lock，并在 notes 记录选择了主依赖还是 extra 及理由。不得顺手升级无关依赖版本。",
+      "acceptance": [
+        "全新环境下 uv sync 后 import jieba 与 import rank_bm25 均成功",
+        "import src.retrieval.bm25_retriever 不触发 ModuleNotFoundError",
+        "lock 文件已同步，diff 中不含与本 task 无关的版本跳变"
+      ],
+      "verify": [
+        "uv run python -c \"import jieba, rank_bm25\"",
+        "uv run python -c \"import src.retrieval.bm25_retriever\"",
+        "uv run python -m pytest tests/test_hybrid_retriever.py -q"
+      ]
+    },
+    {
+      "status": "pending",
+      "attempts": 0,
+      "max_attempts": 3,
+      "last_error": null,
+      "notes": "",
+      "created_at": "2026-09-14T22:36:00+08:00",
+      "updated_at": "2026-09-14T22:36:00+08:00",
+      "id": "T-005",
+      "phase": "P1-trigger",
+      "title": "持仓与关注池的 REST 端点",
+      "risk": "medium",
+      "size": "M",
+      "deps": [
+        "T-002"
+      ],
+      "context": [
+        "src/api/main.py",
+        "src/api/auth.py",
+        "src/portfolio/store.py",
+        "src/portfolio/models.py"
+      ],
+      "files": [
+        "src/api/portfolio.py",
+        "tests/test_portfolio_api.py"
+      ],
+      "desc": "为 T-002 已落地的持仓存储补一层 HTTP 接口，让分析师能自助维护自己的标的池而不必直连数据库。必须挂载到 src/api/main.py 现有 app，沿用 src/api/auth.py 既有鉴权依赖，不得另起一套认证。路由覆盖列表、新增、修改、软删除；所有 handler 必须从鉴权依赖取 user_id，禁止接受请求体或路径参数中的 user_id。返回结构用 TypedDict 或既有 response schema 表达。",
+      "acceptance": [
+        "所有读写接口均从鉴权上下文取 user_id，不接受外部传入",
+        "用户 A 的请求无法读取或变更用户 B 的持仓，有测试覆盖",
+        "软删除后的标的不再出现在列表结果中",
+        "新增已存在的同一标的返回明确冲突语义，而非静默覆盖"
+      ],
+      "verify": [
+        "uv run python -m pytest tests/test_portfolio_api.py -q",
+        "uv run python -m ruff check src/api/portfolio.py"
+      ]
+    },
+    {
+      "status": "pending",
+      "attempts": 0,
+      "max_attempts": 3,
+      "last_error": null,
+      "notes": "",
+      "created_at": "2026-09-14T22:36:00+08:00",
+      "updated_at": "2026-09-14T22:36:00+08:00",
+      "id": "T-006",
+      "phase": "P1-trigger",
+      "title": "传导链：事件到持仓影响的显式推理",
+      "risk": "medium",
+      "size": "L",
+      "deps": [
+        "T-003"
+      ],
+      "context": [
+        "src/jobs/daily_scan.py",
+        "src/retrieval/hybrid_retriever.py",
+        "src/agents/graph.py",
+        "src/agents/nodes.py"
+      ],
+      "files": [
+        "src/jobs/impact_chain.py",
+        "tests/test_impact_chain.py"
+      ],
+      "desc": "把当前「这条公告属于 P0」的单点判断，升级为「这条公告 → 影响哪条业务线/财务口径 → 影响我哪个持仓、影响方向如何」的显式传导链。输入是 T-003 产出的事件卡片，输出是带 hop 序列的传导链对象：每一跳都必须附上支撑它的原文片段来源（文档相对路径或 chunk id），不得凭空断言。检索不到支撑证据时，链路必须标记为证据不足并返回未完成，严禁补一段看似合理的推测充当结论。此 task 是对现有多跳检索能力的重新定向，不是新增一个平行实现。",
+      "acceptance": [
+        "传导链每一跳都带可回溯的证据引用，缺任意一跳即判定链路未完成",
+        "证据不足时返回明确的未完成状态，不生成推测性结论",
+        "同一事件重复推理结果稳定，可用于回归比对",
+        "测试覆盖无证据场景，证明不会编造中间环节"
+      ],
+      "verify": [
+        "uv run python -m pytest tests/test_impact_chain.py -q",
+        "uv run python -m ruff check src/jobs/impact_chain.py"
+      ]
+    },
+    {
+      "status": "pending",
+      "attempts": 0,
+      "max_attempts": 3,
+      "last_error": null,
+      "notes": "",
+      "created_at": "2026-09-14T22:36:00+08:00",
+      "updated_at": "2026-09-14T22:36:00+08:00",
+      "id": "T-007",
+      "phase": "P2-delivery",
+      "title": "晨报模板与渲染",
+      "risk": "low",
+      "size": "M",
+      "deps": [
+        "T-006"
+      ],
+      "context": [
+        "src/rag/prompts.py",
+        "src/rag/formatter.py",
+        "src/jobs/daily_scan.py",
+        "src/jobs/event_grading.py"
+      ],
+      "files": [
+        "src/briefing/template.py",
+        "src/briefing/renderer.py",
+        "tests/test_briefing_renderer.py"
+      ],
+      "desc": "把 P0/P1 事件卡片渲染成固定结构的晨报：今日必看 / 持仓影响 / 风险提示 / 待办。渲染必须是确定性函数——给定同一组事件卡片输出完全一致，便于 diff 与回归，禁止把结构化组装交给 LLM 自由发挥。每一条陈述必须携带来自 T-006 传导链的证据引用；缺失引用的内容一律不进正文。无事件时需要给出明确的空态文案，不得渲染成空白或编造占位内容。",
+      "acceptance": [
+        "同一输入多次渲染输出完全一致",
+        "正文中每条陈述都能追溯到至少一条证据引用",
+        "无 P0/P1 事件时输出明确空态，不含编造内容",
+        "四个板块结构固定，缺失板块保留标题并说明原因"
+      ],
+      "verify": [
+        "uv run python -m pytest tests/test_briefing_renderer.py -q",
+        "uv run python -m ruff check src/briefing"
+      ]
+    },
+    {
+      "status": "pending",
+      "attempts": 0,
+      "max_attempts": 3,
+      "last_error": null,
+      "notes": "",
+      "created_at": "2026-09-14T22:36:00+08:00",
+      "updated_at": "2026-09-14T22:36:00+08:00",
+      "id": "T-008",
+      "phase": "P2-delivery",
+      "title": "晨报合规预检闸门",
+      "risk": "medium",
+      "size": "M",
+      "deps": [
+        "T-007"
+      ],
+      "context": [
+        "src/utils/compliance.py",
+        "src/utils/verifier.py",
+        "src/utils/pii.py",
+        "scripts/evaluate_compliance.py"
+      ],
+      "files": [
+        "src/briefing/compliance_gate.py",
+        "tests/test_briefing_compliance.py"
+      ],
+      "desc": "晨报是唯一会「发出去并担责」的产物，因此复用既有 src/utils/compliance.py 与 verifier.py 在渲染之后、归档之前设一道闸门。产品定位严格为信息聚合与原文引用，绝不生成评级、目标价或买卖建议——检测到此类表述必须拦截而非放行。同时拦截无引用的断言与疑似个人信息泄露。失败时返回逐条违规项（类型、位置、原文片段），不得返回笼统的「不合规」。",
+      "acceptance": [
+        "含投资建议类表述的晨报被拦截，并指出具体位置",
+        "缺少引用支撑的断言被拦截",
+        "合规时给出通过结论，且记录本次检查的规则版本",
+        "违规结果可机读，含类型与原文片段"
+      ],
+      "verify": [
+        "uv run python -m pytest tests/test_briefing_compliance.py -q",
+        "uv run python -m ruff check src/briefing/compliance_gate.py"
+      ]
+    },
+    {
+      "status": "pending",
+      "attempts": 0,
+      "max_attempts": 3,
+      "last_error": null,
+      "notes": "",
+      "created_at": "2026-09-14T22:36:00+08:00",
+      "updated_at": "2026-09-14T22:36:00+08:00",
+      "id": "T-009",
+      "phase": "P2-delivery",
+      "title": "晨报归档与审计留痕",
+      "risk": "medium",
+      "size": "M",
+      "deps": [
+        "T-008"
+      ],
+      "context": [
+        "src/utils/audit.py",
+        "src/jobs/daily_scan.py",
+        "src/briefing/renderer.py"
+      ],
+      "files": [
+        "src/briefing/archive.py",
+        "tests/test_briefing_archive.py"
+      ],
+      "desc": "把通过合规闸门的晨报持久化归档，并接入既有 src/utils/audit.py 的审计留痕。归档内容包含渲染原文、输入事件卡片快照、合规检查结果与生成时间，保证事后可以完整复现「当时为什么发出这一版」。同一交易日重复归档必须幂等（按交易日加用户维度去重），重复写入返回已存在而非产生第二份记录。读取仍按 user_id 隔离。",
+      "acceptance": [
+        "归档内容足以复现当时的渲染结果与合规结论",
+        "同一交易日同一用户重复归档不产生重复记录",
+        "归档动作写入审计日志",
+        "跨用户读取被拒绝，有测试覆盖"
+      ],
+      "verify": [
+        "uv run python -m pytest tests/test_briefing_archive.py -q",
+        "uv run python -m ruff check src/briefing/archive.py"
+      ]
+    },
+    {
+      "status": "pending",
+      "attempts": 0,
+      "max_attempts": 3,
+      "last_error": null,
+      "notes": "",
+      "created_at": "2026-09-14T22:36:00+08:00",
+      "updated_at": "2026-09-14T22:36:00+08:00",
+      "id": "T-010",
+      "phase": "P3-harden",
+      "title": "扫描链路的漏报与误报评估集",
+      "risk": "low",
+      "size": "M",
+      "deps": [
+        "T-003"
+      ],
+      "context": [
+        "scripts/evaluate_retrieval.py",
+        "scripts/evaluation_common.py",
+        "src/jobs/event_grading.py"
+      ],
+      "files": [
+        "scripts/evaluate_scan_coverage.py",
+        "tests/test_scan_coverage_eval.py"
+      ],
+      "desc": "现有检索评估集是个位数量级，无法支撑「这东西能不能用」的判断。为分级环节建立可复算的评估集与脚本：以人工标注的事件样本为基准，输出分级准确率、P0 漏报率、P2 误升率的量化结果，并按规则 id 归因，使阈值调优有依据而非凭感觉。评估脚本必须离线可跑，不依赖网络与真实行情。初始样本规模在 notes 中如实写明，不得夸大。",
+      "acceptance": [
+        "给定标注集能输出分级准确率、P0 漏报率、P2 误升率三个指标",
+        "指标可按 matched_rules 归因到具体规则",
+        "评估脚本离线可重复运行，结果稳定",
+        "notes 如实记录样本规模与来源，不含夸大规模的表述"
+      ],
+      "verify": [
+        "uv run python -m pytest tests/test_scan_coverage_eval.py -q",
+        "uv run python -m ruff check scripts/evaluate_scan_coverage.py"
+      ]
+    },
+    {
+      "status": "pending",
+      "attempts": 0,
+      "max_attempts": 3,
+      "last_error": null,
+      "notes": "",
+      "created_at": "2026-09-14T22:36:00+08:00",
+      "updated_at": "2026-09-14T22:36:00+08:00",
+      "id": "T-011",
+      "phase": "P3-harden",
+      "title": "权限矩阵覆盖新增模块",
+      "risk": "low",
+      "size": "S",
+      "deps": [
+        "T-005"
+      ],
+      "context": [
+        "scripts/check_permissions.py",
+        "src/api/portfolio.py",
+        "src/jobs/daily_scan.py",
+        "src/portfolio/store.py"
+      ],
+      "files": [
+        "scripts/check_permissions.py",
+        "tests/test_permission_matrix.py"
+      ],
+      "desc": "T-002 与 T-003 引入了 portfolio 和 jobs 两个新模块，既有权限审查脚本只覆盖到此前的范围。扩展 scripts/check_permissions.py，把新模块的权限声明纳入审查：每个新接口与 Store 方法都必须有明确的角色约束声明，缺声明即视为违规而非通过。审查脚本的退出码必须真实反映违规与否，禁止为了让流水线变绿而放宽检查。",
+      "acceptance": [
+        "审查范围包含 portfolio 与 jobs 模块的全部对外入口",
+        "缺少角色声明的新入口被判定为违规并输出清单",
+        "存在违规时脚本以非零退出码结束",
+        "审查结果输出为可清单化的数据，便于定位到具体函数"
+      ],
+      "verify": [
+        "uv run python -m pytest tests/test_permission_matrix.py -q",
+        "uv run python -m ruff check scripts/check_permissions.py"
+      ]
+    },
+    {
+      "status": "pending",
+      "attempts": 0,
+      "max_attempts": 3,
+      "last_error": null,
+      "notes": "",
+      "created_at": "2026-09-14T22:36:00+08:00",
+      "updated_at": "2026-09-14T22:36:00+08:00",
+      "id": "T-012",
+      "phase": "P3-harden",
+      "title": "SQL 与计算器工具降级为离线预计算",
+      "risk": "high",
+      "size": "L",
+      "deps": [
+        "T-007"
+      ],
+      "context": [
+        "src/tools/sql_query.py",
+        "src/tools/calculator.py",
+        "src/tools/financial_ratios.py",
+        "src/tools/market_data.py"
+      ],
+      "files": [
+        "src/tools/precomputed_metrics.py",
+        "tests/test_precomputed_metrics.py"
+      ],
+      "desc": "让 LLM 在线拼 SQL 或即兴算估值，在券商场景既不可控也是合规风险：同一问题两次可能给出不同数字，且无法留痕复算。把指标口径固化为离线预计算表 + 确定性取值函数，downstream 只做查表不再做推导。此改动收窄公开接口，属于风险等级 high，执行前必须获得人工确认：明确允许移除哪些公开函数、谁是当前调用方、以及是否接受破坏性变更。未获确认前禁止动工，直接置 blocked。",
+      "acceptance": [
+        "需人工确认：允许移除的公开函数清单与破坏性变更范围",
+        "核心财务指标由确定性函数产出，相同输入结果完全一致",
+        "所有调用方已迁移，无残留引用被删接口",
+        "迁移后全量测试通过，无降级兜底掩盖缺失能力"
+      ],
+      "verify": [
+        "uv run python -m pytest tests/test_precomputed_metrics.py -q",
+        "uv run python -m pytest -q"
+      ]
+    },
+    {
+      "status": "pending",
+      "attempts": 0,
+      "max_attempts": 3,
+      "last_error": null,
+      "notes": "",
+      "created_at": "2026-09-14T22:36:00+08:00",
+      "updated_at": "2026-09-14T22:36:00+08:00",
+      "id": "T-013",
+      "phase": "P0-data-pipeline",
+      "title": "第三方 provider 契约的真机校准",
+      "risk": "medium",
+      "size": "M",
+      "deps": [
+        "T-001"
+      ],
+      "context": [
+        "scripts/fetch_real_securities_data.py",
+        "data/raw/real_securities_data/.fetch_failures.json",
+        "data/raw/real_securities_data/.fetch_state.json"
+      ],
+      "files": [
+        "scripts/provider_contract_probe.py",
+        "scripts/fetch_real_securities_data.py",
+        "tests/test_provider_contract_probe.py"
+      ],
+      "desc": "T-001 的三类 provider 契约（akshare 成分股列名、cninfo orgId 解析、efinance/baostock 返回值）均未在本环境真机验证，全部写在该 task 的未验证清单里。新增只读探针脚本，在有限标的集合上实测各 provider 的真实返回列名与形态，输出契约快照并与代码现有假设做逐项比对，差异以清单形式报出。探针只做读取，不写入正式数据目录。若运行环境缺少依赖或网络不可达，如实置 blocked 并说明缺失项，禁止用 mock 结果假装已验证。",
+      "acceptance": [
+        "探针输出的契约快照能被 diff，便于观察 provider 漂移",
+        "代码假设与实测不符时逐项报出差异，不静默兜底",
+        "探针为只读，不修改正式数据目录",
+        "环境不满足时置 blocked 并写明缺失的依赖或网络条件"
+      ],
+      "verify": [
+        "uv run python -m pytest tests/test_provider_contract_probe.py -q",
+        "uv run python -m ruff check scripts/provider_contract_probe.py"
+      ]
     }
   ]
 }
