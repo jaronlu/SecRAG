@@ -38,6 +38,7 @@ from src.schemas.constants import (
     STATE_FINAL_ANSWER,
     STATE_THREAD_ID,
     STATE_TURN_ID,
+    STATE_VERIFICATION,
 )
 from src.schemas.request_response import (
     AssistantQARequest,
@@ -504,9 +505,17 @@ async def assistant_qa(
         _record_metrics("error")
         raise HTTPException(status_code=500, detail="内部处理错误") from exc
 
-    # P1-4: 语义缓存——结果返回前存入缓存（仅缓存有回答且验证通过的结果）
+    # P1-4: 语义缓存——仅缓存验证与合规均通过的成功终态，避免把拒答/拦截结果
+    # 以"合规通过"语义缓存后再次返回（issues.md 一.1）
     answer = result.get(STATE_FINAL_ANSWER, "")
-    if answer and len(answer) > 10:
+    compliance = result.get(STATE_COMPLIANCE, {})
+    verification = result.get(STATE_VERIFICATION, {})
+    if (
+        answer
+        and len(answer) > 10
+        and compliance.get("passed", False)
+        and verification.get("passed", False)
+    ):
         cache.store(
             query=request.query,
             answer=answer,

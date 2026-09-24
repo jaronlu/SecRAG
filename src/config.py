@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     allowed_origins: list[str] = ["*"]
     api_request_timeout_seconds: float = 60.0
 
+    # 答案语义缓存——默认关闭。缓存未绑定会话上下文与知识库版本，且命中路径
+    # 绕过会话保存与审计；重新启用需先满足 issues.md 一.1 的绑定条件。
+    semantic_cache_enabled: bool = False
+
     # LLM — provider switch
     #   "ollama": uses ChatOllama
     #   "openai": uses ChatOpenAI (OpenAI-compatible API, e.g. StepFun)

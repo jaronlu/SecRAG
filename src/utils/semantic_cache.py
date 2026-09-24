@@ -41,7 +41,8 @@ from src.config import config
 DEFAULT_CACHE_THRESHOLD = 0.90  # cosine similarity 阈值，超过则命中
 DEFAULT_CACHE_TTL_SECONDS = 86400  # 24 小时
 DEFAULT_CACHE_DB_PATH = "./data/semantic_cache.db"
-DEFAULT_CACHE_ENABLED = True
+DEFAULT_CACHE_ENABLED = False  # 答案缓存默认关闭：缓存未绑定会话上下文与知识库版本，
+# 且命中路径无法复现会话保存/审计流程；重新启用前需满足 issues.md 一.1 的条件
 
 # 嵌入模型懒加载（避免启动时加载模型）
 _embedding_model = None
@@ -320,10 +321,13 @@ _semantic_cache_lock = threading.Lock()
 
 
 def get_semantic_cache() -> SemanticCache:
-    """获取语义缓存单例。"""
+    """获取语义缓存单例。
+
+    开关由 config.semantic_cache_enabled 控制，默认关闭。
+    """
     global _semantic_cache
     if _semantic_cache is None:
         with _semantic_cache_lock:
             if _semantic_cache is None:
-                _semantic_cache = SemanticCache()
+                _semantic_cache = SemanticCache(enabled=config.semantic_cache_enabled)
     return _semantic_cache

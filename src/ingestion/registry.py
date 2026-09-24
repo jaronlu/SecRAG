@@ -131,20 +131,57 @@ class DocumentRegistryStore:
         connection.execute("PRAGMA foreign_keys = ON")
         return connection
 
-    @staticmethod
-    def _columns(connection: sqlite3.Connection, table: str) -> set[str]:
-        return {str(row["name"]) for row in connection.execute(f"PRAGMA table_info({table})")}
+    # SQLite 的 PRAGMA/ALTER TABLE 不支持参数绑定。这里不拼接任何 SQL，
+    # 直接为每张表维护字面量 SQL，按白名单分派，杜绝标识符注入。
+    _TABLE_COLUMNS_SQL: dict[str, str] = {
+        "document_registry": "PRAGMA table_info(document_registry)",
+        "ingest_runs": "PRAGMA table_info(ingest_runs)",
+        "ingest_run_files": "PRAGMA table_info(ingest_run_files)",
+        "ingest_run_items": "PRAGMA table_info(ingest_run_items)",
+    }
 
-    @staticmethod
+    # 每个可缺省列对应一条完整的字面量 ALTER 语句
+    _ADD_COLUMN_SQL: dict[str, dict[str, str]] = {
+        "ingest_runs": {
+            "category_id": "ALTER TABLE ingest_runs ADD COLUMN category_id TEXT NOT NULL DEFAULT ''",
+            "requested_by": "ALTER TABLE ingest_runs ADD COLUMN requested_by TEXT NOT NULL DEFAULT 'legacy'",
+            "executor": "ALTER TABLE ingest_runs ADD COLUMN executor TEXT NOT NULL DEFAULT 'legacy'",
+            "worker_id": "ALTER TABLE ingest_runs ADD COLUMN worker_id TEXT NOT NULL DEFAULT ''",
+            "queued_at": "ALTER TABLE ingest_runs ADD COLUMN queued_at TEXT NOT NULL DEFAULT ''",
+            "heartbeat_at": "ALTER TABLE ingest_runs ADD COLUMN heartbeat_at TEXT NOT NULL DEFAULT ''",
+            "lease_expires_at": "ALTER TABLE ingest_runs ADD COLUMN lease_expires_at TEXT NOT NULL DEFAULT ''",
+            "error_code": "ALTER TABLE ingest_runs ADD COLUMN error_code TEXT NOT NULL DEFAULT ''",
+        },
+        "ingest_run_items": {
+            "sequence": "ALTER TABLE ingest_run_items ADD COLUMN sequence INTEGER NOT NULL DEFAULT 0",
+            "relative_path": "ALTER TABLE ingest_run_items ADD COLUMN relative_path TEXT NOT NULL DEFAULT ''",
+            "processed_at": "ALTER TABLE ingest_run_items ADD COLUMN processed_at TEXT NOT NULL DEFAULT ''",
+            "error_code": "ALTER TABLE ingest_run_items ADD COLUMN error_code TEXT NOT NULL DEFAULT ''",
+        },
+    }
+
+    @classmethod
+    def _columns(cls, connection: sqlite3.Connection, table: str) -> set[str]:
+        sql = cls._TABLE_COLUMNS_SQL.get(table)
+        if sql is None:
+            raise ValueError("未知数据表: " + table)
+        return {str(row["name"]) for row in connection.execute(sql)}
+
+    @classmethod
     def _add_missing_columns(
+        cls,
         connection: sqlite3.Connection,
         table: str,
         definitions: dict[str, str],
     ) -> None:
         columns = DocumentRegistryStore._columns(connection, table)
-        for name, definition in definitions.items():
+        ddl_by_column = cls._ADD_COLUMN_SQL.get(table, {})
+        for name in definitions:
             if name not in columns:
-                connection.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
+                ddl = ddl_by_column.get(name)
+                if ddl is None:
+                    raise ValueError("缺少列的字面量 DDL 定义: " + table + "." + name)
+                connection.execute(ddl)
 
     def _init_schema(self) -> None:
         with self._connect() as connection:
