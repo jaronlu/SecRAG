@@ -76,23 +76,30 @@ export default function ChatMessage({ message }: ChatMessageProps) {
             </button>
             {showCitations && (
               <div className="mt-2 space-y-1">
-                {message.citations.map((c, i) => (
-                  <div key={i} className="bg-slate-50 rounded p-2 text-[11px]">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium text-slate-700">[{i + 1}]</span>
-                      {c.doc_type && (
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] ${docTypeColors[c.doc_type] || docTypeColors.unknown}`}>
-                          {c.doc_type}
-                        </span>
-                      )}
-                      {c.score !== undefined && (
-                        <span className="text-slate-400">相似度 {(c.score * 100).toFixed(0)}%</span>
-                      )}
+                {message.citations.map((c, i) => {
+                  // citation_id（cite_003）与 prompt 的来源序号一致；同一来源去重
+                  // 时会跳号，展示编号必须取它的数字而不是数组位置，才能对上
+                  // 正文里的 [来源3] 标注（issues.md 一.7）
+                  const match = (c.citation_id ?? '').match(/cite_(\d+)/)
+                  const sourceNumber = match ? Number(match[1]) : i + 1
+                  return (
+                    <div key={i} className="bg-slate-50 rounded p-2 text-[11px]">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-slate-700">[{sourceNumber}]</span>
+                        {c.doc_type && (
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] ${docTypeColors[c.doc_type] || docTypeColors.unknown}`}>
+                            {c.doc_type}
+                          </span>
+                        )}
+                        {c.score !== undefined && (
+                          <span className="text-slate-400">相似度 {(c.score * 100).toFixed(0)}%</span>
+                        )}
+                      </div>
+                      <div className="text-slate-600 truncate">{c.source}</div>
+                      {c.content && <div className="text-slate-500 mt-1 line-clamp-2">{c.content}</div>}
                     </div>
-                    <div className="text-slate-600 truncate">{c.source}</div>
-                    {c.content && <div className="text-slate-500 mt-1 line-clamp-2">{c.content}</div>}
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>

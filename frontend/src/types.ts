@@ -1,6 +1,8 @@
 // SecRAG 前端类型定义
 
 export interface Citation {
+  // cite_00N，数字与 prompt 的来源序号一致（issues.md 一.7）
+  citation_id?: string
   source: string
   title?: string
   doc_type?: string
