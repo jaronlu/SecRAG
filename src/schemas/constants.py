@@ -18,6 +18,7 @@ META_DOC_TYPE: Final = "doc_type"
 META_SOURCE: Final = "source"
 META_TITLE: Final = "title"
 META_DATE: Final = "date"
+META_DATE_DAY: Final = "date_day"  # 数值日期 yyyymmdd，用于 Chroma 数值范围过滤（issues.md 一.6）
 META_STOCK_CODE: Final = "stock_code"
 META_PERMISSION_LEVEL: Final = "permission_level"
 META_PAGE_NUMBER: Final = "page_number"

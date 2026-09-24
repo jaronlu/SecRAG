@@ -18,6 +18,7 @@ from src.schemas.constants import (
     META_CHUNK_INDEX,
     META_CHUNKER_VERSION,
     META_DATE,
+    META_DATE_DAY,
     META_DOC_ID,
     META_DOC_TYPE,
     META_DOC_VERSION,
@@ -42,6 +43,7 @@ from src.schemas.constants import (
     ROLE_OPERATIONS,
     ROLE_TECHNICAL,
 )
+from src.utils.dates import parse_date_day
 
 SUPPORTED_SUFFIXES = {".pdf", ".docx", ".doc", ".html", ".htm", ".csv", ".xlsx", ".xls"}
 PARSER_VERSION = "secrag-loader-v1"
@@ -305,6 +307,13 @@ def normalize_chunks(
         chunk.metadata.setdefault(META_SOURCE, source)
         chunk.metadata.setdefault(META_TITLE, title)
         chunk.metadata.setdefault(META_DATE, date)
+        # 数值日期字段供 Chroma 数值范围过滤使用（issues.md 一.6）；
+        # 日期缺失或不可解析时不写该字段，查询端也就不会生成对应过滤器
+        date_day = parse_date_day(chunk.metadata.get(META_DATE))
+        if date_day is not None:
+            chunk.metadata[META_DATE_DAY] = date_day
+        else:
+            chunk.metadata.pop(META_DATE_DAY, None)
         chunk.metadata.setdefault(META_PERMISSION_LEVEL, PERMISSION_INTERNAL)
         if not chunk.metadata.get(META_RETRIEVAL_SOURCE):
             chunk.metadata[META_RETRIEVAL_SOURCE] = DOC_TYPE_RETRIEVAL_SOURCES[doc_type]

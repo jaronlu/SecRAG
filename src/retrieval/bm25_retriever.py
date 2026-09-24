@@ -153,8 +153,24 @@ class BM25Retriever:
 
     @staticmethod
     def _match_filters(metadata: dict, filters: dict) -> bool:
-        """简单后过滤：支持精确匹配和 $gte/$lte 范围。"""
+        """简单后过滤：支持精确匹配、$gte/$lte 范围和 $and 组合。
+
+        与 Chroma where 契约对齐（issues.md 一.6）：时间过滤形如
+        {"$and": [{"date_day": {"$gte": 20240101}}, {"date_day": {"$lte": 20241231}}]}。
+        """
         for key, condition in filters.items():
+            if key == "$and":
+                if not isinstance(condition, list):
+                    return False
+                if not all(BM25Retriever._match_filters(metadata, item) for item in condition):
+                    return False
+                continue
+            if key == "$or":
+                if not isinstance(condition, list):
+                    return False
+                if not any(BM25Retriever._match_filters(metadata, item) for item in condition):
+                    return False
+                continue
             value = metadata.get(key)
             if isinstance(condition, dict):
                 if "$gte" in condition and (value is None or value < condition["$gte"]):

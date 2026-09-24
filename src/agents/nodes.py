@@ -38,6 +38,7 @@ from src.schemas.constants import (
     AUDIT_REQUEST_ID,
     META_CHUNK_ID,
     META_DATE,
+    META_DATE_DAY,
     META_RRF_SCORE,
     META_SOURCE,
     META_STOCK_CODE,
@@ -103,6 +104,7 @@ from src.utils.compliance import (
     ComplianceChecker,
     matches_investment_advice,
 )
+from src.utils.dates import parse_date_day
 from src.utils.verifier import CitationExtractor, ComprehensiveVerifier
 
 
@@ -172,21 +174,26 @@ _retrieval_cache: dict[str, tuple[float, list[RetrievalResult]]] = {}
 def _time_range_to_filters(time_range: dict[str, Any] | None) -> dict[str, Any] | None:
     """将 query_understand 抽取的 time_range 转为 ChromaDB where 过滤器。
 
-    time_range 格式: {"start": "2024-01-01", "end": "2024-12-31"}
-    转为: {"date": {"$gte": "2024-01-01", "$lte": "2024-12-31"}}
+    issues.md 一.6：Chroma 1.5 要求范围操作符的操作数是数值，且同一字段
+    表达式只能有一个操作符。因此入库时写入数值 date_day（yyyymmdd），
+    查询时把上下界拆成两个 $and 条件，例如：
+      {"$and": [{"date_day": {"$gte": 20240101}}, {"date_day": {"$lte": 20241231}}]}
+    任一端无法解析为日期时省略该端；两端都不可用时返回 None（不做时间过滤）。
     """
     if not time_range:
         return None
-    start = time_range.get("start", "")
-    end = time_range.get("end", "")
-    if not start and not end:
+    start_day = parse_date_day(time_range.get("start"))
+    end_day = parse_date_day(time_range.get("end"))
+    conditions: list[dict[str, Any]] = []
+    if start_day is not None:
+        conditions.append({META_DATE_DAY: {"$gte": start_day}})
+    if end_day is not None:
+        conditions.append({META_DATE_DAY: {"$lte": end_day}})
+    if not conditions:
         return None
-    date_filter: dict[str, str] = {}
-    if start:
-        date_filter["$gte"] = start
-    if end:
-        date_filter["$lte"] = end
-    return {META_DATE: date_filter} if date_filter else None
+    if len(conditions) == 1:
+        return conditions[0]
+    return {"$and": conditions}
 
 
 def _plan_fingerprint(plan: list[RetrievalPlanStep]) -> str:
