@@ -478,12 +478,39 @@ time_range 说明：如果查询涉及时间范围（如"最近3个月"、"2024�
             "ambiguity": [],
         }
 
+    # issues.md 二.5：合法 JSON 不一定是正确对象（如 [] 或 null），
+    # 运行时逐字段校验类型，不符合契约的字段回退默认值
+    if not isinstance(result, dict):
+        result = {}
+    entities = result.get("entities")
+    if not isinstance(entities, dict):
+        entities = {}
+    clean_entities = {
+        key: value
+        for key, value in entities.items()
+        if isinstance(key, str) and isinstance(value, str)
+    }
+    time_range = entities.get("time_range")
+    clean_entities["time_range"] = {
+        "start": time_range.get("start", "") if isinstance(time_range, dict) else "",
+        "end": time_range.get("end", "") if isinstance(time_range, dict) else "",
+    }
+    ambiguity = result.get("ambiguity")
+    ambiguity = (
+        [item for item in ambiguity if isinstance(item, str)]
+        if isinstance(ambiguity, list)
+        else []
+    )
+    intent = result.get("intent")
+    query_type = result.get("query_type")
+    rewritten = result.get("rewritten_query")
+
     return {
-        STATE_INTENT: result.get("intent", "unknown"),
-        STATE_QUERY_TYPE: result.get("query_type", "unknown"),
-        STATE_ENTITIES: result.get("entities", {}),
-        STATE_REWRITTEN_QUERY: result.get("rewritten_query", safe_query),
-        STATE_AMBIGUITY: result.get("ambiguity", []),
+        STATE_INTENT: intent if isinstance(intent, str) and intent else "unknown",
+        STATE_QUERY_TYPE: query_type if isinstance(query_type, str) and query_type else "unknown",
+        STATE_ENTITIES: clean_entities,
+        STATE_REWRITTEN_QUERY: rewritten if isinstance(rewritten, str) and rewritten else safe_query,
+        STATE_AMBIGUITY: ambiguity,
         STATE_QUERY_SANITIZED: injection_detected,
         STATE_PII_DETECTED: pii_findings,
         STATE_LANGUAGE: language,
