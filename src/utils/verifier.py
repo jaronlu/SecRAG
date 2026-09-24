@@ -46,10 +46,19 @@ def _structured_metadata_evidence(metadata: dict) -> str:
 
 class CitationExtractor:
     def extract(self, retrieval_results: list[RetrievalResult], query: str) -> list[CitationDict]:
+        """提取引用，编号与 prompt 中的来源序号对齐。
+
+        issues.md 一.7：prompt 按检索结果顺序给证据编号 [来源1..N]，
+        引用列表也必须使用同一编号——同一证据去重跳过时保持其 prompt 序号，
+        不再按提取后的列表位置重新编号，避免答案中的 [来源2] 展示时移位。
+        """
         citations: list[CitationDict] = []
         eligible = [result for result in retrieval_results if not result.get(RR_DENIED)]
         seen_evidence = set()
-        for result in eligible:
+        # 与 _build_reason_system_prompt 相同的上限：prompt 最多展示 5 条来源
+        for index, result in enumerate(eligible, start=1):
+            if index > 5:
+                break
             metadata = result.get(RR_METADATA, {})
             quote = self._extract_quote(result.get(RR_CONTENT, ""), query)
             structured_evidence = self._structured_evidence(metadata)
@@ -59,7 +68,6 @@ class CitationExtractor:
             if evidence_key in seen_evidence:
                 continue
             seen_evidence.add(evidence_key)
-            index = len(citations) + 1
             citation = Citation(
                 citation_id=f"cite_{index:03d}",
                 doc_title=str(metadata.get(META_TITLE, "未知文档")),
@@ -75,8 +83,6 @@ class CitationExtractor:
                 metadata=dict(metadata),
             )
             citations.append(CitationDict(**asdict(citation)))
-            if len(citations) >= 5:
-                break
         return citations
 
     def _structured_evidence(self, metadata: dict) -> str:
@@ -97,6 +103,9 @@ class CitationExtractor:
 
 
 class SourceVerifier:
+    # 与 CitationExtractor / prompt 的来源上限一致
+    MAX_SOURCES = 5
+
     def verify(
         self,
         answer: str,
@@ -104,10 +113,16 @@ class SourceVerifier:
         retrieval_results: list[RetrievalResult],
     ) -> dict:
         issues: list[str] = []
+        # 编号有效性按 prompt 中的来源序号判定（非 denied 结果数，上限 5），
+        # 而不是引用列表长度：去重会让引用列表短于来源序号（issues.md 一.7）
+        source_count = min(
+            self.MAX_SOURCES,
+            sum(1 for result in retrieval_results if not result.get(RR_DENIED)),
+        )
         for cite_id in re.findall(r"\[来源([^\]]*)\]", answer):
             if not cite_id.isdigit() or int(cite_id) < 1:
                 issues.append(f"引用来源编号无效: {cite_id or '<empty>'}")
-            elif int(cite_id) > len(citations):
+            elif int(cite_id) > source_count:
                 issues.append(f"引用来源 {cite_id} 不存在")
         if "[来源" in answer and not citations:
             issues.append("答案包含引用标注但无检索结果")
@@ -134,13 +149,59 @@ class SourceVerifier:
 
 
 class NumberVerifier:
+    # 答案中的引用编号 [来源N] 不是业务数字
+    _CITATION_MARKER_RE = re.compile(r"\[来源[^\]]*\]")
+    # Markdown 有序列表的序号（行首 "1." / "2、"）不是业务数字
+    _LIST_MARKER_RE = re.compile(r"(?m)^\s*\d+[.、)]\s*")
+    # 数字复合词（日期 2024-04-26、区间 10-20）：把连字符两侧数字合并成一个 token，
+    # 两侧（答案与证据）同规则归一化，避免 "04"、"26" 这类成分被单独校验。
+    # 用 lookaround 而非 \b：中文语境下 \b 在 CJK 字符旁不成立
+    _DATE_FULL_RE = re.compile(r"(?<![\d-])(\d{4})-(\d{1,2})-(\d{1,2})(?![\d-])")
+    _DATE_YEAR_MONTH_RE = re.compile(r"(?<![\d-])(\d{4})-(\d{1,2})(?![\d-])")
+    _NUMBER_RANGE_RE = re.compile(r"(?<![\d-])(\d{1,3})-(\d{1,3})(?![\d-])")
+
+    @classmethod
+    def _normalize_numeric_text(cls, text: str) -> str:
+        text = text.replace(",", "")
+        text = cls._DATE_FULL_RE.sub(r"\1\2\3", text)
+        text = cls._DATE_YEAR_MONTH_RE.sub(r"\1\2", text)
+        text = cls._NUMBER_RANGE_RE.sub(r"\1\2", text)
+        return text
+
+    @classmethod
+    def _extract_answer_numbers(cls, answer: str) -> list[str]:
+        """提取答案中的业务数字：先剔除引用编号与列表序号，再带符号/百分号提取。"""
+        text = cls._CITATION_MARKER_RE.sub("", answer)
+        text = cls._LIST_MARKER_RE.sub("", text)
+        text = cls._normalize_numeric_text(text)
+        return re.findall(r"-?\d+(?:\.\d+)?%?", text)
+
+    @staticmethod
+    def _number_in_evidence(number: str, evidence: str) -> bool:
+        """检查数字是否出现在证据中，绑定数值边界与正负号（issues.md 一.7）。
+
+        - "20" 不得命中 "120"（前向不能是数字或小数点）
+        - "10%" 不得命中 "-10%"（负号必须显式出现在答案数字中才允许匹配）
+        - 千分位逗号在两侧同时归一化后再匹配
+        """
+        evidence = NumberVerifier._normalize_numeric_text(evidence)
+        pattern = re.escape(number.replace(",", ""))
+        # 前向：不能是数字/小数点；数字本身不带负号时，前向也不能是负号
+        if number.startswith("-"):
+            lookbehind = r"(?<![\d.])"
+        else:
+            lookbehind = r"(?<![\d.-])"
+        # 后向：不能紧跟数字或小数点（"20" 不得命中 "2024"）
+        lookahead = r"(?![\d.])"
+        return re.search(f"{lookbehind}{pattern}{lookahead}", evidence) is not None
+
     def verify(
         self,
         answer: str,
         retrieval_results: list[RetrievalResult],
         tool_calls: list[ToolCallDict],
     ) -> dict:
-        numbers = re.findall(r"\d+\.?\d*%?", answer)
+        numbers = self._extract_answer_numbers(answer)
         evidence = [
             "\n".join(
                 filter(
@@ -160,7 +221,7 @@ class NumberVerifier:
         issues = [
             f"数字 {number} 在检索或工具结果中未找到"
             for number in numbers
-            if number not in all_content
+            if not self._number_in_evidence(number, all_content)
         ]
         return {
             "passed": not issues,
