@@ -16,6 +16,7 @@ from src.schemas.constants import (
     META_PERMISSION_LEVEL,
     META_RETRIEVAL_SOURCE,
     META_SOURCE,
+    PERMISSION_OVERFETCH_FACTOR,
     PERMISSION_PUBLIC,
     PLAN_DENIED,
     PLAN_FILTERS,
@@ -24,6 +25,7 @@ from src.schemas.constants import (
     PLAN_SOURCE,
     PLAN_TOP_K,
     ROLE_ALLOWED_SOURCES,
+    RR_DENIED,
     RR_METADATA,
     SOURCE_FAQ,
     SOURCE_PRODUCT,
@@ -73,9 +75,14 @@ class HybridRetriever:
                 continue
 
             try:
+                # issues.md 二.4：角色过滤发生在结果级，先超量取回候选，
+                # 过滤后再截断到请求的 top_k，避免高分候选全部越权时
+                # 误判为"全部越权"，而更低位置其实存在可访问文档
+                requested_top_k = step.get(PLAN_TOP_K, DEFAULT_TOP_K)
+                fetch_top_k = requested_top_k * PERMISSION_OVERFETCH_FACTOR
                 retrieved = retriever.retrieve(
                     query=step.get(PLAN_QUERY, ""),
-                    top_k=step.get(PLAN_TOP_K, DEFAULT_TOP_K),
+                    top_k=fetch_top_k,
                     filters=step.get(PLAN_FILTERS),
                 )
                 # P1-1: BM25 关键词检索 + RRF 融合（失败时静默降级为纯向量）
@@ -90,18 +97,21 @@ class HybridRetriever:
                             bm25_filters[META_RETRIEVAL_SOURCE] = source
                         bm25_results = bm25.retrieve(
                             query=step.get(PLAN_QUERY, ""),
-                            top_k=step.get(PLAN_TOP_K, DEFAULT_TOP_K),
+                            top_k=fetch_top_k,
                             filters=bm25_filters or None,
                         )
                         if bm25_results:
                             retrieved = rrf_fuse(
                                 retrieved,
                                 bm25_results,
-                                top_k=step.get(PLAN_TOP_K, DEFAULT_TOP_K),
+                                top_k=fetch_top_k,
                             )
                     except Exception:
                         pass  # BM25 失败时静默降级
-                results.extend(self._filter_results_by_role(retrieved))
+                filtered_results = self._filter_results_by_role(retrieved)
+                usable = [r for r in filtered_results if not r.get(RR_DENIED)]
+                denied_placeholder = [r for r in filtered_results if r.get(RR_DENIED)]
+                results.extend(usable[:requested_top_k] + denied_placeholder)
             except Exception as exc:
                 results.append(self._error_result(source, "检索失败", str(exc)))
 

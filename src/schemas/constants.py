@@ -316,6 +316,9 @@ ROLE_DATA_PERMISSIONS: dict[str, list[str]] = {
 # ══════════════════════════════════════════════════════════════════════
 
 DEFAULT_TOP_K = 5
+# 权限感知检索的超量取回倍数（issues.md 二.4）：角色过滤发生在结果级，
+# 先取回倍数候选再过滤截断，避免高分候选全部越权时误判"全部越权"
+PERMISSION_OVERFETCH_FACTOR = 3
 DEFAULT_MAX_HOPS = 3
 MAX_REASON_ATTEMPTS = 2
 MAX_TOOL_ITERATIONS = 3

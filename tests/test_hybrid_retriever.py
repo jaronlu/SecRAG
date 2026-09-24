@@ -14,6 +14,7 @@ from src.schemas.constants import (
     META_ERROR,
     META_PERMISSION_LEVEL,
     META_SOURCE,
+    PERMISSION_OVERFETCH_FACTOR,
     PLAN_FILTERS,
     PLAN_QUERY,
     PLAN_SOURCE,
@@ -125,11 +126,12 @@ class TestHybridRetriever:
             }
         ])
 
-        assert results[0][RR_CONTENT] == "风险等级:3"
+        fetch_k = 3 * PERMISSION_OVERFETCH_FACTOR
+        assert results[0][RR_CONTENT] == f"风险等级:{fetch_k}"
         assert fake.calls == [
             {
                 "query": "风险等级",
-                "top_k": 3,
+                "top_k": fetch_k,
                 "filters": {"product_type": "fund"},
             }
         ]
@@ -206,7 +208,15 @@ class TestHybridRetriever:
             {PLAN_SOURCE: SOURCE_FAQ, PLAN_QUERY: "FAQ", PLAN_TOP_K: 1},
         ])
 
-        assert [r[RR_CONTENT] for r in results] == ["产品:2", "FAQ:1"]
+        results = [
+            r
+            for r in results
+            if not r.get(RR_DENIED)
+        ]
+        assert sorted(r[RR_CONTENT] for r in results) == [
+            f"FAQ:{1 * PERMISSION_OVERFETCH_FACTOR}",
+            f"产品:{2 * PERMISSION_OVERFETCH_FACTOR}",
+        ]
 
     def test_chunk_permission_denial_preserves_safe_placeholder(self):
         fake = FakeRetriever()
@@ -219,7 +229,7 @@ class TestHybridRetriever:
             {PLAN_SOURCE: SOURCE_REGULATION, PLAN_QUERY: "法规"},
         ])
 
-        assert results[0][RR_CONTENT] == "FAQ:5"
+        assert results[0][RR_CONTENT] == f"FAQ:{5 * PERMISSION_OVERFETCH_FACTOR}"
         assert results[1][RR_DENIED] is True
         assert "confidential" not in results[1][RR_CONTENT]
 
@@ -309,6 +319,53 @@ class _FakeVectorSource(BaseRetriever):
 
     def retrieve(self, query, top_k=5, filters=None):
         return list(self._results)
+
+
+def test_role_filter_happens_before_truncation(monkeypatch):
+    """issues.md 二.4：高分候选全部越权时，应继续取回可访问文档而不是误判全部越权。
+
+    旧实现先按 top_k=2 截断（取回的全是 confidential），再按角色过滤，
+    结果全是 denied 占位符。超量取回后低位的可访问文档得以保留。
+    """
+    monkeypatch.setattr(HybridRetriever, "_get_bm25_retriever", lambda self: None)
+    from src.schemas.constants import (
+        META_PERMISSION_LEVEL as perm_level,
+    )
+    from src.schemas.constants import PERMISSION_PUBLIC
+
+    pool = [
+        {
+            RR_CONTENT: f"secret-{i}",
+            RR_METADATA: {META_SOURCE: "s", META_PERMISSION_LEVEL: "confidential"},
+            RR_SCORE: 0.95 - i * 0.01,
+        }
+        for i in range(3)
+    ] + [
+        {
+            RR_CONTENT: f"public-{i}",
+            RR_METADATA: {META_SOURCE: "s", META_PERMISSION_LEVEL: PERMISSION_PUBLIC},
+            RR_SCORE: 0.6 - i * 0.01,
+        }
+        for i in range(2)
+    ]
+
+    class _PooledRetriever(BaseRetriever):
+        def retrieve(self, query, top_k=5, filters=None):
+            return list(pool[:top_k])
+
+    retriever = HybridRetriever(user_role=ROLE_ADVISOR)
+    retriever._retriever_cache[SOURCE_REPORT] = _PooledRetriever()
+
+    results = retriever.retrieve([
+        {PLAN_SOURCE: SOURCE_REPORT, PLAN_QUERY: "评级", PLAN_TOP_K: 2}
+    ])
+
+    usable = [r[RR_CONTENT] for r in results if not r.get(RR_DENIED)]
+    denied = [r for r in results if r.get(RR_DENIED)]
+    # 可访问文档没有被截断丢弃
+    assert usable == ["public-0", "public-1"]
+    # 越权结果仍保留占位符，供上层明确提示
+    assert len(denied) == 3
 
 
 class _FakeBM25:
