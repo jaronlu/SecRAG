@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "pages": {
+    "/openwiki/architecture/state-and-safety.md": {
+      "pageVersion": "sha256:5e24f5da95bf815e6d796c72b3210665f7e26bff12a12b42cfd8a72226689d84",
+      "completedBy": "codex",
+      "completedRunId": "ed8a4fe3-6277-40c9-a696-83e206e40208",
+      "gitHead": "2604ed84d248093b77080a910117cbc4cad44584",
+      "sourceFingerprint": "sha256:e309e833ea7b9c65343bbcab1b5e0fa47acbaaf7f268497c50f050ae7c3ef068"
+    },
+    "/openwiki/quickstart.md": {
+      "pageVersion": "sha256:ea8305e1822b64f286fb8e64aaaf9ab6adcaea12188b6a3b55482dfb41ddf89c",
+      "completedBy": "codex",
+      "completedRunId": "ed8a4fe3-6277-40c9-a696-83e206e40208",
+      "gitHead": "2604ed84d248093b77080a910117cbc4cad44584",
+      "sourceFingerprint": "sha256:e309e833ea7b9c65343bbcab1b5e0fa47acbaaf7f268497c50f050ae7c3ef068"
+    },
+    "/openwiki/tutorials/knowledge-ingestion.md": {
+      "pageVersion": "sha256:7e627c2d3477943dd0ee80cbf26a67328e0375b0703957aa165dda1890279f50",
+      "completedBy": "codex",
+      "completedRunId": "ed8a4fe3-6277-40c9-a696-83e206e40208",
+      "gitHead": "2604ed84d248093b77080a910117cbc4cad44584",
+      "sourceFingerprint": "sha256:e309e833ea7b9c65343bbcab1b5e0fa47acbaaf7f268497c50f050ae7c3ef068"
+    },
+    "/openwiki/tutorials/request-execution.md": {
+      "pageVersion": "sha256:63f05aa862ff42d953c6dde3ff1aabf08e0e0fd8452ca38dd8fa173f27e609a7",
+      "completedBy": "codex",
+      "completedRunId": "ed8a4fe3-6277-40c9-a696-83e206e40208",
+      "gitHead": "2604ed84d248093b77080a910117cbc4cad44584",
+      "sourceFingerprint": "sha256:e309e833ea7b9c65343bbcab1b5e0fa47acbaaf7f268497c50f050ae7c3ef068"
+    }
+  }
+}

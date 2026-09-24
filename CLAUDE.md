@@ -87,3 +87,11 @@ tests/
 docs/
 scripts/
 ```
+
+<!-- OPENWIKI:START -->
+
+## OpenWiki
+
+@AGENTS.md
+
+<!-- OPENWIKI:END -->
