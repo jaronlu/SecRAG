@@ -38,6 +38,7 @@ from src.schemas.constants import (
     AUDIT_REQUEST_ID,
     META_CHUNK_ID,
     META_DATE,
+    META_RRF_SCORE,
     META_SOURCE,
     META_STOCK_CODE,
     META_TITLE,
@@ -703,10 +704,26 @@ def grade_and_filter(state: AssistantState) -> dict[str, Any]:
     denied = [result for result in results if result.get(RR_DENIED)]
     candidates = []
     seen_evidence = set()
-    # 先按相似度降序做阈值过滤和去重，候选池不超过 GRADE_TOP_K 的 2 倍以控制 rerank 开销
+
+    def _sort_key(result: RetrievalResult) -> float:
+        """每个阶段只用一种量纲排序：RRF 融合结果按 rrf_score，
+        未融合结果按原始 score（向量相似度）（issues.md 一.5）。"""
+        rrf_score = result.get(RR_METADATA, {}).get(META_RRF_SCORE)
+        if rrf_score is not None:
+            return float(rrf_score)
+        return float(result.get(RR_SCORE, 0) or 0.0)
+
+    def _passes_threshold(result: RetrievalResult) -> bool:
+        # RETRIEVAL_MIN_SCORE 是相似度阈值，只适用于未融合结果的原始 score；
+        # RRF 分数量纲不同（最大约 2/(k+1)），不得用同一阈值过滤
+        if result.get(RR_METADATA, {}).get(META_RRF_SCORE) is not None:
+            return True
+        return float(result.get(RR_SCORE, 0) or 0.0) >= RETRIEVAL_MIN_SCORE
+
+    # 先按排序依据降序做阈值过滤和去重，候选池不超过 GRADE_TOP_K 的 2 倍以控制 rerank 开销
     pool_limit = GRADE_TOP_K * 2
-    for result in sorted(results, key=lambda x: x.get(RR_SCORE, 0), reverse=True):
-        if result.get(RR_DENIED) or result.get(RR_SCORE, 0) < RETRIEVAL_MIN_SCORE:
+    for result in sorted(results, key=_sort_key, reverse=True):
+        if result.get(RR_DENIED) or not _passes_threshold(result):
             continue
         metadata = result.get(RR_METADATA, {})
         # 以来源 + 内容指纹去重，避免同一证据反复占据上下文窗口

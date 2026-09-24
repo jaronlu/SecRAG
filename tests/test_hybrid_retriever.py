@@ -10,6 +10,7 @@ from src.retrieval.base import BaseRetriever
 from src.retrieval.hybrid_retriever import HybridRetriever
 from src.schemas.constants import (
     META_ALLOWED_ROLES,
+    META_CHUNK_ID,
     META_ERROR,
     META_PERMISSION_LEVEL,
     META_SOURCE,
@@ -318,3 +319,30 @@ class _FakeBM25:
     def retrieve(self, query, top_k=5, filters=None):
         self.calls.append({"query": query, "top_k": top_k, "filters": filters})
         return list(self._results)
+
+
+def test_rrf_order_survives_grade_and_filter():
+    """issues.md 一.5：RRF 融合排序必须保留到 grade_and_filter。
+
+    旧实现丢弃融合分数，下游按原始 score 重排，导致 BM25 原始分
+    （量纲不同、数值更大）把同时命中的文档挤到后面。
+    """
+    from src.agents.nodes import grade_and_filter
+    from src.retrieval.bm25_retriever import rrf_fuse
+    from src.schemas.constants import (
+        STATE_RETRIEVAL_RESULTS,
+    )
+
+    vec_a = {RR_CONTENT: "A", RR_METADATA: {META_SOURCE: "s", META_CHUNK_ID: "a"}, RR_SCORE: 0.9}
+    vec_b = {RR_CONTENT: "B", RR_METADATA: {META_SOURCE: "s", META_CHUNK_ID: "b"}, RR_SCORE: 0.8}
+    bm_b = {RR_CONTENT: "B", RR_METADATA: {META_SOURCE: "s", META_CHUNK_ID: "b"}, RR_SCORE: 12.0}
+    bm_c = {RR_CONTENT: "C", RR_METADATA: {META_SOURCE: "s", META_CHUNK_ID: "c"}, RR_SCORE: 9.0}
+
+    fused = rrf_fuse([vec_a, vec_b], [bm_b, bm_c], top_k=5)
+    assert [r[RR_CONTENT] for r in fused] == ["B", "A", "C"]
+    assert fused[0][RR_METADATA]["rrf_score"] > fused[1][RR_METADATA]["rrf_score"]
+
+    updated = grade_and_filter({STATE_RETRIEVAL_RESULTS: list(fused)})
+    graded = [r[RR_CONTENT] for r in updated[STATE_RETRIEVAL_RESULTS]]
+    # C 的 BM25 原始分 9.0 不应再把 B、A 挤到后面
+    assert graded == ["B", "A", "C"]

@@ -12,8 +12,11 @@ from rank_bm25 import BM25Okapi
 
 from src.retrieval.vector_retriever import ChromaVectorRetriever
 from src.schemas.constants import (
+    META_BM25_SCORE,
     META_CHUNK_ID,
+    META_RRF_SCORE,
     META_SOURCE,
+    META_VECTOR_SCORE,
     RR_CONTENT,
     RR_METADATA,
     RR_SCORE,
@@ -174,6 +177,10 @@ def rrf_fuse(
 
     score = sum(1 / (k + rank)) for each result in both lists.
     以 chunk_id 或 (source, content) 作为去重 key。
+
+    issues.md 一.5：RRF 分数写入 metadata.rrf_score，原始量纲分别保留在
+    metadata.vector_score / metadata.bm25_score，返回顺序即融合排序；
+    下游不得再用原始 score 重排或阈值过滤融合结果。
     """
     if not bm25_results:
         return vector_results[:top_k]
@@ -192,6 +199,7 @@ def rrf_fuse(
     for rank, result in enumerate(vector_results):
         key = _result_key(result)
         score = 1.0 / (k + rank + 1)
+        result.setdefault(RR_METADATA, {})[META_VECTOR_SCORE] = result.get(RR_SCORE, 0.0)
         if key in fused:
             existing_score, existing = fused[key]
             # 保留向量检索的 metadata（更完整），累加分数
@@ -202,14 +210,17 @@ def rrf_fuse(
     for rank, result in enumerate(bm25_results):
         key = _result_key(result)
         score = 1.0 / (k + rank + 1)
+        result.setdefault(RR_METADATA, {})[META_BM25_SCORE] = result.get(RR_SCORE, 0.0)
         if key in fused:
             existing_score, existing = fused[key]
             fused[key] = (existing_score + score, existing)
         else:
-            # BM25 独有的结果，标记 score 为 BM25 分数
-            result[RR_SCORE] = result.get(RR_SCORE, 0)  # 保留 BM25 原始分数
             fused[key] = (score, result)
 
-    # 按融合分数降序
+    # 按融合分数降序，并把融合分写进 metadata 供下游排序使用
     ranked = sorted(fused.values(), key=lambda x: x[0], reverse=True)
-    return [result for _, result in ranked[:top_k]]
+    results: list[RetrievalResult] = []
+    for fused_score, result in ranked[:top_k]:
+        result.setdefault(RR_METADATA, {})[META_RRF_SCORE] = round(fused_score, 6)
+        results.append(result)
+    return results

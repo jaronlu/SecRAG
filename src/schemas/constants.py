@@ -46,6 +46,13 @@ RR_SCORE: Final = "score"
 RR_DENIED: Final = "denied"
 RR_REASON: Final = "reason"
 
+# 检索分数语义分离（issues.md 一.5）：RR_SCORE 在不同阶段含义不同
+# （向量相似度 / BM25 原始分 / rerank 分），原始量纲保存在 metadata 中，
+# RRF 融合分单独存放，排序时每阶段只用一种量纲。
+META_VECTOR_SCORE: Final = "vector_score"
+META_BM25_SCORE: Final = "bm25_score"
+META_RRF_SCORE: Final = "rrf_score"
+
 # ══════════════════════════════════════════════════════════════════════
 # retrieval_plan step 键名  (SCHEMA-REFERENCE §1.3)
 # ══════════════════════════════════════════════════════════════════════
