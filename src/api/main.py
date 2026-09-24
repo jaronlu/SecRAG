@@ -96,27 +96,6 @@ async def admin_ui():
     return HTMLResponse(content=admin_html.read_text(encoding="utf-8"))
 
 
-@app.get("/{full_path:path}", response_class=HTMLResponse)
-async def spa_catch_all(full_path: str):
-    """React Router catch-all——非 API 路径返回 index.html。"""
-    # API 路径由具体路由处理，不会走到这里
-    if _FRONTEND_DIST.exists() and not full_path.startswith(("v1/", "health", "metrics", "docs", "openapi.json")):
-        index_file = _FRONTEND_DIST / "index.html"
-        if index_file.exists():
-            return FileResponse(str(index_file))
-    raise HTTPException(status_code=404, detail="Not Found")
-
-
-@app.get("/favicon.ico", include_in_schema=False)
-async def favicon():
-    return Response(status_code=204)
-
-
-@app.get("/.well-known/appspecific/com.chrome.devtools.json", include_in_schema=False)
-async def chrome_devtools_probe():
-    return {}
-
-
 @app.get("/health")
 async def health_check():
     """P2-4: 健康检查端点——检查 ChromaDB 连通性和文档计数。
@@ -622,3 +601,29 @@ async def assistant_qa_stream(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ══════════════════════════════════════════════════════════════════════
+# SPA fallback——必须注册在所有业务路由之后（issues.md 一.2）
+# Starlette 按注册顺序匹配路径，通配 GET 路由若先注册会截走 /health 等接口
+# ══════════════════════════════════════════════════════════════════════
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return Response(status_code=204)
+
+
+@app.get("/.well-known/appspecific/com.chrome.devtools.json", include_in_schema=False)
+async def chrome_devtools_probe():
+    return {}
+
+
+@app.get("/{full_path:path}", response_class=HTMLResponse)
+async def spa_catch_all(full_path: str):
+    """React Router catch-all——非 API 路径返回 index.html。"""
+    if _FRONTEND_DIST.exists() and not full_path.startswith(("v1/", "health", "metrics", "docs", "openapi.json")):
+        index_file = _FRONTEND_DIST / "index.html"
+        if index_file.exists():
+            return FileResponse(str(index_file))
+    raise HTTPException(status_code=404, detail="Not Found")
