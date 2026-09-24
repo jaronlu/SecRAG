@@ -447,9 +447,11 @@ async def assistant_qa(
         "recursion_limit": AGENT_RECURSION_LIMIT,
     }
 
-    # P1-4: 语义缓存——查询前先查缓存，命中则直接返回
+    # P1-4: 语义缓存——查询前先查缓存，命中则直接返回。
+    # 缓存查询涉及 embedding 计算与全表扫描，放到线程池执行，
+    # 避免阻塞事件循环（issues.md 二.2）
     cache = get_semantic_cache()
-    cache_hit = cache.lookup(request.query, role=user.role)
+    cache_hit = await asyncio.to_thread(cache.lookup, request.query, user.role)
     if cache_hit:
         audit_logger.info(
             "Semantic cache hit: thread_id=%s similarity=%.4f",
@@ -515,7 +517,8 @@ async def assistant_qa(
         and compliance.get("passed", False)
         and verification.get("passed", False)
     ):
-        cache.store(
+        await asyncio.to_thread(
+            cache.store,
             query=request.query,
             answer=answer,
             citations=result.get(STATE_CITATIONS, []),
