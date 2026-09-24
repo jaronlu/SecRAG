@@ -9,6 +9,7 @@ from typing import Annotated, cast
 from fastapi import Header, HTTPException, status
 
 from src.agents.state import AssistantState
+from src.config import config
 from src.schemas.constants import (
     AUDIT_REQUEST_ID,
     AUDIT_STARTED_PERF_COUNTER,
@@ -39,7 +40,8 @@ from src.schemas.constants import (
     STATE_RESOLVED_QUERY,
     STATE_REASON_ATTEMPTS,
     STATE_REASON_MESSAGE_START,
-    STATE_REASON_STARTED_PERF_COUNTER,
+        STATE_REASON_STARTED_PERF_COUNTER,
+        STATE_REQUEST_DEADLINE,
     STATE_RETRIEVAL_PLAN,
     STATE_RETRIEVAL_ATTEMPTS,
     STATE_RETRIEVAL_FILTERED_CHUNKS,
@@ -146,6 +148,8 @@ def build_assistant_initial_state(
         STATE_REASON_MESSAGE_START: 0,
         STATE_TOOL_MESSAGE_CURSOR: 0,
         STATE_REASON_STARTED_PERF_COUNTER: 0.0,
+        # 请求级截止时间：Agent 在模型调用/工具执行前检查，超时尽快短路（issues.md 一.8）
+        STATE_REQUEST_DEADLINE: time.monotonic() + config.api_request_timeout_seconds,
         STATE_VERIFICATION: {},
         STATE_COMPLIANCE: {},
         STATE_FINAL_ANSWER: "",

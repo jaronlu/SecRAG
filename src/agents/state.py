@@ -67,6 +67,7 @@ class AssistantState(TypedDict):
     reason_message_start: int
     tool_message_cursor: int
     reason_started_perf_counter: float
+    request_deadline: float  # STATE_REQUEST_DEADLINE，请求级截止（time.monotonic）；缺省表示无截止
 
     # 验证结果 — STATE_VERIFICATION
     verification: VerificationResult

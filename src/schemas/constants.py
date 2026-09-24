@@ -110,6 +110,7 @@ STATE_TOOL_ITERATIONS: Final = "tool_iterations"
 STATE_REASON_MESSAGE_START: Final = "reason_message_start"
 STATE_TOOL_MESSAGE_CURSOR: Final = "tool_message_cursor"
 STATE_REASON_STARTED_PERF_COUNTER: Final = "reason_started_perf_counter"
+STATE_REQUEST_DEADLINE: Final = "request_deadline"  # 请求级截止时间（time.monotonic 秒）
 STATE_VERIFICATION: Final = "verification"
 STATE_COMPLIANCE: Final = "compliance"
 STATE_FINAL_ANSWER: Final = "final_answer"

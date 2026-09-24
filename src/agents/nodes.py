@@ -80,6 +80,7 @@ from src.schemas.constants import (
     STATE_REASON_ATTEMPTS,
     STATE_REASON_MESSAGE_START,
     STATE_REASON_STARTED_PERF_COUNTER,
+    STATE_REQUEST_DEADLINE,
     STATE_RESOLVED_QUERY,
     STATE_RETRIEVAL_ATTEMPTS,
     STATE_RETRIEVAL_FILTERED_CHUNKS,
@@ -166,6 +167,16 @@ AUDIT_OUTBOX_PATH = "data/audit_outbox.jsonl"
 
 # P1-7: 工具熔断器——记录工具最后失败时间，冷却期内跳过调用
 _tool_circuit_breaker: dict[str, float] = {}
+
+# P1-8: 工具执行线程池引用——防止超时后 executor 被垃圾回收导致异常
+_tool_executors: set[concurrent.futures.ThreadPoolExecutor] = set()
+
+
+def _request_deadline_exceeded(state: AssistantState) -> bool:
+    """检查请求级截止时间（issues.md 一.8）：超时后各执行点尽快短路，
+    而不是让图继续调用模型或工具。"""
+    deadline = state.get(STATE_REQUEST_DEADLINE)
+    return deadline is not None and time.monotonic() > float(deadline)
 
 # P1-4: 检索结果 TTL 缓存——key=(role, plan_fingerprint), value=(timestamp, results)
 _retrieval_cache: dict[str, tuple[float, list[RetrievalResult]]] = {}
@@ -916,6 +927,10 @@ def call_reason_model(state: AssistantState) -> dict[str, Any]:
         raise ValueError("ReAct 推理缺少当前尝试的输入消息")
 
     role = state.get(STATE_USER_ROLE, ROLE_OPERATIONS)
+    # 请求已超时：不再调用模型，用一条无工具调用的 AIMessage 短路到 finalize，
+    # 让终态/会话保存/审计照常收敛（issues.md 一.8）
+    if _request_deadline_exceeded(state):
+        return {STATE_MESSAGES: [AIMessage(content="请求处理已超时，本轮生成已停止。")]}
     bound_model = _get_bound_reason_model(role, _excluded_retrieval_sources(state))
     response = bound_model.invoke([
         SystemMessage(content=_build_reason_system_prompt(state)),
@@ -947,6 +962,15 @@ def authorize_reason_tool_call(
             status="error",
         )
 
+    # 请求级截止时间优先于单工具超时
+    if _request_deadline_exceeded(state):
+        return ToolMessage(
+            content="请求处理已超时，工具调用已停止。",
+            name=tool_name,
+            tool_call_id=tool_call_id,
+            status="error",
+        )
+
     # 熔断器：冷却期内跳过已知失败工具
     last_failure = _tool_circuit_breaker.get(tool_name, 0)
     if time.time() - last_failure < TOOL_CIRCUIT_BREAKER_SECONDS:
@@ -957,11 +981,14 @@ def authorize_reason_tool_call(
             status="error",
         )
 
-    # 超时保护：在线程中执行，超时返回错误
+    # 超时保护：线程中执行，超时立即返回错误。
+    # 不能用 with 上下文管理 executor——__exit__ 会 join 残留线程，
+    # 使实际等待时间被拉长为任务耗时而非超时上限（issues.md 一.8）
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    _tool_executors.add(executor)
     try:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(execute, request)
-            result = future.result(timeout=TOOL_TIMEOUT_SECONDS)
+        future = executor.submit(execute, request)
+        result = future.result(timeout=TOOL_TIMEOUT_SECONDS)
         return result
     except concurrent.futures.TimeoutError:
         _tool_circuit_breaker[tool_name] = time.time()
@@ -979,6 +1006,10 @@ def authorize_reason_tool_call(
             tool_call_id=tool_call_id,
             status="error",
         )
+    finally:
+        # 立即释放调用方等待；残留任务无法强制终止，但不再阻塞本轮请求
+        executor.shutdown(wait=False, cancel_futures=True)
+        _tool_executors.discard(executor)
 
 
 def record_tool_results(state: AssistantState) -> dict[str, Any]:

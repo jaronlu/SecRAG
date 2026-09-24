@@ -595,29 +595,31 @@ async def assistant_qa_stream(
         }
 
         try:
-            # 流式获取每个节点的状态更新
-            async for state_update in agent.astream(
-                initial_state, runnable_config, stream_mode="updates"
-            ):
-                for node_name, node_output in state_update.items():
-                    # 只发送关键节点的进度，避免事件过多
-                    if node_name in ("query_understand", "planner", "retrieve", "grade_and_filter", "reason", "verify", "compose"):
-                        yield (
-                            "event: progress\n"
-                            f"data: {json.dumps({'type': 'progress', 'node': node_name, 'status': 'done'}, ensure_ascii=False)}\n\n"
-                        )
-                    # 终态节点输出最终回答：compose 之外，clarify 与
-                    # permission_denied_response 会跳过 compose 直接产出答案
-                    if node_name in ("compose", "clarify", "permission_denied_response") and STATE_FINAL_ANSWER in node_output:
-                        answer_data = json.dumps({
-                            "type": "answer",
-                            "answer": node_output[STATE_FINAL_ANSWER],
-                            "citations": node_output.get(STATE_CITATIONS, []),
-                            "confidence": node_output.get(STATE_CONFIDENCE, "unknown"),
-                            "thread_id": thread_id,
-                            "turn_id": turn_id,
-                        }, ensure_ascii=False)
-                        yield f"event: answer\ndata: {answer_data}\n\n"
+            # 流式获取每个节点的状态更新；整条流受请求级总超时约束
+            #（issues.md 一.8：SSE 此前没有总超时包装）
+            async with asyncio.timeout(config.api_request_timeout_seconds):
+                async for state_update in agent.astream(
+                    initial_state, runnable_config, stream_mode="updates"
+                ):
+                    for node_name, node_output in state_update.items():
+                        # 只发送关键节点的进度，避免事件过多
+                        if node_name in ("query_understand", "planner", "retrieve", "grade_and_filter", "reason", "verify", "compose"):
+                            yield (
+                                "event: progress\n"
+                                f"data: {json.dumps({'type': 'progress', 'node': node_name, 'status': 'done'}, ensure_ascii=False)}\n\n"
+                            )
+                        # 终态节点输出最终回答：compose 之外，clarify 与
+                        # permission_denied_response 会跳过 compose 直接产出答案
+                        if node_name in ("compose", "clarify", "permission_denied_response") and STATE_FINAL_ANSWER in node_output:
+                            answer_data = json.dumps({
+                                "type": "answer",
+                                "answer": node_output[STATE_FINAL_ANSWER],
+                                "citations": node_output.get(STATE_CITATIONS, []),
+                                "confidence": node_output.get(STATE_CONFIDENCE, "unknown"),
+                                "thread_id": thread_id,
+                                "turn_id": turn_id,
+                            }, ensure_ascii=False)
+                            yield f"event: answer\ndata: {answer_data}\n\n"
         except asyncio.TimeoutError:
             yield (
                 "event: error\n"
