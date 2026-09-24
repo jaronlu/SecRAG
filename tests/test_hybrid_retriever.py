@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
+import pytest
+
 from src.retrieval.base import BaseRetriever
 from src.retrieval.hybrid_retriever import HybridRetriever
 from src.schemas.constants import (
@@ -102,6 +104,12 @@ class RestrictedRetriever(BaseRetriever):
 
 
 class TestHybridRetriever:
+    @pytest.fixture(autouse=True)
+    def _disable_bm25(self, monkeypatch):
+        """单元测试默认关闭 BM25，避免依赖本机 Chroma 数据；BM25 行为在
+        test_bm25_results_kept_with_realistic_source_metadata 中单独验证。"""
+        monkeypatch.setattr(HybridRetriever, "_get_bm25_retriever", lambda self: None)
+
     def test_executes_allowed_plan_and_passes_arguments(self):
         fake = FakeRetriever()
         retriever = HybridRetriever(user_role=ROLE_ADVISOR)
@@ -245,3 +253,68 @@ class TestHybridRetriever:
         assert len(created_engines) == 1
         assert product._engine is created_engines[0]
         assert faq._engine is created_engines[0]
+
+
+def test_bm25_results_kept_with_realistic_source_metadata():
+    """issues.md 一.4：BM25 来源过滤必须用 retrieval_source 精确匹配。
+
+    metadata.source 是文件路径（如 data/raw/reports/example.pdf），
+    旧实现检查路径是否包含 "report_search"，会误杀合法 BM25 命中。
+    放在类外：TestHybridRetriever 的 autouse fixture 会禁用 BM25。
+    """
+    vector_result = {
+        RR_CONTENT: "vector hit",
+        RR_METADATA: {
+            META_SOURCE: "data/raw/reports/example.pdf",
+            "retrieval_source": "report_search",
+        },
+        RR_SCORE: 0.9,
+    }
+    bm25_result = {
+        RR_CONTENT: "bm25 hit 股票代码 600519",
+        RR_METADATA: {
+            META_SOURCE: "data/raw/reports/example2.pdf",
+            "retrieval_source": "report_search",
+        },
+        RR_SCORE: 7.3,
+    }
+
+    retriever = HybridRetriever(user_role=ROLE_ADVISOR)
+    retriever._retriever_cache[SOURCE_REPORT] = _FakeVectorSource([vector_result])
+    retriever._bm25_retriever = _FakeBM25([bm25_result])
+
+    plan = [
+        {
+            PLAN_SOURCE: SOURCE_REPORT,
+            PLAN_QUERY: "贵州茅台 评级",
+            PLAN_TOP_K: 5,
+        }
+    ]
+    results = retriever.retrieve(plan)
+
+    # BM25 收到精确的 retrieval_source 前置过滤
+    bm25_filters = retriever._bm25_retriever.calls[0]["filters"]
+    assert bm25_filters.get("retrieval_source") == SOURCE_REPORT
+
+    # BM25 独有结果没有因 metadata.source 是文件路径而被过滤掉
+    contents = [r[RR_CONTENT] for r in results if not r.get(RR_DENIED)]
+    assert "bm25 hit 股票代码 600519" in contents
+    assert "vector hit" in contents
+
+
+class _FakeVectorSource(BaseRetriever):
+    def __init__(self, results):
+        self._results = results
+
+    def retrieve(self, query, top_k=5, filters=None):
+        return list(self._results)
+
+
+class _FakeBM25:
+    def __init__(self, results):
+        self.calls: list[dict] = []
+        self._results = results
+
+    def retrieve(self, query, top_k=5, filters=None):
+        self.calls.append({"query": query, "top_k": top_k, "filters": filters})
+        return list(self._results)

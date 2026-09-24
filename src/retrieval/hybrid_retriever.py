@@ -14,6 +14,7 @@ from src.schemas.constants import (
     META_ALLOWED_ROLES,
     META_ERROR,
     META_PERMISSION_LEVEL,
+    META_RETRIEVAL_SOURCE,
     META_SOURCE,
     PERMISSION_PUBLIC,
     PLAN_DENIED,
@@ -81,22 +82,21 @@ class HybridRetriever:
                 bm25 = self._get_bm25_retriever()
                 if bm25 is not None:
                     try:
+                        # 来源过滤必须用 retrieval_source（report_search 等逻辑源名）
+                        # 精确匹配，而不是 metadata.source（文件路径/URL）；
+                        # 且要在 BM25 截断 top_k 之前作为前置过滤生效（issues.md 一.4）
+                        bm25_filters = dict(step.get(PLAN_FILTERS) or {})
+                        if source:
+                            bm25_filters[META_RETRIEVAL_SOURCE] = source
                         bm25_results = bm25.retrieve(
                             query=step.get(PLAN_QUERY, ""),
-                            top_k=step.get(PLAN_TOP_K, DEFAULT_TOP_K) * 2,
-                            filters=step.get(PLAN_FILTERS),
+                            top_k=step.get(PLAN_TOP_K, DEFAULT_TOP_K),
+                            filters=bm25_filters or None,
                         )
-                        # BM25 结果按 source 过滤，只保留当前检索源
-                        source_filter = source or ""
-                        bm25_filtered = [
-                            r
-                            for r in bm25_results
-                            if source_filter in r.get(RR_METADATA, {}).get(META_SOURCE, "")
-                        ]
-                        if bm25_filtered:
+                        if bm25_results:
                             retrieved = rrf_fuse(
                                 retrieved,
-                                bm25_filtered,
+                                bm25_results,
                                 top_k=step.get(PLAN_TOP_K, DEFAULT_TOP_K),
                             )
                     except Exception:
