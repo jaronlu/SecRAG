@@ -20,6 +20,7 @@ from src.schemas.constants import (
     RR_CONTENT,
     RR_METADATA,
     RR_SCORE,
+    RRF_K,
 )
 from src.schemas.typed_dicts import RetrievalResult
 
@@ -210,7 +211,7 @@ class BM25Retriever:
 def rrf_fuse(
     vector_results: list[RetrievalResult],
     bm25_results: list[RetrievalResult],
-    k: int = 60,
+    k: int = RRF_K,
     top_k: int = 10,
 ) -> list[RetrievalResult]:
     """Reciprocal Rank Fusion：融合向量检索和 BM25 检索结果。

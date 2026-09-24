@@ -328,9 +328,6 @@ def test_role_filter_happens_before_truncation(monkeypatch):
     结果全是 denied 占位符。超量取回后低位的可访问文档得以保留。
     """
     monkeypatch.setattr(HybridRetriever, "_get_bm25_retriever", lambda self: None)
-    from src.schemas.constants import (
-        META_PERMISSION_LEVEL as perm_level,
-    )
     from src.schemas.constants import PERMISSION_PUBLIC
 
     pool = [
@@ -403,3 +400,35 @@ def test_rrf_order_survives_grade_and_filter():
     graded = [r[RR_CONTENT] for r in updated[STATE_RETRIEVAL_RESULTS]]
     # C 的 BM25 原始分 9.0 不应再把 B、A 挤到后面
     assert graded == ["B", "A", "C"]
+
+
+def test_mixed_pool_does_not_demote_fused_results():
+    """issues.md 一.5 残留：混合池中 rrf_score 与原始 cosine 不得直接混排。
+
+    部分来源有 BM25 命中（结果带 rrf_score，约 <=2/(k+1)）、部分没有
+    （结果只剩 cosine，阈值 0.6 起）时，两种量纲进同一个排序键会让
+    融合结果被系统性压底——双路命中的最优证据反而沉底。
+    """
+    from src.agents.nodes import grade_and_filter
+    from src.retrieval.bm25_retriever import rrf_fuse
+    from src.schemas.constants import STATE_RETRIEVAL_RESULTS
+
+    vec_a1 = {RR_CONTENT: "A1", RR_METADATA: {META_SOURCE: "s-a", META_CHUNK_ID: "a1"}, RR_SCORE: 0.9}
+    vec_a2 = {RR_CONTENT: "A2", RR_METADATA: {META_SOURCE: "s-a", META_CHUNK_ID: "a2"}, RR_SCORE: 0.8}
+    bm25_a1 = {RR_CONTENT: "A1", RR_METADATA: {META_SOURCE: "s-a", META_CHUNK_ID: "a1"}, RR_SCORE: 12.0}
+    # 来源 A 有 BM25 命中：结果带 rrf_score，A1 同时命中双路
+    fused = rrf_fuse([vec_a1, vec_a2], [bm25_a1], top_k=5)
+
+    # 来源 B 没有 BM25 命中：结果是纯向量结果，没有 rrf_score
+    unfused = [
+        {RR_CONTENT: "B1", RR_METADATA: {META_SOURCE: "s-b", META_CHUNK_ID: "b1"}, RR_SCORE: 0.95},
+        {RR_CONTENT: "B2", RR_METADATA: {META_SOURCE: "s-b", META_CHUNK_ID: "b2"}, RR_SCORE: 0.7},
+    ]
+
+    updated = grade_and_filter({STATE_RETRIEVAL_RESULTS: fused + unfused})
+    graded = [r[RR_CONTENT] for r in updated[STATE_RETRIEVAL_RESULTS]]
+
+    # 双路命中的 A1 必须排在最前，而不是被高 cosine 的未融合结果压底
+    assert graded[0] == "A1"
+    # 未融合结果之间保持 cosine 序
+    assert graded.index("B1") < graded.index("B2")

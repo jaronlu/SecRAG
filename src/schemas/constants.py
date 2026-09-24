@@ -329,6 +329,9 @@ CONFIDENCE_HIGH_THRESHOLD = 0.75
 CONFIDENCE_MEDIUM_THRESHOLD = 0.5
 CONFIDENCE_HIGH_MIN_RESULTS = 3
 RETRIEVAL_MIN_SCORE = 0.6
+# RRF 融合常数（issues.md 一.5）：rrf_fuse 与 grade_and_filter 的未融合结果
+# 等值折算必须共用同一个 k，否则两处分数不可比
+RRF_K = 60
 
 # ══════════════════════════════════════════════════════════════════════
 # Embedding 默认值  (SCHEMA-REFERENCE §4)

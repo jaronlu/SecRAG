@@ -59,6 +59,7 @@ from src.schemas.constants import (
     RR_DENIED,
     RR_METADATA,
     RR_SCORE,
+    RRF_K,
     SOURCE_REPORT,
     STATE_AMBIGUITY,
     STATE_AUDIT_TRAIL,
@@ -720,6 +721,29 @@ def _try_rerank_candidates(
         return candidates, f"error:{exc}"
 
 
+def _comparable_retrieval_scores(results: list[RetrievalResult]) -> dict[int, float]:
+    """给候选池计算同量纲排序分，供 grade_and_filter 统一排序。
+
+    RRF 融合结果直接用 metadata.rrf_score；未融合的纯向量结果按 cosine
+    排名折算成单列表 RRF 等值分 1/(k+rank+1)（与 rrf_fuse 共用 RRF_K）。
+    直接混排 rrf_score（上限约 2/(k+1)）与 cosine（阈值 0.6 起）会让
+    混合池（部分来源有 BM25 命中、部分没有）里的融合结果被系统性压底
+    （issues.md 一.5）。折算是单调变换，未融合结果之间的相对顺序不变。
+    """
+    scores: dict[int, float] = {}
+    unfused: list[RetrievalResult] = []
+    for result in results:
+        rrf_score = result.get(RR_METADATA, {}).get(META_RRF_SCORE)
+        if rrf_score is not None:
+            scores[id(result)] = float(rrf_score)
+        else:
+            unfused.append(result)
+    unfused.sort(key=lambda r: float(r.get(RR_SCORE, 0) or 0.0), reverse=True)
+    for rank, result in enumerate(unfused):
+        scores[id(result)] = 1.0 / (RRF_K + rank + 1)
+    return scores
+
+
 def grade_and_filter(state: AssistantState) -> dict[str, Any]:
     """相关性评分与过滤：阈值过滤 → 去重 → BGE 语义重排 → 保留前 GRADE_TOP_K 条。
 
@@ -732,16 +756,16 @@ def grade_and_filter(state: AssistantState) -> dict[str, Any]:
 
     # 先把无权限结果摘出来；保留它们是为了后续可明确提示用户"部分结果无权查看"
     denied = [result for result in results if result.get(RR_DENIED)]
+    usable = [result for result in results if not result.get(RR_DENIED)]
     candidates = []
     seen_evidence = set()
 
+    # 整个候选池只用一种量纲排序（issues.md 一.5）：融合分与未融合结果的
+    # RRF 等值分同量纲，见 _comparable_retrieval_scores
+    comparable_scores = _comparable_retrieval_scores(usable)
+
     def _sort_key(result: RetrievalResult) -> float:
-        """每个阶段只用一种量纲排序：RRF 融合结果按 rrf_score，
-        未融合结果按原始 score（向量相似度）（issues.md 一.5）。"""
-        rrf_score = result.get(RR_METADATA, {}).get(META_RRF_SCORE)
-        if rrf_score is not None:
-            return float(rrf_score)
-        return float(result.get(RR_SCORE, 0) or 0.0)
+        return comparable_scores.get(id(result), float(result.get(RR_SCORE, 0) or 0.0))
 
     def _passes_threshold(result: RetrievalResult) -> bool:
         # RETRIEVAL_MIN_SCORE 是相似度阈值，只适用于未融合结果的原始 score；
@@ -752,8 +776,8 @@ def grade_and_filter(state: AssistantState) -> dict[str, Any]:
 
     # 先按排序依据降序做阈值过滤和去重，候选池不超过 GRADE_TOP_K 的 2 倍以控制 rerank 开销
     pool_limit = GRADE_TOP_K * 2
-    for result in sorted(results, key=_sort_key, reverse=True):
-        if result.get(RR_DENIED) or not _passes_threshold(result):
+    for result in sorted(usable, key=_sort_key, reverse=True):
+        if not _passes_threshold(result):
             continue
         metadata = result.get(RR_METADATA, {})
         # 以来源 + 内容指纹去重，避免同一证据反复占据上下文窗口
