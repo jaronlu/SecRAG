@@ -33,6 +33,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     const text = await res.text().catch(() => '')
     throw new Error(`HTTP ${res.status}: ${text || res.statusText}`)
   }
+  // 204 无响应体（如删除会话），不能走 res.json()
+  if (res.status === 204) {
+    return undefined as T
+  }
   return res.json()
 }
 
@@ -98,16 +102,23 @@ export async function streamQuestion(
     const lines = buffer.split('\n')
     buffer = lines.pop() || ''
 
+    // SSE 事件名由 event: 行给出，payload JSON 内也有同名字段 type
+    let eventName = 'message'
     for (const line of lines) {
-      if (!line.startsWith('data: ')) continue
-      const dataStr = line.slice(6).trim()
+      if (line.startsWith('event:')) {
+        eventName = line.slice(6).trim()
+        continue
+      }
+      if (!line.startsWith('data:')) continue
+      const dataStr = line.slice(5).trim()
       if (!dataStr || dataStr === '[DONE]') continue
       try {
-        const event = JSON.parse(dataStr) as StreamEvent
-        onEvent(event)
+        const payload = JSON.parse(dataStr) as Record<string, unknown>
+        onEvent({ ...payload, type: payload.type ?? eventName } as unknown as StreamEvent)
       } catch {
         // 忽略解析错误
       }
+      eventName = 'message'
     }
   }
 }

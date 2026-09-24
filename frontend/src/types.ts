@@ -91,14 +91,19 @@ export interface CacheStats {
   enabled: boolean
 }
 
-// SSE 流式事件类型
+// SSE 流式事件类型（与后端 assistant_qa_stream 的事件协议一致：
+// event 名与 JSON 内 type 字段相同，issues.md 一.3）
 export type StreamEventType = 'progress' | 'answer' | 'error' | 'done'
 
 export interface StreamEvent {
   type: StreamEventType
   node?: string
-  data?: string
-  message?: string
+  answer?: string
+  citations?: Citation[]
+  confidence?: string
+  thread_id?: string
+  turn_id?: string
+  detail?: string
 }
 
 // 流式进度节点

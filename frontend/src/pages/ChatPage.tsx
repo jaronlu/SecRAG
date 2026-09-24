@@ -5,11 +5,13 @@ import StreamingProgress from '../components/StreamingProgress'
 import { askQuestion, streamQuestion, createThread, listThreads, deleteThread } from '../api'
 import type { ChatMessage as ChatMessageType, StreamEvent } from '../types'
 
+// 角色取值必须与后端 TOKEN_USER_BINDINGS 一致（issues.md 一.3）
 const ROLES = [
   { value: 'demo-advisor', label: '投资顾问', desc: '可查看产品和研报' },
-  { value: 'demo-analyst', label: '分析师', desc: '可查看法规和研报' },
-  { value: 'demo-technical', label: '技术支持', desc: '可查看技术文档' },
-  { value: 'demo-admin', label: '管理员', desc: '全部权限' },
+  { value: 'demo-sales', label: '机构销售', desc: '可查看研报和市场信息' },
+  { value: 'demo-compliance', label: '合规', desc: '可查看法规和制度' },
+  { value: 'demo-ops', label: '运营支持', desc: '可查看FAQ和流程' },
+  { value: 'demo-tech', label: '技术支持', desc: '可查看技术文档' },
 ]
 
 export default function ChatPage() {
@@ -97,15 +99,24 @@ export default function ChatPage() {
         await streamQuestion(input.trim(), currentThreadId, (event: StreamEvent) => {
           if (event.type === 'progress' && event.node) {
             setCurrentNode(event.node)
-          } else if (event.type === 'answer' && event.data) {
+          } else if (event.type === 'answer') {
+            // 后端 answer 事件承载完整终态：answer 文本 + 引用 + 置信度
+            const text = event.answer ?? ''
+            const citations = event.citations
+            const confidence = event.confidence
+            // 自动创建会话后，把 thread_id 回写，后续问题沿用同一会话
+            if (event.thread_id) {
+              setCurrentThreadId(event.thread_id)
+            }
             // 打字机效果
-            const text = event.data
             let i = 0
             const typeInterval = setInterval(() => {
               if (i < text.length) {
                 setMessages((prev) =>
                   prev.map((m) =>
-                    m.id === assistantId ? { ...m, content: text.slice(0, i + 1) } : m,
+                    m.id === assistantId
+                      ? { ...m, content: text.slice(0, i + 1), citations, confidence }
+                      : m,
                   ),
                 )
                 i++
@@ -113,6 +124,14 @@ export default function ChatPage() {
                 clearInterval(typeInterval)
               }
             }, 10)
+          } else if (event.type === 'error') {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId
+                  ? { ...m, content: `错误: ${event.detail ?? '未知错误'}`, streaming: false }
+                  : m,
+              ),
+            )
           } else if (event.type === 'done') {
             setCurrentNode(null)
           }
@@ -135,6 +154,10 @@ export default function ChatPage() {
       // 同步输出
       try {
         const result = await askQuestion(input.trim(), currentThreadId)
+        // 未显式新建会话时，问答会自动创建会话——回写 thread_id 保证连续对话
+        if (result.thread_id) {
+          setCurrentThreadId(result.thread_id)
+        }
         setMessages((prev) => [
           ...prev,
           {

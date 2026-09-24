@@ -252,7 +252,7 @@ async def get_document_chunks(
     return get_kb_manager().get_document_chunks(source=source, limit=limit, offset=offset)
 
 
-@app.post("/v1/admin/documents/search")
+@app.get("/v1/admin/documents/search")
 async def search_knowledge_base(
     query: str,
     top_k: int = 5,
@@ -261,6 +261,7 @@ async def search_knowledge_base(
     """P2: 知识库语义搜索——直接在向量库中搜索，用于预览检索效果。
 
     仅 admin/technical 角色可访问。不经过 Agent 流程，直接返回检索结果。
+    issues.md 一.3：前端以 GET 查询参数调用，这里注册为 GET 保持契约一致。
     """
     if user.role not in ("admin", "technical"):
         raise HTTPException(status_code=403, detail="仅管理员可搜索知识库")
@@ -303,6 +304,25 @@ def _conversation_http_error(exc: Exception) -> HTTPException:
     if isinstance(exc, ConversationContextMismatchError):
         return HTTPException(status_code=409, detail=str(exc))
     raise exc
+
+
+@app.get(API_ROUTE_ASSISTANT_THREADS, response_model=dict[str, list[ConversationThreadResponse]])
+async def list_assistant_threads(
+    limit: int = 50,
+    user: AuthenticatedUser = Depends(authenticate_user),
+):
+    """列出当前用户的活跃会话（issues.md 一.3：前端会话列表契约）。"""
+    threads = _get_conversation_store().list_threads(user_id=user.user_id, limit=limit)
+    return {
+        "threads": [
+            ConversationThreadResponse(
+                thread_id=thread["thread_id"],
+                title=thread["title"],
+                created_at=thread["created_at"],
+            )
+            for thread in threads
+        ]
+    }
 
 
 @app.post(API_ROUTE_ASSISTANT_THREADS, response_model=ConversationThreadResponse)
@@ -521,18 +541,26 @@ async def assistant_qa_stream(
 ):
     """P2-1: 流式输出端点——SSE 逐事件返回 Agent 执行进度和最终回答。
 
-    事件格式：
-    - event: progress, data: {"node": "...", "status": "done"}
-    - event: answer, data: {"answer": "...", "citations": [...], "confidence": "..."}
-    - event: error, data: {"detail": "..."}
-    - event: done
+    事件协议（issues.md 一.3：event 名与 JSON 内 type 字段一致，前端按同一契约解析）：
+    - event: progress, data: {"type": "progress", "node": "...", "status": "done"}
+    - event: answer,   data: {"type": "answer", "answer": "...", "citations": [...],
+                       "confidence": "...", "thread_id": "...", "turn_id": "..."}
+    - event: error,    data: {"type": "error", "detail": "..."}
+    - event: done,     data: {"type": "done"}
+
+    answer 事件来自统一终态：compose（正常回答/验证失败/合规拦截）、
+    clarify（澄清）、permission_denied_response（权限拒绝）——
+    后两者不经过 compose，直接产出 final_answer。
     """
     # P2-2: 限流
     rate_key = get_rate_limit_key(user_id=user.user_id)
     allowed, _ = check_rate_limit(rate_key)
     if not allowed:
         return StreamingResponse(
-            iter([f"event: error\ndata: {json.dumps({'detail': '请求过于频繁'})}\n\n"]),
+            iter([
+                "event: error\n"
+                f"data: {json.dumps({'type': 'error', 'detail': '请求过于频繁'})}\n\n"
+            ]),
             media_type="text/event-stream",
             status_code=429,
         )
@@ -574,10 +602,15 @@ async def assistant_qa_stream(
                 for node_name, node_output in state_update.items():
                     # 只发送关键节点的进度，避免事件过多
                     if node_name in ("query_understand", "planner", "retrieve", "grade_and_filter", "reason", "verify", "compose"):
-                        yield f"event: progress\ndata: {json.dumps({'node': node_name, 'status': 'done'})}\n\n"
-                    # compose 节点输出包含最终回答
-                    if node_name == "compose" and STATE_FINAL_ANSWER in node_output:
+                        yield (
+                            "event: progress\n"
+                            f"data: {json.dumps({'type': 'progress', 'node': node_name, 'status': 'done'}, ensure_ascii=False)}\n\n"
+                        )
+                    # 终态节点输出最终回答：compose 之外，clarify 与
+                    # permission_denied_response 会跳过 compose 直接产出答案
+                    if node_name in ("compose", "clarify", "permission_denied_response") and STATE_FINAL_ANSWER in node_output:
                         answer_data = json.dumps({
+                            "type": "answer",
                             "answer": node_output[STATE_FINAL_ANSWER],
                             "citations": node_output.get(STATE_CITATIONS, []),
                             "confidence": node_output.get(STATE_CONFIDENCE, "unknown"),
@@ -586,11 +619,17 @@ async def assistant_qa_stream(
                         }, ensure_ascii=False)
                         yield f"event: answer\ndata: {answer_data}\n\n"
         except asyncio.TimeoutError:
-            yield f"event: error\ndata: {json.dumps({'detail': '请求处理超时'})}\n\n"
+            yield (
+                "event: error\n"
+                f"data: {json.dumps({'type': 'error', 'detail': '请求处理超时'}, ensure_ascii=False)}\n\n"
+            )
         except Exception as exc:
-            yield f"event: error\ndata: {json.dumps({'detail': str(exc)[:200]})}\n\n"
+            yield (
+                "event: error\n"
+                f"data: {json.dumps({'type': 'error', 'detail': str(exc)[:200]}, ensure_ascii=False)}\n\n"
+            )
 
-        yield "event: done\ndata: {}\n\n"
+        yield f"event: done\ndata: {json.dumps({'type': 'done'})}\n\n"
 
     return StreamingResponse(
         event_generator(),

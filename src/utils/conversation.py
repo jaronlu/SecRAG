@@ -120,6 +120,27 @@ class SQLiteConversationStore:
             raise ConversationNotFoundError("会话不存在或不可访问")
         return cast(ConversationThreadDict, dict(row))
 
+    def list_threads(
+        self, *, user_id: str, limit: int = 50
+    ) -> list[ConversationThreadDict]:
+        """列出当前用户的活跃会话，按最近更新排序（issues.md 一.3 会话列表契约）。"""
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(str(self.db_path), timeout=5) as conn:
+            conn.row_factory = sqlite3.Row
+            self._ensure_schema(conn)
+            rows = conn.execute(
+                """
+                SELECT thread_id, user_id, user_role, client_id, title, status,
+                       turn_count, created_at, updated_at, deleted_at
+                FROM conversation_threads
+                WHERE user_id = ? AND status = 'active'
+                ORDER BY updated_at DESC
+                LIMIT ?
+                """,
+                (user_id, limit),
+            ).fetchall()
+        return [cast(ConversationThreadDict, dict(row)) for row in rows]
+
     def soft_delete_thread(self, *, thread_id: str, user_id: str) -> None:
         deleted_at = utc_now()
         with sqlite3.connect(str(self.db_path), timeout=5) as conn:
