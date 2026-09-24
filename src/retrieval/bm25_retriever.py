@@ -26,6 +26,26 @@ from src.schemas.typed_dicts import RetrievalResult
 # 模块级 BM25 索引缓存：(persist_directory) -> (bm25, docs, metadatas, ids)
 _bm25_cache: dict[str, tuple[BM25Okapi, list[str], list[dict], list[str]]] = {}
 
+
+def invalidate_bm25_cache(persist_directory: str | None = None) -> int:
+    """使 BM25 索引缓存失效；入库发布新版本后必须调用（issues.md 二.1）。
+
+    Args:
+        persist_directory: 只失效指定索引；None 表示全部失效。
+
+    Returns:
+        失效的条目数。
+    """
+    if persist_directory is None:
+        count = len(_bm25_cache)
+        _bm25_cache.clear()
+        return count
+    removed = 0
+    for key in [key for key in _bm25_cache if key == persist_directory]:
+        del _bm25_cache[key]
+        removed += 1
+    return removed
+
 # 中文分词：jieba 延迟导入，避免启动开销
 _tokenizer = None
 
@@ -97,11 +117,15 @@ class BM25Retriever:
         self._index: Optional[tuple[BM25Okapi, list[str], list[dict], list[str]]] = None
 
     def _get_index(self) -> tuple[BM25Okapi, list[str], list[dict], list[str]]:
-        """懒加载 BM25 索引，带模块级缓存。"""
+        """懒加载 BM25 索引，带模块级缓存。
+
+        缓存 key 用 vector_engine 的 persist_directory（稳定的索引身份），
+        而不是 id(engine)——同一进程内每次检索会新建 engine 实例，
+        id 作 key 既不稳定也不表达知识库版本（issues.md 二.1）。
+        """
         if self._index is not None:
             return self._index
-        # 用 vector_engine 的 id 作为缓存 key，避免依赖 ChromaDB 内部属性
-        cache_key = str(id(self.vector_engine))
+        cache_key = str(getattr(self.vector_engine, "persist_directory", ""))
         if cache_key in _bm25_cache:
             self._index = _bm25_cache[cache_key]
             return self._index

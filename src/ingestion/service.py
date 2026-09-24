@@ -517,6 +517,15 @@ class IngestionService:
             stop_heartbeat.set()
             heartbeat_thread.join(timeout=1)
 
+        # 无论成功或部分失败，文档可能已发布/删除，统一失效进程内检索缓存
+        #（issues.md 二.1：缓存生命周期与知识库生命周期统一）
+        from src.retrieval.result_cache import invalidate_retrieval_caches
+
+        try:
+            invalidate_retrieval_caches()
+        except Exception:
+            pass
+
         summary = self.registry.summarize_run(run_id)
         if summary is None:
             raise IngestRunNotFoundError(run_id)

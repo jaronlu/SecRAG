@@ -28,6 +28,7 @@ from src.schemas.typed_dicts import RetrievalResult
 class ChromaVectorRetriever(BaseRetriever):
     def __init__(self, persist_directory: Optional[str] = None):
         persist_directory = persist_directory or config.chroma.persist_directory
+        self.persist_directory = persist_directory  # 稳定的索引身份，供下游缓存作 key
         self.client = chromadb.PersistentClient(
             path=persist_directory,
         )

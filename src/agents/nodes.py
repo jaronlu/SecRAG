@@ -17,6 +17,7 @@ from langgraph.types import Command
 
 from src.agents.state import AssistantState
 from src.config import config
+from src.retrieval import result_cache
 from src.retrieval.hybrid_retriever import HybridRetriever
 from src.schemas.constants import (
     CONFIDENCE_HIGH,
@@ -30,7 +31,6 @@ from src.schemas.constants import (
     MAX_PROMPT_TOKENS,
     TOOL_TIMEOUT_SECONDS,
     TOOL_CIRCUIT_BREAKER_SECONDS,
-    RETRIEVAL_CACHE_TTL_SECONDS,
     STATE_CLARIFICATION_NEEDED,
     STATE_PII_DETECTED,
     STATE_LANGUAGE,
@@ -178,9 +178,6 @@ def _request_deadline_exceeded(state: AssistantState) -> bool:
     deadline = state.get(STATE_REQUEST_DEADLINE)
     return deadline is not None and time.monotonic() > float(deadline)
 
-# P1-4: 检索结果 TTL 缓存——key=(role, plan_fingerprint), value=(timestamp, results)
-_retrieval_cache: dict[str, tuple[float, list[RetrievalResult]]] = {}
-
 
 def _time_range_to_filters(time_range: dict[str, Any] | None) -> dict[str, Any] | None:
     """将 query_understand 抽取的 time_range 转为 ChromaDB where 过滤器。
@@ -207,34 +204,22 @@ def _time_range_to_filters(time_range: dict[str, Any] | None) -> dict[str, Any] 
     return {"$and": conditions}
 
 
-def _plan_fingerprint(plan: list[RetrievalPlanStep]) -> str:
-    """生成检索计划的稳定指纹，用于缓存 key。"""
-    parts = []
-    for step in plan:
-        filters = step.get(PLAN_FILTERS)
-        filter_str = json.dumps(filters, sort_keys=True, ensure_ascii=False) if filters else ""
-        parts.append(f"{step.get(PLAN_SOURCE)}:{step.get(PLAN_QUERY)}:{step.get(PLAN_TOP_K)}:{filter_str}")
-    return "|".join(parts)
-
-
 def _cached_retrieve(
     retriever: HybridRetriever,
     plan: list[RetrievalPlanStep],
     user_role: str,
 ) -> list[RetrievalResult]:
-    """带 TTL 缓存的检索调用。命中缓存时跳过 embedding + ChromaDB 查询。"""
-    cache_key = f"{user_role}:{_plan_fingerprint(plan)}"
-    now = time.time()
-    cached = _retrieval_cache.get(cache_key)
+    """带 TTL 缓存的检索调用。命中缓存时跳过 embedding + ChromaDB 查询。
+
+    缓存本体位于 src/retrieval/result_cache.py（issues.md 二.1）：
+    入库发布后可从服务侧统一失效，而无需导入 Agent 模块。
+    """
+    cached = result_cache.get_cached_plan(user_role, plan)
     if cached is not None:
-        timestamp, results = cached
-        if now - timestamp < RETRIEVAL_CACHE_TTL_SECONDS:
-            return list(results)  # 返回副本，避免缓存被修改
-        # 过期，删除
-        del _retrieval_cache[cache_key]
+        return cached
 
     results = retriever.retrieve(plan=plan)
-    _retrieval_cache[cache_key] = (now, list(results))
+    result_cache.store_cached_plan(user_role, plan, results)
     return results
 
 # ══════════════════════════════════════════════════════════════════════
