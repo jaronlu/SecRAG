@@ -22,9 +22,6 @@ from src.api.auth import (
 from src.api.ingestion import router as ingestion_router
 from src.api.ui import render_ui_html
 from src.config import config
-
-# 追踪日志记录器（结构化 JSON，可对接 ELK / Loki）
-audit_logger = logging.getLogger("secrag.audit")
 from src.schemas.constants import (
     AGENT_RECURSION_LIMIT,
     API_ROUTE_ASSISTANT_QA,
@@ -51,6 +48,9 @@ from src.schemas.request_response import (
 from src.utils.rate_limit import check_rate_limit, get_rate_limit_key
 from src.utils.semantic_cache import get_semantic_cache
 from src.utils.metrics import get_metrics
+
+# 追踪日志记录器（结构化 JSON，可对接 ELK / Loki）
+audit_logger = logging.getLogger("secrag.audit")
 
 app = FastAPI(title="机构内部投研知识平台", version="0.1.0")
 app.include_router(ingestion_router)

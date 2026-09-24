@@ -54,6 +54,10 @@ target-version = "py311"
 line-length = 100
 exclude = [".venv"]
 
+[tool.ruff.lint.per-file-ignores]
+# scripts 先把项目根目录插入 sys.path 再 import 项目模块，E402 属预期结构
+"scripts/**" = ["E402"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

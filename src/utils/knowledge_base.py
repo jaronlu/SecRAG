@@ -13,7 +13,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any, Optional
+from typing import Any
 
 from src.config import config
 from src.schemas.constants import (

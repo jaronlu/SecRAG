@@ -31,7 +31,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 import httpx
 
 from scripts.evaluation_common import current_commit_sha, write_artifact
-from src.evaluation.answer_judge import AnswerJudge, DIMENSIONS, DIMENSION_LABELS
+from src.evaluation.answer_judge import AnswerJudge, DIMENSIONS
 
 # Demo token 映射
 ROLE_TO_TOKEN: dict[str, str] = {

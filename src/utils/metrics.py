@@ -46,7 +46,7 @@ class Metric:
     def _label_key(self, label_values: dict[str, str] | None) -> tuple:
         if not label_values:
             return ()
-        return tuple(label_values.get(l, "") for l in self.labels)
+        return tuple(label_values.get(label, "") for label in self.labels)
 
 
 class Counter(Metric):
@@ -311,10 +311,6 @@ class MetricsRegistry:
         cache_hit_rate = round(cache_hits / total_cache, 4) if total_cache > 0 else 0.0
 
         # 计算全局延迟百分位
-        all_durations = []
-        for _, data in self.query_duration.collect():
-            # 从 bucket 数据无法精确还原，用近似
-            pass
         p50 = self.query_duration.percentile(50)
         p95 = self.query_duration.percentile(95)
         p99 = self.query_duration.percentile(99)
