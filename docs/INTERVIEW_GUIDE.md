@@ -52,7 +52,7 @@
 | **语言** | Python 3.11+ | 生态最成熟，LangChain/LangGraph 原生支持 |
 | **Web 框架** | FastAPI | 异步、自动 OpenAPI 文档、类型安全 |
 | **Agent 框架** | LangGraph | 显式状态机、条件路由、Checkpointer，比 LangChain Chain 更可控 |
-| **LLM 接入** | LangChain ChatOpenAI / ChatOllama | OpenAI-compatible 协议，可切换 StepFun / 本地 Ollama |
+| **LLM 接入** | LangChain ChatOpenAI / ChatOllama | OpenAI-compatible 协议，可切换火山方舟 Ark / 本地 Ollama |
 | **向量数据库** | ChromaDB（持久化模式） | 轻量、本地部署、无需外部服务，适合原型验证 |
 | **Embedding** | BAAI/bge-small-zh-v1.5（Sentence Transformers） | 中文效果好、模型小（~100MB）、本地推理无 API 成本 |
 | **稀疏检索** | BM25（rank_bm25） | 关键词精确匹配，与向量检索互补 |
@@ -747,7 +747,7 @@ Body: {"query": "货币基金的风险等级是什么？"}
 
 #### 缺点 2：LLM 是 API 调用，没有模型层优化
 
-- 使用 StepFun API（OpenAI-compatible），不是自研模型
+- 使用火山方舟 Ark API（OpenAI-compatible），不是自研模型
 - 没有做 fine-tuning、prompt 优化的系统性实验
 - 没有量化、蒸馏等推理优化
 

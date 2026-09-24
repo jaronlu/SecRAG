@@ -51,7 +51,7 @@ class Settings(BaseSettings):
 
     # LLM — provider switch
     #   "ollama": uses ChatOllama
-    #   "openai": uses ChatOpenAI (OpenAI-compatible API, e.g. StepFun)
+    #   "openai": uses ChatOpenAI (OpenAI-compatible API, e.g. Volcano Ark)
     llm_provider: str = LLM_PROVIDER_OPENAI
 
     # Ollama 配置（llm_provider = "ollama" 时生效）

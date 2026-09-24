@@ -343,8 +343,8 @@ DEFAULT_EMBEDDING_MODEL = "BAAI/bge-m3"
 # LLM 提供方默认值  (SCHEMA-REFERENCE §4)
 # ══════════════════════════════════════════════════════════════════════
 
-OPENAI_DEFAULT_API_BASE = "https://api.stepfun.com/step_plan/v1"
-OPENAI_DEFAULT_MODEL = "step-3.7-flash"
+OPENAI_DEFAULT_API_BASE = "https://ark.cn-beijing.volces.com/api/coding/v3"
+OPENAI_DEFAULT_MODEL = "deepseek-v4-flash"
 OLLAMA_DEFAULT_BASE_URL = "http://localhost:11434"
 OLLAMA_DEFAULT_MODEL = "llama3.1:8b"
 LLM_DEFAULT_TEMPERATURE = 0.1
