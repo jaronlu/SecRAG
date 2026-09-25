@@ -96,7 +96,19 @@ class SemanticCache:
         self.ttl_seconds = ttl_seconds
         self.enabled = enabled
         self._local = threading.local()
+        # 命中率按真实 lookup 请求口径统计（进程内计数，重启归零）；
+        # 独立于条目 hit_count，不受过期清理影响
+        self._stats_lock = threading.Lock()
+        self._lookup_hits = 0
+        self._lookup_misses = 0
         self._init_db()
+
+    def _record_lookup(self, *, hit: bool) -> None:
+        with self._stats_lock:
+            if hit:
+                self._lookup_hits += 1
+            else:
+                self._lookup_misses += 1
 
     def _get_conn(self) -> sqlite3.Connection:
         """获取线程本地 SQLite 连接。"""
@@ -174,6 +186,7 @@ class SemanticCache:
         rows = cursor.fetchall()
 
         if not rows:
+            self._record_lookup(hit=False)
             return None
 
         # 计算查询 embedding
@@ -196,6 +209,7 @@ class SemanticCache:
                 (best_row[0],),
             )
             conn.commit()
+            self._record_lookup(hit=True)
             return {
                 "query": best_row[1],
                 "answer": best_row[3],
@@ -208,6 +222,7 @@ class SemanticCache:
                 "verification": json.loads(best_row[8]) if best_row[8] else {},
             }
 
+        self._record_lookup(hit=False)
         return None
 
     def store(
@@ -268,7 +283,12 @@ class SemanticCache:
         """获取缓存统计信息。
 
         Returns:
-            {total_entries, active_entries, total_hits, hit_rate, avg_similarity}
+            {total_entries, active_entries, total_hits, lookup_total, lookup_hits,
+            lookup_misses, hit_rate, threshold, ttl_seconds, enabled}
+
+        hit_rate 按真实 lookup 请求口径计算：lookup_hits / lookup_total，
+        只统计 enabled 且查询非空的真实请求；条目级 total_hits 是历史
+        hit_count 汇总，仅作参考，不参与命中率计算。
         """
         conn = self._get_conn()
         now = time.time()
@@ -281,16 +301,20 @@ class SemanticCache:
             "SELECT COALESCE(SUM(hit_count), 0) FROM cache_entries"
         ).fetchone()[0]
 
-        # 命中率 = total_hits / (total_hits + total_entries) 近似
-        # 因为每次 store 算一次 miss，每次 lookup 命中算一次 hit
-        total_requests = total_hits + total
-        hit_rate = round(total_hits / total_requests, 4) if total_requests > 0 else 0.0
+        with self._stats_lock:
+            lookup_hits = self._lookup_hits
+            lookup_misses = self._lookup_misses
+        lookup_total = lookup_hits + lookup_misses
+        hit_rate = round(lookup_hits / lookup_total, 4) if lookup_total > 0 else 0.0
 
         return {
             "total_entries": total,
             "active_entries": active,
             "expired_entries": total - active,
             "total_hits": total_hits,
+            "lookup_total": lookup_total,
+            "lookup_hits": lookup_hits,
+            "lookup_misses": lookup_misses,
             "hit_rate": hit_rate,
             "threshold": self.threshold,
             "ttl_seconds": self.ttl_seconds,
@@ -317,6 +341,9 @@ class SemanticCache:
         """
         conn = self._get_conn()
         cursor = conn.execute("DELETE FROM cache_entries")
+        with self._stats_lock:
+            self._lookup_hits = 0
+            self._lookup_misses = 0
         conn.commit()
         return cursor.rowcount
 

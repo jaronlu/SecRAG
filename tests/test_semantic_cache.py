@@ -80,3 +80,52 @@ def test_init_db_adds_snapshot_columns_to_legacy_table(tmp_path):
         row[1] for row in sqlite3.connect(db_path).execute("PRAGMA table_info(cache_entries)")
     }
     assert {"compliance", "verification"} <= columns
+
+
+def _cache_with_distinct_embeddings(monkeypatch, tmp_path, name="stats.db"):
+    """embedding 按查询文本区分的缓存实例，可构造真实的 miss。"""
+    cache = SemanticCache(db_path=str(tmp_path / name), enabled=True)
+    embeddings = {
+        "货币基金风险等级": np.array([1.0, 0.0]),
+        "股票交易手续费": np.array([0.0, 1.0]),
+    }
+    monkeypatch.setattr(cache, "_embed", lambda text: embeddings[text])
+    return cache
+
+
+def test_hit_rate_counts_real_lookup_misses(monkeypatch, tmp_path):
+    """命中率按真实 lookup 请求口径统计，而不是用条目数近似 miss。"""
+    cache = _cache_with_distinct_embeddings(monkeypatch, tmp_path)
+    cache.store("货币基金风险等级", "货币基金风险等级为低。", role="advisor")
+
+    assert cache.lookup("股票交易手续费", role="advisor") is None
+    assert cache.lookup("货币基金风险等级", role="advisor") is not None
+
+    stats = cache.get_stats()
+    assert stats["lookup_total"] == 2
+    assert stats["lookup_hits"] == 1
+    assert stats["lookup_misses"] == 1
+    assert stats["hit_rate"] == 0.5
+
+
+def test_disabled_cache_does_not_count_lookups(tmp_path):
+    """enabled=False 或空查询的短路返回不构成真实请求，不进入命中口径。"""
+    cache = SemanticCache(db_path=str(tmp_path / "off.db"), enabled=False)
+
+    assert cache.lookup("任何问题") is None
+
+    stats = cache.get_stats()
+    assert stats["lookup_total"] == 0
+    assert stats["hit_rate"] == 0.0
+
+
+def test_clear_all_resets_lookup_counters(monkeypatch, tmp_path):
+    cache = _cache_with_distinct_embeddings(monkeypatch, tmp_path, name="reset.db")
+    cache.store("货币基金风险等级", "货币基金风险等级为低。", role="advisor")
+    cache.lookup("货币基金风险等级", role="advisor")
+
+    assert cache.clear_all() >= 1
+
+    stats = cache.get_stats()
+    assert stats["lookup_total"] == 0
+    assert stats["hit_rate"] == 0.0
