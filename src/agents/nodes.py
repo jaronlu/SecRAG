@@ -75,6 +75,7 @@ from src.schemas.constants import (
     STATE_FINAL_ANSWER,
     STATE_INTENT,
     STATE_INTERMEDIATE_STEPS,
+    STATE_TERMINAL,
     STATE_MESSAGES,
     STATE_ORIGINAL_QUERY,
     STATE_QUERY_TYPE,
@@ -561,6 +562,7 @@ def clarify(state: AssistantState) -> dict[str, Any]:
 
     return {
         STATE_FINAL_ANSWER: clarification,
+        STATE_TERMINAL: True,
         STATE_CONFIDENCE: "low",
         STATE_CITATIONS: [],
         STATE_CLARIFICATION_NEEDED: True,
@@ -1222,6 +1224,7 @@ def permission_denied_response(state: AssistantState) -> dict[str, Any]:
     # 在进入 LLM 推理前短路返回，既省成本，也避免把无权限内容继续带入后续节点
     return {
         STATE_FINAL_ANSWER: _structure_answer("当前角色无权限访问完成该请求所需的数据源。"),
+        STATE_TERMINAL: True,
         STATE_CITATIONS: [],
         STATE_CONFIDENCE: CONFIDENCE_LOW,
         STATE_RISK_DISCLOSURE: "",
@@ -1284,6 +1287,7 @@ def compose(state: AssistantState) -> dict[str, Any]:
 
     return {
         STATE_FINAL_ANSWER: final_answer,
+        STATE_TERMINAL: True,
         STATE_CITATIONS: citations,
         STATE_CONFIDENCE: confidence,
         STATE_RISK_DISCLOSURE: risk + suitability,

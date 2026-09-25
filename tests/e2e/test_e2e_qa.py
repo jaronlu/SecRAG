@@ -99,6 +99,7 @@ class _StreamingAgentApp:
         yield {
             "compose": {
                 "final_answer": "货币基金风险等级为低。",
+                "terminal": True,
                 "citations": [{"source": "a.pdf"}],
                 "confidence": "high",
             }
@@ -162,6 +163,34 @@ def test_tc017_sse_event_protocol(sse_client):
     assert answer["citations"] == [{"source": "a.pdf"}]
     assert answer["confidence"] == "high"
     assert answer["thread_id"] and answer["turn_id"]
+
+
+def test_sse_terminal_answer_follows_final_answer_not_node_name(sse_client, monkeypatch):
+    """终态以节点声明的 terminal 标记为准，不按节点名白名单推断；
+    新增的拒答/澄清路径按契约产出 final_answer + terminal 即自动发送 answer 事件。"""
+
+    class _NewTerminalPathAgent:
+        async def astream(self, initial_state, config=None, stream_mode="updates"):
+            yield {
+                "custom_refusal_path": {
+                    "final_answer": "权限不足，无法回答该问题。",
+                    "terminal": True,
+                }
+            }
+
+    monkeypatch.setattr("src.api.main._get_agent_app", lambda: _NewTerminalPathAgent())
+
+    with sse_client.stream(
+        "POST", API_ROUTE_ASSISTANT_QA_STREAM, json={"query": "货币基金风险"}
+    ) as res:
+        assert res.status_code == 200
+        events = _parse_sse(list(res.iter_lines()))
+
+    names = [name for name, _ in events]
+    assert "answer" in names
+    assert names[-1] == "done"
+    answer = next(data for name, data in events if name == "answer")
+    assert answer["answer"] == "权限不足，无法回答该问题。"
 
 
 # ══════════════════════════════════════════════════════════════════════

@@ -2,7 +2,7 @@
 
 import logging
 import time
-from typing import Any, Literal, Protocol
+from typing import Any, Final, Literal, Protocol
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -54,6 +54,22 @@ logger = logging.getLogger(__name__)
 
 class _AgentNode(Protocol):
     def __call__(self, state: AssistantState) -> dict[str, Any]: ...
+
+
+# SSE progress 事件面向客户端的节点集合。由图模块声明：新增或重命名节点
+# 只需改这里；传输层只转发，不解释节点语义，更不据此推断业务终态——
+# 终态以节点产出 final_answer 为准。
+CLIENT_PROGRESS_NODES: Final[frozenset[str]] = frozenset(
+    {
+        "query_understand",
+        "planner",
+        "retrieve",
+        "grade_and_filter",
+        "reason",
+        "verify",
+        "compose",
+    }
+)
 
 
 def _node_execution_succeeded(result: dict[str, Any]) -> bool:

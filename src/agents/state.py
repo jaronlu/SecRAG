@@ -76,8 +76,11 @@ class AssistantState(TypedDict):
     # 合规检查 — STATE_COMPLIANCE
     compliance: ComplianceResult
 
-    # 最终回答 — STATE_FINAL_ANSWER / STATE_CITATIONS / STATE_CONFIDENCE / STATE_RISK_DISCLOSURE
+    # 最终回答 — STATE_FINAL_ANSWER / STATE_TERMINAL / STATE_CITATIONS / STATE_CONFIDENCE / STATE_RISK_DISCLOSURE
     final_answer: str
+    # STATE_TERMINAL：对外终态标记。compose/clarify/权限拒绝等对外终态节点置 True；
+    # ReAct 尝试产出的中间 final_answer（finalize_reason）不带此标记，传输层据此区分
+    terminal: bool
     citations: list[CitationDict]
     confidence: str  # 值域见 src.schemas.constants.Confidence
     risk_disclosure: str

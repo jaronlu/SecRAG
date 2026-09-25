@@ -21,6 +21,7 @@ from src.schemas.constants import (
     STATE_FINAL_ANSWER,
     STATE_INTENT,
     STATE_RETRIEVAL_PLAN,
+    STATE_TERMINAL,
 )
 from src.utils.audit import SQLiteAuditStore
 from src.utils.conversation import SQLiteConversationStore
@@ -102,6 +103,7 @@ class _StreamingAgentApp:
         yield {
             "compose": {
                 STATE_FINAL_ANSWER: "货币基金风险等级为低。",
+                STATE_TERMINAL: True,
                 STATE_CITATIONS: [{"source": "a.pdf"}],
                 STATE_CONFIDENCE: "high",
             }

@@ -34,6 +34,7 @@ from src.schemas.constants import (
     STATE_COMPLIANCE,
     STATE_CONFIDENCE,
     STATE_FINAL_ANSWER,
+    STATE_TERMINAL,
     STATE_THREAD_ID,
     STATE_TURN_ID,
     STATE_VERIFICATION,
@@ -653,6 +654,8 @@ async def assistant_qa_stream(
             "configurable": {"thread_id": thread_id},
             "recursion_limit": AGENT_RECURSION_LIMIT,
         }
+        # 进度节点集合由图模块声明，传输层不解释节点语义
+        from src.agents.graph import CLIENT_PROGRESS_NODES
 
         try:
             # 流式获取每个节点的状态更新；整条流受请求级总超时约束
@@ -662,15 +665,18 @@ async def assistant_qa_stream(
                     initial_state, runnable_config, stream_mode="updates"
                 ):
                     for node_name, node_output in state_update.items():
-                        # 只发送关键节点的进度，避免事件过多
-                        if node_name in ("query_understand", "planner", "retrieve", "grade_and_filter", "reason", "verify", "compose"):
+                        if not isinstance(node_output, dict):
+                            continue
+                        # 只发送图模块声明的客户端可见节点进度，避免事件过多
+                        if node_name in CLIENT_PROGRESS_NODES:
                             yield (
                                 "event: progress\n"
                                 f"data: {json.dumps({'type': 'progress', 'node': node_name, 'status': 'done'}, ensure_ascii=False)}\n\n"
                             )
-                        # 终态节点输出最终回答：compose 之外，clarify 与
-                        # permission_denied_response 会跳过 compose 直接产出答案
-                        if node_name in ("compose", "clarify", "permission_denied_response") and STATE_FINAL_ANSWER in node_output:
+                        # 终态以节点声明的 terminal 标记 + final_answer 为准，
+                        # 不按节点名推断；ReAct 尝试的中间 final_answer 不带标记，
+                        # 新增终态路径（拒答/澄清等）按契约声明 STATE_TERMINAL 即自动生效
+                        if node_output.get(STATE_TERMINAL) and STATE_FINAL_ANSWER in node_output:
                             answer_data = json.dumps({
                                 "type": "answer",
                                 "answer": node_output[STATE_FINAL_ANSWER],

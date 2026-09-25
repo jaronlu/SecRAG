@@ -114,6 +114,7 @@ STATE_REQUEST_DEADLINE: Final = "request_deadline"  # 请求级截止时间（ti
 STATE_VERIFICATION: Final = "verification"
 STATE_COMPLIANCE: Final = "compliance"
 STATE_FINAL_ANSWER: Final = "final_answer"
+STATE_TERMINAL: Final = "terminal"  # True 表示该节点输出是对外业务终态；ReAct 尝试的中间 final_answer 不带此标记
 STATE_CITATIONS: Final = "citations"
 STATE_CONFIDENCE: Final = "confidence"
 STATE_RISK_DISCLOSURE: Final = "risk_disclosure"
