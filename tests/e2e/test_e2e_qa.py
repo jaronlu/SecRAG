@@ -85,3 +85,90 @@ def test_tc016_qa_full_chain_happy_path(run_agent_graph, isolated_stores, fake_l
 # ══════════════════════════════════════════════════════════════════════
 # TC-018 验证失败重试与安全兜底（占位，后续提交）
 # ══════════════════════════════════════════════════════════════════════
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-017 SSE 流式事件协议
+# ══════════════════════════════════════════════════════════════════════
+
+
+class _StreamingAgentApp:
+    """按 stream_mode="updates" 产出节点更新的 Agent 替身。"""
+
+    async def astream(self, initial_state, config=None, stream_mode="updates"):
+        yield {"query_understand": {"intent": "产品咨询"}}
+        yield {"planner": {"retrieval_plan": []}}
+        yield {"retrieve": {"retrieval_results": [1]}}
+        yield {"grade_and_filter": {"retrieval_results": [1]}}
+        yield {"reason": {"final_answer": "x"}}
+        yield {
+            "compose": {
+                "final_answer": "货币基金风险等级为低。",
+                "citations": [{"source": "a.pdf"}],
+                "confidence": "high",
+            }
+        }
+
+
+@pytest.fixture()
+def sse_client(monkeypatch, tmp_path):
+    from src.utils.audit import SQLiteAuditStore
+    from src.utils.conversation import SQLiteConversationStore
+
+    store = SQLiteConversationStore(tmp_path / "conversations.db")
+    monkeypatch.setattr("src.api.main._get_conversation_store", lambda: store)
+    monkeypatch.setattr(
+        "src.api.main._get_cache_hit_audit_store",
+        lambda: SQLiteAuditStore(tmp_path / "audit.db"),
+    )
+    monkeypatch.setattr("src.api.main._get_agent_app", lambda: _StreamingAgentApp())
+    app.dependency_overrides[authenticate_user] = lambda: AuthenticatedUser(
+        "user_advisor", ROLE_ADVISOR, "wealth"
+    )
+    yield TestClient(app)
+    app.dependency_overrides.clear()
+
+
+def _parse_sse(lines: list[str]) -> list[tuple[str, dict[str, Any]]]:
+    events = []
+    current: str | None = None
+    for line in lines:
+        if line.startswith("event: "):
+            current = line[len("event: "):]
+        elif line.startswith("data: ") and current:
+            events.append((current, json.loads(line[len("data: "):])))
+            current = None
+    return events
+
+
+def test_tc017_sse_event_protocol(sse_client):
+    """TC-017：SSE 事件序列 progress…→answer→done；data.type 与 event 名一致。"""
+    with sse_client.stream(
+        "POST", API_ROUTE_ASSISTANT_QA_STREAM, json={"query": "货币基金风险"}
+    ) as res:
+        assert res.status_code == 200
+        assert res.headers["content-type"].startswith("text/event-stream")
+        events = _parse_sse(list(res.iter_lines()))
+
+    names = [name for name, _ in events]
+    assert names[0] == "progress"
+    assert names[-1] == "done"
+    assert "answer" in names
+
+    progress_nodes = [data["node"] for name, data in events if name == "progress"]
+    assert {"query_understand", "planner", "retrieve", "grade_and_filter", "compose"} <= set(
+        progress_nodes
+    )
+    for name, data in events:
+        assert data["type"] == name, "data.type 必须与 event 名一致"
+
+    answer = next(data for name, data in events if name == "answer")
+    assert answer["answer"] == "货币基金风险等级为低。"
+    assert answer["citations"] == [{"source": "a.pdf"}]
+    assert answer["confidence"] == "high"
+    assert answer["thread_id"] and answer["turn_id"]
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-018 验证失败重试与安全兜底（占位，后续提交）
+# ══════════════════════════════════════════════════════════════════════
