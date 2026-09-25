@@ -1,3 +1,6 @@
+import json
+import sqlite3
+
 import pytest
 from fastapi import HTTPException
 from httpx import ConnectError
@@ -7,6 +10,7 @@ from src.api.main import app, assistant_qa
 from src.api.ui import render_ui_html
 from src.schemas.constants import AGENT_RECURSION_LIMIT, ROLE_TECHNICAL
 from src.schemas.request_response import AssistantQARequest
+from src.utils.audit import SQLiteAuditStore
 from src.utils.conversation import SQLiteConversationStore
 
 
@@ -189,3 +193,35 @@ async def test_assistant_qa_stores_compliance_snapshot_on_cache_miss(monkeypatch
     assert len(cache.store_calls) == 1
     assert cache.store_calls[0]["compliance"]["passed"] is True
     assert cache.store_calls[0]["verification"]["passed"] is True
+
+
+@pytest.mark.asyncio
+async def test_assistant_qa_cache_hit_persists_audit_event(monkeypatch, tmp_path):
+    """P1-2: 命中路径补一条持久化审计事件，并带 cache_hit 标记。"""
+    cache = _StubSemanticCache(hit={
+        "query": "货币基金风险等级",
+        "answer": "货币基金风险等级为低。",
+        "citations": [{"source": "a.pdf"}],
+        "confidence": "high",
+        "similarity": 0.95,
+        "hit_count": 1,
+        "compliance": {"passed": True, "risk_disclosure": ""},
+        "verification": {"passed": True, "confidence": "high"},
+    })
+    monkeypatch.setattr("src.api.main.get_semantic_cache", lambda: cache)
+    audit_store = SQLiteAuditStore(tmp_path / "audit.db")
+    monkeypatch.setattr("src.api.main._get_cache_hit_audit_store", lambda: audit_store)
+
+    await assistant_qa(
+        AssistantQARequest(query="货币基金风险等级"),
+        AuthenticatedUser("user_tech", ROLE_TECHNICAL, "tech"),
+    )
+
+    with sqlite3.connect(str(tmp_path / "audit.db")) as conn:
+        rows = conn.execute("SELECT payload_json FROM audit_entries").fetchall()
+    assert len(rows) == 1
+    payload = json.loads(rows[0][0])
+    assert payload["query"]["original"] == "货币基金风险等级"
+    assert payload["user_id"] == "user_tech"
+    assert "semantic_cache_hit" in payload["reasoning"]["execution_path"]
+    assert payload["compliance"]["passed"] is True

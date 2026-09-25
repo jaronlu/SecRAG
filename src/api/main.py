@@ -3,6 +3,7 @@ import json
 import logging
 import time
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
@@ -45,6 +46,8 @@ from src.schemas.request_response import (
     ConversationThreadCreate,
     ConversationThreadResponse,
 )
+from src.schemas.models import AuditEntry
+from src.schemas.typed_dicts import AuditQuery, AuditReasoning, AuditResponse, AuditRetrieval
 from src.utils.rate_limit import check_rate_limit, get_rate_limit_key
 from src.utils.semantic_cache import get_semantic_cache
 from src.utils.metrics import get_metrics
@@ -394,6 +397,53 @@ def _is_provider_unavailable(exc: Exception) -> bool:
     return False
 
 
+def _get_cache_hit_audit_store():
+    """审计存储懒加载（P1-2 命中路径持久化审计事件），与 audit_log 节点同库。"""
+    from src.agents.nodes import _get_audit_store
+
+    return _get_audit_store()
+
+
+def _persist_cache_hit_audit_event(
+    user: AuthenticatedUser,
+    request: AssistantQARequest,
+    start_time: float,
+    cache_hit: dict,
+) -> None:
+    """P1-2: 缓存命中跳过了图执行（audit_log 节点不会运行），在此补一条
+    持久化审计事件；写入失败时复用 audit 节点的 outbox 机制落本地待重试。
+    """
+    import dataclasses
+
+    from src.agents.nodes import _write_audit_outbox
+
+    entry = AuditEntry(
+        request_id=str(uuid.uuid4()),
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        user_id=user.user_id,
+        user_role=user.role,
+        department=user.department,
+        query=AuditQuery(original=request.query),
+        retrieval=AuditRetrieval(total_chunks=0, filtered_chunks=0),
+        reasoning=AuditReasoning(
+            iterations=0,
+            duration_ms=0.0,
+            execution_path=["semantic_cache_hit"],
+        ),
+        verification=cache_hit["verification"],
+        compliance=cache_hit["compliance"],
+        response=AuditResponse(
+            citations=cache_hit["citations"],
+            confidence=cache_hit["confidence"],
+        ),
+        total_duration_ms=max((time.time() - start_time) * 1000, 0.0),
+    )
+    try:
+        _get_cache_hit_audit_store().insert(entry)
+    except Exception as exc:
+        _write_audit_outbox(dataclasses.asdict(entry), str(exc))
+
+
 @app.post(API_ROUTE_ASSISTANT_QA, response_model=AssistantQAResponse)
 async def assistant_qa(
     request: AssistantQARequest,
@@ -456,6 +506,10 @@ async def assistant_qa(
         audit_logger.info(
             "Semantic cache hit: thread_id=%s similarity=%.4f",
             thread_id, cache_hit["similarity"],
+        )
+        # P1-2: 命中路径补持久化审计事件（非阻塞，失败走 outbox）
+        await asyncio.to_thread(
+            _persist_cache_hit_audit_event, user, request, start_time, cache_hit
         )
         _record_metrics("success", is_cached=True)
         # P1-1: 返回 store 时保存的终态合规快照，不再硬编码 passed=True
