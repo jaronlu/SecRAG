@@ -210,3 +210,29 @@ def test_tc005_updated_document_replaces_old_chunks(ingestion_env):
         )
         remaining = set(vs.get(ids=sorted(removed))["ids"])
         assert remaining.isdisjoint(removed), "旧 chunk 必须被清理"
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-006 空文档
+# ══════════════════════════════════════════════════════════════════════
+
+
+def test_tc006_empty_document_fails_without_vector_writes(ingestion_env):
+    """TC-006：解析结果为空的 HTML → failed + document_processing_failed，不写向量库。"""
+    env = ingestion_env
+    write_document(
+        env.category_dir, "empty_report.html", "<html><body></body></html>", VALID_META
+    )
+
+    summary, run_id = env.run()
+
+    assert summary["status"] == "failed"
+    items = env.service.list_run_items(run_id)
+    assert len(items) == 1
+    assert items[0]["action"] == "failed"
+    assert items[0]["error_code"] == "document_processing_failed"
+    assert items[0]["error"] == "文档处理失败"
+
+    doc = env.service.registry.get_document(items[0]["doc_id"])
+    assert doc is not None and doc.status != "active"
+    assert chunk_ids_for(env, items[0]["doc_id"]) == []
