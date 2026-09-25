@@ -83,8 +83,34 @@ def test_tc016_qa_full_chain_happy_path(run_agent_graph, isolated_stores, fake_l
 
 
 # ══════════════════════════════════════════════════════════════════════
-# TC-018 验证失败重试与安全兜底（占位，后续提交）
+# TC-018 验证失败重试与安全兜底
 # ══════════════════════════════════════════════════════════════════════
+
+
+def test_tc018_verification_failure_retries_then_safe_fallback(
+    run_agent_graph, isolated_stores, fake_llm
+):
+    """TC-018：编造数字的答案验证不通过 → 重推 1 次 → 仍失败 → 安全提示兜底。"""
+    from src.schemas.constants import MAX_REASON_ATTEMPTS
+
+    from tests.e2e.conftest import build_state
+
+    thread = isolated_stores.conversation.create_thread(
+        user_id="user_advisor", user_role=ROLE_ADVISOR, client_id=None, title="TC-018"
+    )
+    fake_llm.reason_content = "## 结论\n\n该基金年化收益率为3.9%，表现优异[来源1]。"
+
+    state = run_agent_graph(build_state(thread_id=thread["thread_id"]))
+
+    # 重试受 MAX_REASON_ATTEMPTS 限制，且确实发生了重推
+    assert state[STATE_REASON_ATTEMPTS] == MAX_REASON_ATTEMPTS
+    assert len([kind for kind, _ in fake_llm.calls if kind == "reason"]) == MAX_REASON_ATTEMPTS
+
+    # 不可靠答案不得返回给用户：替换为安全提示 + 清空引用 + 低置信
+    assert "未通过来源或数字验证" in state[STATE_FINAL_ANSWER]
+    assert "3.9%" not in state[STATE_FINAL_ANSWER]
+    assert state[STATE_CITATIONS] == []
+    assert state[STATE_CONFIDENCE] == CONFIDENCE_LOW
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -170,5 +196,31 @@ def test_tc017_sse_event_protocol(sse_client):
 
 
 # ══════════════════════════════════════════════════════════════════════
-# TC-018 验证失败重试与安全兜底（占位，后续提交）
+# TC-018 验证失败重试与安全兜底
 # ══════════════════════════════════════════════════════════════════════
+
+
+def test_tc018_verification_failure_retries_then_safe_fallback(
+    run_agent_graph, isolated_stores, fake_llm
+):
+    """TC-018：编造数字的答案验证不通过 → 重推 1 次 → 仍失败 → 安全提示兜底。"""
+    from src.schemas.constants import MAX_REASON_ATTEMPTS
+
+    from tests.e2e.conftest import build_state
+
+    thread = isolated_stores.conversation.create_thread(
+        user_id="user_advisor", user_role=ROLE_ADVISOR, client_id=None, title="TC-018"
+    )
+    fake_llm.reason_content = "## 结论\n\n该基金年化收益率为3.9%，表现优异[来源1]。"
+
+    state = run_agent_graph(build_state(thread_id=thread["thread_id"]))
+
+    # 重试受 MAX_REASON_ATTEMPTS 限制，且确实发生了重推
+    assert state[STATE_REASON_ATTEMPTS] == MAX_REASON_ATTEMPTS
+    assert len([kind for kind, _ in fake_llm.calls if kind == "reason"]) == MAX_REASON_ATTEMPTS
+
+    # 不可靠答案不得返回给用户：替换为安全提示 + 清空引用 + 低置信
+    assert "未通过来源或数字验证" in state[STATE_FINAL_ANSWER]
+    assert "3.9%" not in state[STATE_FINAL_ANSWER]
+    assert state[STATE_CITATIONS] == []
+    assert state[STATE_CONFIDENCE] == CONFIDENCE_LOW
