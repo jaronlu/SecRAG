@@ -325,3 +325,69 @@ def test_tc009_invalid_manifest_blocks_run_creation(ingestion_env, name, content
     files = {f["relative_path"].split("/")[-1]: f for f in excinfo.value.files}
     assert files[name]["manifest_status"] != "valid", f"{desc} 应被预检标记"
     assert env.service.list_recent_runs(1) == []
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-010 入库管理接口权限与参数
+# ══════════════════════════════════════════════════════════════════════
+
+
+@pytest.fixture()
+def ingestion_api_client(monkeypatch, tmp_path):
+    """真实路由 + 隔离 IngestionService + 可切换角色。"""
+    from fastapi.testclient import TestClient
+
+    from src.api.auth import AuthenticatedUser, authenticate_user
+    from src.api.ingestion import _get_ingestion_service
+    from src.api.main import app
+
+    category_dir = tmp_path / "data" / "raw" / "reports"
+    category_dir.mkdir(parents=True)
+    write_document(category_dir, "xx_money_fund_2024.html", FUND_REPORT_HTML, VALID_META)
+    category = {
+        "category_id": "reports",
+        "label": "财报公告",
+        "group": "reports",
+        "relative_path": "data/raw/reports",
+        "default_doc_type": DOC_TYPE_RESEARCH_REPORT,
+        "allowed_doc_types": sorted(ALL_VALID_DOC_TYPES),
+    }
+    service = IngestionService(
+        project_root=tmp_path,
+        registry_path=tmp_path / "registry.db",
+        persist_directory=str(tmp_path / "chroma"),
+        catalog=(category,),
+        embedding_model_factory=lambda model: FakeEmbeddings(),
+    )
+    monkeypatch.setattr("src.api.ingestion._get_ingestion_service", lambda: service)
+
+    current_user = {"role": ROLE_ADVISOR}
+
+    def _auth_user():
+        return AuthenticatedUser(f"user_{current_user['role']}", current_user["role"], "dept")
+
+    app.dependency_overrides[authenticate_user] = _auth_user
+    app.dependency_overrides[_get_ingestion_service] = lambda: service
+    yield type("ClientCtx", (), {"client": TestClient(app), "role": current_user})()
+    app.dependency_overrides.clear()
+
+
+def test_tc010_ingestion_api_role_and_params(ingestion_api_client):
+    """TC-010：非 technical 403；未知分类 404；technical 正常 200。"""
+    ctx = ingestion_api_client
+    API = "/v1/admin/ingestion"
+
+    ctx.role["role"] = ROLE_ADVISOR
+    res = ctx.client.get(f"{API}/categories")
+    assert res.status_code == 403
+    assert res.json()["detail"] == "technical role required"
+
+    ctx.role["role"] = "technical"
+    res = ctx.client.get(f"{API}/categories")
+    assert res.status_code == 200
+    body = res.json()
+    assert [c["category_id"] for c in body["categories"]] == ["reports"]
+
+    res = ctx.client.get(f"{API}/not-a-category/files")
+    assert res.status_code == 404
+    assert res.json()["detail"] == "文档分类不存在"
