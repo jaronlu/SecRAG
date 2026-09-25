@@ -20,8 +20,6 @@ from src.schemas.constants import (
     STATE_CITATIONS,
     STATE_CONFIDENCE,
     STATE_FINAL_ANSWER,
-    STATE_THREAD_ID,
-    STATE_USER_ID,
 )
 from src.utils.audit import SQLiteAuditStore
 from src.utils.semantic_cache import SemanticCache

@@ -12,7 +12,6 @@ from src.schemas.constants import (
     STATE_COMPLIANCE,
     STATE_CONFIDENCE,
     STATE_FINAL_ANSWER,
-    STATE_REASON_ATTEMPTS,
     STATE_VERIFICATION,
 )
 from src.utils.compliance import ComplianceChecker, matches_investment_advice
@@ -268,7 +267,6 @@ def test_tc029_all_results_denied_short_circuits_before_llm(
     """TC-029：advisor 检索 confidential 财报全部被拒 → 进入 permission_denied，
     不调用推理 LLM，不产生引用。"""
     from src.schemas.constants import (
-        STATE_RISK_DISCLOSURE,
         STATE_THREAD_ID,
         STATE_USER_ID,
     )

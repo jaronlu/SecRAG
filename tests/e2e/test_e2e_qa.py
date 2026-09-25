@@ -424,7 +424,6 @@ def test_tc023_unauthorized_tool_is_rejected_without_execution(_reset_circuit_br
         ROLE_ADVISOR,
         SOURCE_PRODUCT,
         STATE_RETRIEVAL_PLAN,
-        STATE_RETRIEVAL_RESULTS,
         STATE_USER_ROLE,
     )
 
@@ -458,7 +457,6 @@ def test_tc023_tool_timeout_trips_circuit_breaker(
         ROLE_ADVISOR,
         SOURCE_PRODUCT,
         STATE_RETRIEVAL_PLAN,
-        STATE_RETRIEVAL_RESULTS,
         STATE_USER_ROLE,
     )
 
