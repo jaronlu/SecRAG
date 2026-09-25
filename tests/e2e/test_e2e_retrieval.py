@@ -115,3 +115,50 @@ def test_tc011_plan_level_source_permission_filtering(stub_factories):
     assert "无权限" in denied[0]["reason"]
     assert len(usable) == 1
     assert usable[0][RR_METADATA][META_SOURCE] == "p1.html"
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-012 结果级权限过滤
+# ══════════════════════════════════════════════════════════════════════
+
+
+def test_tc012_result_level_permission_filtering(stub_factories):
+    """TC-012：permission_level/allowed_roles 组合的结果级过滤契约。
+
+    1) confidential 对 advisor → denied
+    2) internal 无 allowed_roles → 默认拒绝
+    3) public 无 allowed_roles → 放行
+    4) internal 且 allowed_roles 含 advisor → 放行
+    5) allowed_roles 为逗号字符串且不含 advisor → denied
+    """
+    retriever = HybridRetriever(
+        user_role=ROLE_ADVISOR,
+        data_permissions=[PERMISSION_PUBLIC, PERMISSION_INTERNAL],
+    )
+    results = [
+        make_result(source="conf.html", permission_level=PERMISSION_CONFIDENTIAL),
+        make_result(source="no_roles.html", permission_level=PERMISSION_INTERNAL),
+        make_result(source="pub.html", permission_level=PERMISSION_PUBLIC),
+        make_result(
+            source="ok.html",
+            permission_level=PERMISSION_INTERNAL,
+            allowed_roles=[ROLE_ADVISOR, ROLE_COMPLIANCE],
+        ),
+        make_result(source="str_roles.html", permission_level=PERMISSION_INTERNAL,
+                    allowed_roles="compliance,technical"),
+    ]
+
+    filtered = retriever._filter_results_by_role(results)
+
+    verdicts = {f[RR_METADATA][META_SOURCE]: not f.get(RR_DENIED) for f in filtered}
+    assert verdicts == {
+        "conf.html": False,
+        "no_roles.html": False,
+        "pub.html": True,
+        "ok.html": True,
+        "str_roles.html": False,
+    }
+    for f in filtered:
+        if f.get(RR_DENIED):
+            assert f[RR_CONTENT] == ""
+            assert f[RR_SCORE] == 0.0
