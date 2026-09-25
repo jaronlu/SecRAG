@@ -1,5 +1,6 @@
 """Agent Graph 构建——节点编排、条件路由、Checkpointer"""
 
+import logging
 import time
 from typing import Any, Literal, Protocol
 
@@ -42,28 +43,54 @@ from src.schemas.constants import (
     STATE_REASON_ATTEMPTS,
     STATE_RETRIEVAL_ATTEMPTS,
     STATE_RETRIEVAL_RESULTS,
+    STATE_RERANKER_STATUS,
     STATE_VERIFICATION,
 )
 from src.schemas.typed_dicts import IntermediateStep
+
+
+logger = logging.getLogger(__name__)
 
 
 class _AgentNode(Protocol):
     def __call__(self, state: AssistantState) -> dict[str, Any]: ...
 
 
+def _node_execution_succeeded(result: dict[str, Any]) -> bool:
+    """节点正常返回只说明没有抛异常，不代表节点职责执行成功；
+    返回字典中的显式执行失败标记（重排 error 降级）视为失败，
+    而 "unavailable" 是环境未配置重排器，不算执行失败。"""
+    reranker_status = result.get(STATE_RERANKER_STATUS)
+    if isinstance(reranker_status, str) and reranker_status.startswith("error:"):
+        return False
+    return True
+
+
 def _traced_node(
     name: str,
     node: _AgentNode,
 ) -> _AgentNode:
-    """Record the actual node path and elapsed time in state."""
+    """Record the actual node path and elapsed time in state.
+
+    节点抛异常时 state 更新会被 LangGraph 丢弃，无法在 intermediate_steps
+    里留下 success=False 记录，只能记入应用日志后原样抛出。
+    """
 
     def wrapped(state: AssistantState) -> dict[str, Any]:
         started = time.perf_counter()
-        result = node(state)
+        try:
+            result = node(state)
+        except Exception:
+            logger.exception(
+                "Node %s raised after %.1f ms",
+                name,
+                max((time.perf_counter() - started) * 1000, 0.0),
+            )
+            raise
         step: IntermediateStep = {
             "step": name,
             "duration_ms": max((time.perf_counter() - started) * 1000, 0.0),
-            "success": True,
+            "success": _node_execution_succeeded(result),
         }
         return {
             **result,

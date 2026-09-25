@@ -1296,6 +1296,35 @@ class TestAuditLog:
         assert step["duration_ms"] >= 0
         assert step["success"] is True
 
+    def test_traced_node_marks_reranker_execution_error_as_failed(self):
+        wrapped = _traced_node(
+            "grade_and_filter",
+            lambda state: {STATE_RERANKER_STATUS: "error:BGE runtime failed"},
+        )
+
+        result = wrapped(_state())
+
+        assert result[STATE_INTERMEDIATE_STEPS][-1]["success"] is False
+
+    def test_traced_node_keeps_reranker_unavailable_as_success(self):
+        wrapped = _traced_node(
+            "grade_and_filter",
+            lambda state: {STATE_RERANKER_STATUS: "unavailable"},
+        )
+
+        result = wrapped(_state())
+
+        assert result[STATE_INTERMEDIATE_STEPS][-1]["success"] is True
+
+    def test_traced_node_reraises_node_exception_without_step(self):
+        def boom(state):
+            raise RuntimeError("model exploded")
+
+        wrapped = _traced_node("reason", boom)
+
+        with pytest.raises(RuntimeError, match="model exploded"):
+            wrapped(_state())
+
     def test_persists_audit_entry_for_lookup(self):
         timestamp = datetime.now(timezone.utc).isoformat()
         state = _state(**{
