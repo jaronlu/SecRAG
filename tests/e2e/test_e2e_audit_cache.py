@@ -120,3 +120,159 @@ def test_tc031_audit_write_failure_does_not_break_qa(
     record = json.loads(outbox_path.read_text(encoding="utf-8").splitlines()[0])
     assert record["error"] == "audit db disk full"
     assert record["entry"]["request_id"] == state["audit_trail"]["request_id"]
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-032/TC-034 共享：QA API + 可控缓存替身
+# ══════════════════════════════════════════════════════════════════════
+
+
+class _HitCache:
+    """命中替身：返回 store 时保存的终态合规快照。"""
+
+    STORED_COMPLIANCE = {
+        "passed": True,
+        "flags": [],
+        "risk_disclosure": "",
+        "suitability_warning": "",
+    }
+    STORED_VERIFICATION = {"passed": True, "issues": [], "confidence": "high"}
+
+    def lookup(self, query, role=""):
+        return {
+            "query": query,
+            "answer": "货币基金风险等级为低。",
+            "citations": [{"source": "cached.pdf"}],
+            "confidence": "high",
+            "similarity": 0.95,
+            "hit_count": 1,
+            "compliance": dict(self.STORED_COMPLIANCE),
+            "verification": dict(self.STORED_VERIFICATION),
+        }
+
+    def store(self, *args: Any, **kwargs: Any) -> bool:
+        raise AssertionError("命中路径不得再写缓存")
+
+
+class _SpyCache:
+    """记录 store 调用的未命中替身。"""
+
+    def __init__(self) -> None:
+        self.store_calls: list[dict[str, Any]] = []
+
+    def lookup(self, query, role=""):
+        return None
+
+    def store(self, query, answer, citations=None, confidence="", role="",
+              compliance=None, verification=None):
+        self.store_calls.append(
+            {"query": query, "answer": answer, "role": role,
+             "compliance": compliance, "verification": verification}
+        )
+        return True
+
+
+class _FakeAgentApp:
+    """固定终态的 Agent 替身：可注入 verification/compliance 结果。"""
+
+    def __init__(self, answer="货币基金风险等级为低风险等级 R1。", compliance=None,
+                 verification=None):
+        self.answer = answer
+        self.compliance = compliance or {"passed": True, "flags": [], "risk_disclosure": ""}
+        self.verification = verification or {"passed": True, "issues": []}
+        self.invoked = 0
+
+    def invoke(self, state, config=None):
+        self.invoked += 1
+        return {
+            **state,
+            STATE_FINAL_ANSWER: self.answer,
+            STATE_CITATIONS: [{"source": "a.pdf"}],
+            STATE_CONFIDENCE: "high",
+            "compliance": self.compliance,
+            "verification": self.verification,
+        }
+
+
+@pytest.fixture()
+def cache_api(monkeypatch, tmp_path):
+    """QA API 上下文：cache holder 可替换缓存替身，agent holder 注入 Agent。"""
+    audit_store = SQLiteAuditStore(tmp_path / "audit.db")
+    conversation = SQLiteConversationStore(tmp_path / "conversations.db")
+    monkeypatch.setattr("src.api.main._get_conversation_store", lambda: conversation)
+    monkeypatch.setattr("src.api.main._get_cache_hit_audit_store", lambda: audit_store)
+
+    holder: dict[str, Any] = {"cache": _SpyCache(), "agent": None}
+    monkeypatch.setattr("src.api.main.get_semantic_cache", lambda: holder["cache"])
+
+    def _agent():
+        assert holder["agent"] is not None, "测试未注入 agent 替身"
+        return holder["agent"]
+
+    monkeypatch.setattr("src.api.main._get_agent_app", _agent)
+    app.dependency_overrides[authenticate_user] = lambda: AuthenticatedUser(
+        "user_advisor", ROLE_ADVISOR, "wealth"
+    )
+    holder["client"] = TestClient(app)
+    holder["audit_db"] = tmp_path / "audit.db"
+    yield holder
+    app.dependency_overrides.clear()
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-032 缓存命中返回存储合规快照并补审计
+# ══════════════════════════════════════════════════════════════════════
+
+
+def test_tc032_cache_hit_returns_stored_snapshot_and_persists_audit_event(cache_api):
+    """TC-032：命中路径返回存储快照、跳过 Agent、泄露内部字段、补 semantic_cache_hit 审计。"""
+    cache_api["cache"] = _HitCache()
+    # Agent 替身带哨兵：命中路径不得执行
+    class _SentinelAgent:
+        def invoke(self, state, config=None):
+            raise AssertionError("缓存命中不应执行 Agent")
+
+    cache_api["agent"] = _SentinelAgent()
+
+    res = cache_api["client"].post(API_ROUTE_ASSISTANT_QA, json={"query": "货币基金风险等级"})
+
+    assert res.status_code == 200
+    body = res.json()
+    assert body["compliance"] == _HitCache.STORED_COMPLIANCE, "必须返回存储的终态快照"
+    assert body["answer"] == "货币基金风险等级为低。"
+    assert "cached" not in body and "cache_similarity" not in body, "内部字段不得泄露"
+
+    # 命中路径补持久化审计事件
+    with sqlite3.connect(str(cache_api["audit_db"])) as conn:
+        rows = conn.execute("SELECT payload_json FROM audit_entries").fetchall()
+    assert len(rows) == 1
+    trail = json.loads(rows[0][0])
+    assert trail["reasoning"]["execution_path"] == ["semantic_cache_hit"]
+    assert trail["compliance"] == _HitCache.STORED_COMPLIANCE
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-034 失败终态不入缓存
+# ══════════════════════════════════════════════════════════════════════
+
+
+def test_tc034_failed_terminal_state_is_not_cached(cache_api):
+    """TC-034：合规未通过/答案过短不入缓存；成功终态才写入（对照）。"""
+    cache_api["agent"] = _FakeAgentApp(
+        answer="当前请求未通过合规检查。",
+        compliance={"passed": False, "flags": ["advice:建议买入"], "risk_disclosure": ""},
+        verification={"passed": True, "issues": []},
+    )
+    res = cache_api["client"].post(API_ROUTE_ASSISTANT_QA, json={"query": "推荐个能买的基金"})
+    assert res.status_code == 200
+    assert cache_api["cache"].store_calls == [], "合规失败终态不得入缓存"
+
+    cache_api["cache"].store_calls.clear()
+    cache_api["agent"] = _FakeAgentApp()  # 默认成功终态
+    res = cache_api["client"].post(API_ROUTE_ASSISTANT_QA, json={"query": "货币基金风险等级"})
+    assert res.status_code == 200
+    assert len(cache_api["cache"].store_calls) == 1, "成功终态应写入缓存"
+    stored = cache_api["cache"].store_calls[0]
+    assert stored["role"] == ROLE_ADVISOR
+    assert stored["compliance"]["passed"] is True
+    assert stored["verification"]["passed"] is True
