@@ -191,3 +191,25 @@ def test_tc013_bm25_failure_degrades_to_vector_results(monkeypatch, stub_factori
     assert len(usable) == 1
     assert usable[0][RR_CONTENT] == PUBLIC_CHUNK
     assert META_RRF_SCORE not in usable[0][RR_METADATA]
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-014 向量库不可用
+# ══════════════════════════════════════════════════════════════════════
+
+
+def test_tc014_vector_store_unavailable_yields_explicit_error_results(stub_factories):
+    """TC-014：底层检索抛异常（ChromaDB 宕机）→ 显式错误结果，不崩溃、不返回空成功。"""
+    stub_factories[SOURCE_PRODUCT] = RuntimeError("ChromaDB connection refused")
+
+    retriever = HybridRetriever(
+        user_role=ROLE_ADVISOR, data_permissions=[PERMISSION_PUBLIC, PERMISSION_INTERNAL]
+    )
+    results = retriever.retrieve([plan_step(SOURCE_PRODUCT)])
+
+    assert len(results) == 1
+    error_result = results[0]
+    assert error_result.get(RR_DENIED) is not True, "错误结果不应伪装成权限拒绝"
+    assert error_result[RR_METADATA].get(META_ERROR) is not None, "必须携带显式错误信息"
+    assert "ChromaDB connection refused" in error_result[RR_METADATA][META_ERROR]
+    assert error_result[RR_CONTENT] == "", "失败检索不得返回看似可用的内容"
