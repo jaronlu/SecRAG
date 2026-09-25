@@ -162,3 +162,32 @@ def test_tc012_result_level_permission_filtering(stub_factories):
         if f.get(RR_DENIED):
             assert f[RR_CONTENT] == ""
             assert f[RR_SCORE] == 0.0
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-013 BM25 失败静默降级
+# ══════════════════════════════════════════════════════════════════════
+
+
+def test_tc013_bm25_failure_degrades_to_vector_results(monkeypatch, stub_factories):
+    """TC-013：BM25 检索抛异常 → 静默降级，向量结果原样返回且可用。"""
+    stub_factories[SOURCE_PRODUCT] = [make_result(source="vec.html", chunk_id="v1")]
+
+    class ExplodingBM25:
+        def __init__(self, engine: Any) -> None:
+            pass
+
+        def retrieve(self, query: str, top_k: int, filters: dict | None = None) -> list:
+            raise RuntimeError("BM25 index unavailable")
+
+    monkeypatch.setattr(hr_module, "BM25Retriever", ExplodingBM25)
+
+    retriever = HybridRetriever(
+        user_role=ROLE_ADVISOR, data_permissions=[PERMISSION_PUBLIC, PERMISSION_INTERNAL]
+    )
+    results = retriever.retrieve([plan_step(SOURCE_PRODUCT)])
+
+    usable = [r for r in results if not r.get(RR_DENIED)]
+    assert len(usable) == 1
+    assert usable[0][RR_CONTENT] == PUBLIC_CHUNK
+    assert META_RRF_SCORE not in usable[0][RR_METADATA]
