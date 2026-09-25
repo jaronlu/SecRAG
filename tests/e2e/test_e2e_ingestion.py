@@ -388,6 +388,6 @@ def test_tc010_ingestion_api_role_and_params(ingestion_api_client):
     body = res.json()
     assert [c["category_id"] for c in body["categories"]] == ["reports"]
 
-    res = ctx.client.get(f"{API}/not-a-category/files")
+    res = ctx.client.get(f"{API}/categories/not-a-category/files")
     assert res.status_code == 404
     assert res.json()["detail"] == "文档分类不存在"
