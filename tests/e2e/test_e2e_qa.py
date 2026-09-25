@@ -291,3 +291,71 @@ def test_tc020_llm_provider_unavailable_returns_503(qa_api):
     detail = res.json()["detail"]
     assert "LLM provider unavailable" in detail
     assert "OPENAI_API_BASE" in detail or "Ollama" in detail
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-021 限流
+# ══════════════════════════════════════════════════════════════════════
+
+
+def test_tc021_rate_limit_blocks_qa_and_sse(qa_api, monkeypatch):
+    """TC-021：限流触发时 QA 返回 429 + Retry-After；SSE 以 error 事件 429 返回。"""
+    qa_api["agent"] = _StreamingAgentApp()
+    monkeypatch.setattr("src.api.main.check_rate_limit", lambda key: (False, 0))
+
+    res = qa_api["client"].post(API_ROUTE_ASSISTANT_QA, json={"query": "货币基金风险"})
+    assert res.status_code == 429
+    assert res.headers.get("retry-after") == "60"
+
+    with qa_api["client"].stream(
+        "POST", API_ROUTE_ASSISTANT_QA_STREAM, json={"query": "货币基金风险"}
+    ) as sse:
+        assert sse.status_code == 429
+        events = _parse_sse(list(sse.iter_lines()))
+    assert events, "限流的 SSE 也必须返回事件"
+    name, data = events[0]
+    assert name == "error"
+    assert data["type"] == "error"
+    assert "频繁" in data["detail"]
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-022 会话异常
+# ══════════════════════════════════════════════════════════════════════
+
+
+def test_tc022_thread_not_found_and_cross_user_denied(qa_api):
+    """TC-022：不存在的 thread_id → 404；他人 thread → 404，不泄露内容。"""
+    qa_api["agent"] = _StreamingAgentApp()
+    client = qa_api["client"]
+
+    res = client.post(
+        API_ROUTE_ASSISTANT_QA, json={"query": "货币基金风险", "thread_id": "no-such-thread"}
+    )
+    assert res.status_code == 404
+    assert res.json()["detail"] == "会话不存在或不可访问"
+
+    thread = qa_api["conversation"].create_thread(
+        user_id="user_other", user_role=ROLE_ADVISOR, client_id=None, title="别人的会话"
+    )
+    res = client.post(
+        API_ROUTE_ASSISTANT_QA,
+        json={"query": "货币基金风险", "thread_id": thread["thread_id"]},
+    )
+    assert res.status_code == 404
+    assert "风险" not in res.text, "跨用户访问不得泄露他人会话内容"
+
+
+def test_tc022_context_mismatch_returns_409(qa_api):
+    """TC-022：同一 thread 的角色/客户上下文变化 → 409 显式冲突。"""
+    qa_api["agent"] = _StreamingAgentApp()
+    thread = qa_api["conversation"].create_thread(
+        user_id="user_advisor", user_role=ROLE_ADVISOR, client_id="client-A", title="TC-022"
+    )
+
+    res = qa_api["client"].post(
+        API_ROUTE_ASSISTANT_QA,
+        json={"query": "货币基金风险", "thread_id": thread["thread_id"], "client_id": "client-B"},
+    )
+    assert res.status_code == 409
+    assert "上下文" in res.json()["detail"] or "变化" in res.json()["detail"]
