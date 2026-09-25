@@ -13,6 +13,7 @@ import pytest
 from src.agents.graph import (
     _traced_node,
     build_agent_graph,
+    build_agent_with_checkpoint,
     build_reason_subgraph,
     is_compliant,
     should_reason_again,
@@ -76,10 +77,13 @@ from src.schemas.constants import (
     SOURCE_REPORT,
     SOURCE_SQL,
     STATE_AUDIT_TRAIL,
+    STATE_AMBIGUITY,
     STATE_CITATIONS,
+    STATE_CHAT_HISTORY,
     STATE_CLIENT_ID,
     STATE_COMPLIANCE,
     STATE_CONFIDENCE,
+    STATE_CONVERSATION_SUMMARY,
     STATE_DEPARTMENT,
     STATE_ENTITIES,
     STATE_FINAL_ANSWER,
@@ -91,6 +95,8 @@ from src.schemas.constants import (
     STATE_REASON_ATTEMPTS,
     STATE_REASON_MESSAGE_START,
     STATE_REASON_STARTED_PERF_COUNTER,
+    STATE_REQUEST_DEADLINE,
+    STATE_RESOLVED_QUERY,
     STATE_RETRIEVAL_ATTEMPTS,
     STATE_RETRIEVAL_FILTERED_CHUNKS,
     STATE_RERANKER_STATUS,
@@ -98,11 +104,16 @@ from src.schemas.constants import (
     STATE_RETRIEVAL_RESULTS,
     STATE_RETRIEVAL_TOTAL_CHUNKS,
     STATE_REWRITTEN_QUERY,
+    STATE_RISK_DISCLOSURE,
+    STATE_THREAD_ID,
     STATE_TOOL_CALLS,
     STATE_TOOL_ITERATIONS,
     STATE_TOOL_MESSAGE_CURSOR,
+    STATE_TURN_ID,
+    STATE_TURN_INDEX,
     STATE_DATA_PERMISSIONS,
     STATE_USER_ROLE,
+    STATE_USER_ID,
     STATE_VERIFICATION,
 )
 from src.utils.audit import SQLiteAuditStore
@@ -1423,3 +1434,142 @@ class TestPromptInjection:
         sanitized, detected = sanitize_query(query)
         assert detected is True
         assert sanitized == query  # 不删除内容，仅标记
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 编译图级回归（P0-1）——节点产出必须穿透编译后的完整图
+# ══════════════════════════════════════════════════════════════════════
+
+
+class TestCompiledGraphRerankerStatus:
+    """P0-1: grade_and_filter 写入的 reranker_status 必须在编译图内可达 compose。
+
+    langgraph 对节点返回的未声明 state 键做静默丢弃，函数级测试无法发现
+    schema 与节点输出的漂移；本测试作为"节点 → 编译后图"边界的第一个样本，
+    在完整图上验证 reranker_status="applied" 能让 compose 输出 CONFIDENCE_HIGH。
+    """
+
+    @staticmethod
+    def _initial_state() -> AssistantState:
+        return cast(AssistantState, {
+            STATE_USER_ID: "user-1",
+            STATE_USER_ROLE: ROLE_OPERATIONS,
+            STATE_DEPARTMENT: "运营部",
+            STATE_DATA_PERMISSIONS: ["public", "internal"],
+            STATE_CLIENT_ID: None,
+            STATE_THREAD_ID: "thread-1",
+            STATE_TURN_ID: "turn-1",
+            STATE_TURN_INDEX: 0,
+            STATE_CHAT_HISTORY: [],
+            STATE_CONVERSATION_SUMMARY: "",
+            STATE_RESOLVED_QUERY: "",
+            STATE_ORIGINAL_QUERY: "货币基金的风险等级是什么",
+            STATE_REWRITTEN_QUERY: "",
+            STATE_INTENT: "",
+            STATE_ENTITIES: {},
+            STATE_AMBIGUITY: [],
+            STATE_QUERY_TYPE: "",
+            STATE_RETRIEVAL_ATTEMPTS: 0,
+            STATE_RETRIEVAL_PLAN: [],
+            STATE_RETRIEVAL_RESULTS: [],
+            STATE_RETRIEVAL_TOTAL_CHUNKS: 0,
+            STATE_RETRIEVAL_FILTERED_CHUNKS: 0,
+            STATE_MESSAGES: [],
+            STATE_TOOL_CALLS: [],
+            STATE_INTERMEDIATE_STEPS: [],
+            STATE_REASON_ATTEMPTS: 0,
+            STATE_TOOL_ITERATIONS: 0,
+            STATE_REASON_MESSAGE_START: 0,
+            STATE_TOOL_MESSAGE_CURSOR: 0,
+            STATE_REASON_STARTED_PERF_COUNTER: 0.0,
+            STATE_REQUEST_DEADLINE: time.monotonic() + 60.0,
+            STATE_VERIFICATION: {},
+            STATE_COMPLIANCE: {},
+            STATE_FINAL_ANSWER: "",
+            STATE_CITATIONS: [],
+            STATE_CONFIDENCE: "low",
+            STATE_RISK_DISCLOSURE: "",
+            STATE_AUDIT_TRAIL: {
+                AUDIT_REQUEST_ID: "req-1",
+                AUDIT_TIMESTAMP: "2026-09-25T00:00:00+00:00",
+                AUDIT_STARTED_PERF_COUNTER: time.perf_counter(),
+            },
+        })
+
+    def test_full_graph_confidence_high_when_reranker_applied(self, monkeypatch):
+        import src.agents.nodes as nodes_module
+        import src.tools.rerank as rerank_module
+        from langchain_core.messages import AIMessage
+
+        class _StubRerankService:
+            def rerank(self, query, documents, top_k=5):
+                return [dict(doc) for doc in documents[:top_k]]
+
+        class _StubResponse:
+            def __init__(self, content: str):
+                self.content = content
+
+        class _StubLLM:
+            """query_understand 返回理解 JSON；planner（含"检索计划"）返回计划数组。"""
+
+            def invoke(self, messages):
+                prompt = messages[-1].content
+                if "检索计划" in prompt:
+                    return _StubResponse(json.dumps([
+                        {PLAN_SOURCE: SOURCE_FAQ, PLAN_QUERY: "货币基金 风险等级", PLAN_TOP_K: 5}
+                    ]))
+                return _StubResponse(json.dumps({
+                    "intent": "FAQ",
+                    "query_type": "faq_inquiry",
+                    "entities": {},
+                    "rewritten_query": "货币基金的风险等级",
+                    "ambiguity": [],
+                }))
+
+        class _StubReasonModel:
+            def invoke(self, messages):
+                return AIMessage(content="货币基金主要投资于短期货币工具，风险等级为低。")
+
+        class _StubVerifier:
+            def verify(self, **kwargs):
+                return {"passed": True, "issues": [], "confidence": CONFIDENCE_HIGH}
+
+        class _StubComplianceChecker:
+            def check(self, *args, **kwargs):
+                return {
+                    "passed": True,
+                    "flags": [],
+                    "risk_disclosure": "",
+                    "suitability_warning": "",
+                }
+
+        monkeypatch.setattr(rerank_module, "RerankService", _StubRerankService)
+        monkeypatch.setattr(nodes_module, "llm", _StubLLM())
+        monkeypatch.setattr(
+            nodes_module, "_get_bound_reason_model", lambda *args, **kwargs: _StubReasonModel()
+        )
+        monkeypatch.setattr(nodes_module, "_VERIFIER", _StubVerifier())
+        monkeypatch.setattr(nodes_module, "_COMPLIANCE_CHECKER", _StubComplianceChecker())
+        monkeypatch.setattr(
+            nodes_module,
+            "_cached_retrieve",
+            lambda retriever, plan, role: [
+                _result("货币基金投资于短期货币工具，风险较低。", score=0.92),
+                _result("货币基金的久期短，利率风险有限。", score=0.88),
+                _result("货币基金净值通常稳定在1元。", score=0.85),
+            ],
+        )
+
+        conversation_store = MagicMock()
+        conversation_store.load_context.return_value = ([], "")
+        monkeypatch.setattr(nodes_module, "_get_conversation_store", lambda: conversation_store)
+        monkeypatch.setattr(nodes_module, "_get_audit_store", lambda: MagicMock())
+
+        agent = build_agent_with_checkpoint()
+        result = agent.invoke(
+            self._initial_state(),
+            {"configurable": {"thread_id": "thread-1"}},
+        )
+
+        assert result[STATE_RERANKER_STATUS] == "applied"
+        assert result[STATE_CONFIDENCE] == CONFIDENCE_HIGH
