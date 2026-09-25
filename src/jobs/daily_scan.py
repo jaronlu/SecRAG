@@ -4,10 +4,13 @@ The job turns raw artifacts into per-user event cards. Three properties matter
 and are covered by tests:
 
 - **Idempotent.** The dedupe key is derived from the *event identity*
-  (user, symbol, source kind, reference, title, date) rather than the run it was
-  seen in, so re-running the same trade day — or any later day — never produces
-  a second card for the same event. The key deliberately excludes `scan_date`
-  because a duplicate card in tomorrow's briefing is worse than no card.
+  (user, symbol, source kind, reference, title, date) plus the current
+  `rule_version` rather than the run it was seen in, so re-running the same
+  trade day — or any later day — never produces a second card for the same
+  event. The key deliberately excludes `scan_date` because a duplicate card in
+  tomorrow's briefing is worse than no card. Retuning the grading thresholds
+  changes the rule version, which re-opens the event under the new rules
+  instead of silently keeping the grade computed earlier (P2-2).
 - **Justified.** Every card carries the grading reasons and rule ids, including
   the P2 cards that get filtered out, so suppression is auditable rather than
   invisible.
@@ -17,6 +20,7 @@ and are covered by tests:
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import re
@@ -63,6 +67,16 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def rule_version_for(thresholds: GradingThresholds) -> str:
+    """Content-derived stamp of the grading rules (P2-2).
+
+    版本直接由阈值内容哈希派生：任何调参都会自动改变版本，从而让同一事件
+    在新规则下重新分级并入库，而不是被旧规则算出的记录静默吞掉。
+    """
+    payload = json.dumps(dataclasses.asdict(thresholds), sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:12]
+
+
 def dedupe_key(
     *,
     user_id: str,
@@ -71,9 +85,14 @@ def dedupe_key(
     source_ref: str,
     title: str,
     date: str,
+    rule_version: str,
 ) -> str:
-    """Stable identity of an event for one user, independent of the run that found it."""
-    raw = "|".join((user_id, stock_code, source_kind, source_ref, title, date))
+    """Stable identity of an event for one user, independent of the run that found it.
+
+    rule_version 参与哈希（P2-2）：阈值/规则变更后同一事件生成新键，
+    新等级得以落库；旧版本的记录保持原样以供审计。
+    """
+    raw = "|".join((user_id, stock_code, source_kind, source_ref, title, date, rule_version))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
@@ -263,6 +282,7 @@ def build_events(
     """
     wanted = {str(symbol).strip() for symbol in symbols if str(symbol).strip()}
     events: list[ScanEventDict] = []
+    version = rule_version_for(thresholds)
     for candidate in candidates:
         if candidate["stock_code"] not in wanted:
             continue
@@ -292,6 +312,7 @@ def build_events(
                     source_ref=candidate["source_ref"],
                     title=candidate["title"],
                     date=candidate["date"],
+                    rule_version=version,
                 ),
                 "first_seen_at": scan_date,
                 "created_at": now,

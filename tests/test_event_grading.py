@@ -17,7 +17,9 @@ from src.jobs.daily_scan import (
     EVENT_STATUS_FILTERED,
     EVENT_STATUS_PENDING,
     SOURCE_DOCUMENT,
+    SOURCE_QUOTE,
     collect_candidates,
+    dedupe_key,
     run_daily_scan,
     SQLiteDailyScanStore,
 )
@@ -244,6 +246,28 @@ def test_rerunning_on_a_later_day_still_produces_no_duplicate_cards(workspace):
     assert again["events_inserted"] == 0
     total = len(scan_store.list_events(user_id="u1"))
     assert total == first["events_inserted"], "the same event resurfaced on a later day"
+
+
+def test_dedupe_key_changes_when_rule_version_changes():
+    identity = dict(
+        user_id="u1",
+        stock_code="600519",
+        source_kind=SOURCE_QUOTE,
+        source_ref="financials/efinance_600519_quote_history.csv",
+        title="600519 2026-09-14 行情波动",
+        date="2026-09-14",
+    )
+    assert dedupe_key(**identity, rule_version="v1") != dedupe_key(**identity, rule_version="v2")
+
+
+def test_threshold_change_regrades_events_under_new_rule_version(workspace):
+    """P2-2: 阈值调参后同一事件以新 rule_version 重新入库，而不是被旧记录吞掉。"""
+    first = scan(workspace, user_ids=["u1"])
+    tuned = GradingThresholds(p1_document_keywords=("办公地址",), p0_pct_change_abs=0.1)
+    retuned = scan(workspace, user_ids=["u1"], thresholds=tuned)
+
+    assert first["events_inserted"] > 0
+    assert retuned["events_inserted"] == first["events_inserted"]
 
 
 def test_p2_cards_are_stored_as_filtered_with_reason(workspace):
