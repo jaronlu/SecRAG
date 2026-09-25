@@ -4,6 +4,8 @@ import json
 import sqlite3
 from pathlib import Path
 
+import pytest
+
 from src.tools.calculator import calculator, safe_eval
 from src.tools.financial_ratios import financial_ratios_tool, query_financial_ratios
 from src.tools.market_data import market_data_tool, query_market_data
@@ -164,8 +166,29 @@ def test_sql_query_tool_rejects_dangerous_sql(tmp_path):
     unsafe = normalize_select_sql("SELECT * FROM financial_ratios; DROP TABLE financial_ratios")
     assert unsafe is None
 
-    result = sql_query_tool.invoke({"query": "SELECT * FROM financial_ratios; DROP TABLE x"})
-    assert "查询错误" in result
+    with pytest.raises(ValueError):
+        sql_query_tool.invoke({"query": "SELECT * FROM financial_ratios; DROP TABLE x"})
+
+
+def test_sql_query_tool_raises_on_disallowed_table_or_column():
+    with pytest.raises(ValueError):
+        sql_query_tool.invoke({"query": "SELECT secret FROM not_allowed"})
+
+
+def test_financial_ratios_tool_raises_on_invalid_input():
+    with pytest.raises(ValueError):
+        query_financial_ratios("bad code!")
+    with pytest.raises(ValueError):
+        query_financial_ratios("600519", report_type="bad type!")
+    with pytest.raises(ValueError):
+        financial_ratios_tool.invoke({"stock_code": "bad code!"})
+
+
+def test_market_data_tool_raises_on_invalid_input():
+    with pytest.raises(ValueError):
+        query_market_data("bad code!", db_path="unused.db")
+    with pytest.raises(ValueError):
+        query_market_data("600519", fields="close; drop table x", db_path="unused.db")
 
 
 def test_financial_ratios_tool_returns_phase2_skeleton():

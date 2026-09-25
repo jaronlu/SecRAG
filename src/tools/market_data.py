@@ -111,12 +111,13 @@ def query_market_data(
     fields: str = DEFAULT_MARKET_FIELDS,
     db_path: str = str(DEFAULT_DB_PATH),
 ) -> str:
-    """Get A-share market data; db_path is internal for tests and offline fixtures."""
-    try:
-        start, end = _default_dates(start_date, end_date)
-        rows = _local_market_data(stock_code, start, end, fields, db_path)
-        if not rows:
-            rows = _baostock_market_data(stock_code, start, end, fields)
-        return json.dumps(rows[:MAX_SQL_ROWS], ensure_ascii=False)
-    except (RuntimeError, ValueError, sqlite3.Error) as exc:
-        return f"行情查询错误: {exc}"
+    """Get A-share market data; db_path is internal for tests and offline fixtures.
+
+    业务错误（非法输入、数据源故障）直接抛异常，由执行链路转为
+    status="error" 的 ToolMessage，避免错误文本被当成行情证据。
+    """
+    start, end = _default_dates(start_date, end_date)
+    rows = _local_market_data(stock_code, start, end, fields, db_path)
+    if not rows:
+        rows = _baostock_market_data(stock_code, start, end, fields)
+    return json.dumps(rows[:MAX_SQL_ROWS], ensure_ascii=False)

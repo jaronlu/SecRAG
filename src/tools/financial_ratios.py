@@ -43,11 +43,15 @@ def query_financial_ratios(
     report_type: str | None = None,
     db_path: str = str(DEFAULT_DB_PATH),
 ) -> str:
-    """Query PE/PB/ROE and other financial ratios from an allowlisted local table."""
+    """Query PE/PB/ROE and other financial ratios from an allowlisted local table.
+
+    输入校验与数据库故障抛异常（执行链路转为 status="error"）；
+    仅"库/表不存在"视为业务上的无数据，返回 missing 载荷。
+    """
     if not _STOCK_CODE_PATTERN.fullmatch(stock_code):
-        return "财务指标查询错误: 标的代码格式不合法"
+        raise ValueError("标的代码格式不合法")
     if report_type and not _REPORT_TYPE_PATTERN.fullmatch(report_type):
-        return "财务指标查询错误: 报告类型格式不合法"
+        raise ValueError("报告类型格式不合法")
 
     filters = ["stock_code = ?"]
     params: list[str | int] = [stock_code]
@@ -62,13 +66,11 @@ def query_financial_ratios(
 
     try:
         rows = run_select_query(query=query, db_path=db_path, params=tuple(params))
-        if rows:
-            return json.dumps(rows, ensure_ascii=False)
-        return _missing_payload(stock_code, year, report_type)
     except sqlite3.OperationalError as exc:
         message = str(exc)
         if "no such table" in message or "unable to open database file" in message:
             return _missing_payload(stock_code, year, report_type)
-        return f"财务指标查询错误: {exc}"
-    except ValueError as exc:
-        return f"财务指标查询错误: {exc}"
+        raise
+    if rows:
+        return json.dumps(rows, ensure_ascii=False)
+    return _missing_payload(stock_code, year, report_type)

@@ -143,9 +143,9 @@ def sql_query_tool(query: str) -> str:
 
     Available datasets include financial statements, market data, and
     `research_reports_index` for AKShare/Eastmoney research report samples.
+
+    业务错误（非法 SQL、数据库故障）直接抛异常，由执行链路转为
+    status="error" 的 ToolMessage，避免错误文本被当成查询结果证据。
     """
-    try:
-        rows = run_select_query(query=query)
-        return json.dumps(rows, ensure_ascii=False)
-    except (ValueError, sqlite3.Error) as exc:
-        return f"查询错误: {exc}"
+    rows = run_select_query(query=query)
+    return json.dumps(rows, ensure_ascii=False)

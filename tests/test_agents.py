@@ -30,6 +30,7 @@ from src.agents.nodes import (
     grade_and_filter,
     planner,
     prepare_reason,
+    record_tool_results,
     retrieve,
     sanitize_query,
     verify,
@@ -1573,3 +1574,73 @@ class TestCompiledGraphRerankerStatus:
 
         assert result[STATE_RERANKER_STATUS] == "applied"
         assert result[STATE_CONFIDENCE] == CONFIDENCE_HIGH
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 工具业务错误上抛（P0-2）
+# ══════════════════════════════════════════════════════════════════════
+
+
+class TestToolErrorHandling:
+    """P0-2: 工具业务错误必须以异常上抛，由执行链路转为 status="error"。
+
+    此前工具把异常吞成普通字符串返回，ToolMessage status 为 success，
+    record_tool_results 记 success=True，验证器把错误文本当证据。
+    """
+
+    @pytest.fixture(autouse=True)
+    def _reset_circuit_breaker(self):
+        import src.agents.nodes as nodes_module
+
+        nodes_module._tool_circuit_breaker.clear()
+        yield
+        nodes_module._tool_circuit_breaker.clear()
+
+    def test_record_tool_results_marks_error_tool_message_as_failure(self):
+        from langchain_core.messages import ToolMessage
+
+        state = _state(**{
+            STATE_MESSAGES: [
+                ToolMessage(
+                    content="查询错误: 仅允许白名单表/字段上的单表 SELECT 查询",
+                    name="sql_query",
+                    tool_call_id="call-1",
+                    status="error",
+                ),
+            ],
+            STATE_TOOL_MESSAGE_CURSOR: 0,
+        })
+
+        result = record_tool_results(state)
+
+        assert result[STATE_TOOL_CALLS][0]["tool"] == "sql_query"
+        assert result[STATE_TOOL_CALLS][0]["success"] is False
+
+    def test_raising_tool_becomes_error_tool_message(self, monkeypatch):
+        """真实工具抛异常 → authorize_reason_tool_call 转 ToolMessage(status="error")。"""
+        from langchain_core.messages import AIMessage, ToolMessage
+
+        class FakeLLM:
+            def bind_tools(self, tools):
+                return self
+
+            def invoke(self, messages):
+                if isinstance(messages[-1], ToolMessage):
+                    return AIMessage(content="工具调用失败，无法给出结论。")
+                return AIMessage(
+                    content="",
+                    tool_calls=[{
+                        "name": SOURCE_SQL,
+                        "args": {"query": "SELECT * FROM financial_ratios; DROP TABLE x"},
+                        "id": "call-err-1",
+                    }],
+                )
+
+        monkeypatch.setattr("src.agents.nodes.llm", FakeLLM())
+        result = build_reason_subgraph().invoke(_state(**{
+            STATE_USER_ROLE: ROLE_ADVISOR,
+            STATE_ORIGINAL_QUERY: "查询并删除数据",
+        }))
+
+        assert result[STATE_TOOL_CALLS][0]["tool"] == SOURCE_SQL
+        assert result[STATE_TOOL_CALLS][0]["success"] is False

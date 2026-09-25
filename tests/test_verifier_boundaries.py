@@ -1,7 +1,7 @@
 """数字验证与引用编号对齐的反例测试（issues.md 一.7）。"""
 
 from src.schemas.constants import META_CHUNK_ID, META_SOURCE, RR_CONTENT, RR_METADATA, RR_SCORE
-from src.utils.verifier import CitationExtractor, NumberVerifier, SourceVerifier
+from src.utils.verifier import CitationExtractor, HallucinationDetector, NumberVerifier, SourceVerifier
 
 
 def _result(content: str, source: str, chunk_id: str) -> dict:
@@ -104,3 +104,44 @@ class TestCitationAlignment:
         # 超出来源数的编号仍然非法
         bad = verifier.verify("结论 [来源4]。", citations, results)
         assert bad["passed"] is False
+
+
+class TestFailedToolOutputNotEvidence:
+    """P0-2: 失败工具输出（success=False）不得作为验证证据。
+
+    工具改为抛异常后，错误文本以 status="error" 进入 tool_calls 且
+    success=False；验证器必须继续排除这类文本，防止错误提示被当成数据。
+    """
+
+    def test_number_verifier_ignores_failed_tool_output(self):
+        verifier = NumberVerifier()
+        result = verifier.verify(
+            answer="据工具查询，目标价 88.88 元。",
+            retrieval_results=[],
+            tool_calls=[{
+                "tool": "sql_query",
+                "output": "查询错误: 目标价 88.88 元",
+                "success": False,
+            }],
+        )
+        assert result["passed"] is False
+        assert result["numbers_found"] == 0
+
+    def test_hallucination_detector_ignores_failed_tool_output(self):
+        detector = HallucinationDetector()
+        error_text = "查询错误: 目标价为 88.88 元"
+
+        failed = detector.detect(
+            "目标价为 88.88 元",
+            [],
+            [{"tool": "sql_query", "output": error_text, "success": False}],
+        )
+        assert failed["passed"] is False
+
+        # 对照：同一输出仅在 success=True 时才算证据
+        succeeded = detector.detect(
+            "目标价为 88.88 元",
+            [],
+            [{"tool": "sql_query", "output": error_text, "success": True}],
+        )
+        assert succeeded["passed"] is True
