@@ -276,3 +276,65 @@ def test_tc034_failed_terminal_state_is_not_cached(cache_api):
     assert stored["role"] == ROLE_ADVISOR
     assert stored["compliance"]["passed"] is True
     assert stored["verification"]["passed"] is True
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-033 缓存角色隔离
+# ══════════════════════════════════════════════════════════════════════
+
+
+@pytest.fixture()
+def enabled_cache(monkeypatch, tmp_path):
+    """启用且嵌入恒定的独立缓存实例——同查询必然命中。"""
+    cache = SemanticCache(db_path=str(tmp_path / "cache.db"), enabled=True)
+    monkeypatch.setattr(cache, "_embed", lambda text: np.array([1.0, 0.0]))
+    return cache
+
+
+def test_tc033_cache_isolated_by_role(enabled_cache):
+    """TC-033：advisor 写入的答案，sales 同查询不命中——角色隔离防越权。"""
+    assert (
+        enabled_cache.store(
+            "XX货币基金风险等级",
+            "货币基金风险等级为低。",
+            citations=[{"source": "a.pdf"}],
+            confidence="high",
+            role=ROLE_ADVISOR,
+            compliance={"passed": True},
+            verification={"passed": True},
+        )
+        is True
+    )
+
+    hit = enabled_cache.lookup("XX货币基金风险等级", role=ROLE_ADVISOR)
+    assert hit is not None
+    assert hit["answer"] == "货币基金风险等级为低。"
+
+    miss = enabled_cache.lookup("XX货币基金风险等级", role=ROLE_INSTITUTIONAL_SALES)
+    assert miss is None, "跨角色不得命中他人缓存"
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-035 缓存 TTL 过期失效
+# ══════════════════════════════════════════════════════════════════════
+
+
+def test_tc035_cache_ttl_expiry_and_clear_expired(monkeypatch, tmp_path):
+    """TC-035：TTL 过期后 lookup 返回 None，clear_expired 清理并返回条目数。"""
+    import src.utils.semantic_cache as cache_module
+
+    cache = SemanticCache(db_path=str(tmp_path / "cache.db"), enabled=True, ttl_seconds=1)
+    monkeypatch.setattr(cache, "_embed", lambda text: np.array([1.0, 0.0]))
+    assert cache.store("货币基金风险等级", "低风险。", role=ROLE_ADVISOR) is True
+
+    class _ShiftedClock:
+        """把模块级 time.time 整体前移 2s，使已存条目过期（避免真实 sleep）。"""
+
+        def time(self) -> float:
+            return time.time() + 2.0
+
+    monkeypatch.setattr(cache_module, "time", _ShiftedClock())
+
+    assert cache.lookup("货币基金风险等级", role=ROLE_ADVISOR) is None, "过期条目不得命中"
+    assert cache.clear_expired() == 1
+    assert cache.get_stats()["total_entries"] == 0
