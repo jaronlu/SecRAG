@@ -131,6 +131,12 @@ class SemanticCache:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_cache_role_expires ON cache_entries(role, expires_at)"
         )
+        # P1-1: 终态快照列——旧库自动补列，历史条目读空串时按空快照处理
+        existing_columns = {row[1] for row in conn.execute("PRAGMA table_info(cache_entries)")}
+        if "compliance" not in existing_columns:
+            conn.execute("ALTER TABLE cache_entries ADD COLUMN compliance TEXT DEFAULT ''")
+        if "verification" not in existing_columns:
+            conn.execute("ALTER TABLE cache_entries ADD COLUMN verification TEXT DEFAULT ''")
         conn.commit()
 
     def _embed(self, text: str) -> np.ndarray:
@@ -151,8 +157,8 @@ class SemanticCache:
             role: 用户角色（用于角色隔离）
 
         Returns:
-            命中时返回 {query, answer, citations, confidence, similarity, hit_count}
-            未命中返回 None
+            命中时返回 {query, answer, citations, confidence, similarity, hit_count,
+            compliance, verification}；未命中返回 None
         """
         if not self.enabled or not query:
             return None
@@ -162,8 +168,7 @@ class SemanticCache:
 
         # 查询该角色下未过期的所有缓存
         cursor = conn.execute(
-            "SELECT id, query, query_embedding, answer, citations, confidence, hit_count "
-            "FROM cache_entries WHERE role = ? AND expires_at > ?",
+            "SELECT id, query, query_embedding, answer, citations, confidence, hit_count, compliance, verification FROM cache_entries WHERE role = ? AND expires_at > ?",
             (role, now),
         )
         rows = cursor.fetchall()
@@ -198,6 +203,9 @@ class SemanticCache:
                 "confidence": best_row[5],
                 "similarity": round(best_similarity, 4),
                 "hit_count": best_row[6] + 1,
+                # P1-1: 返回 store 时的终态快照；旧条目空串按空快照处理
+                "compliance": json.loads(best_row[7]) if best_row[7] else {},
+                "verification": json.loads(best_row[8]) if best_row[8] else {},
             }
 
         return None
@@ -209,6 +217,8 @@ class SemanticCache:
         citations: list[dict[str, Any]] | None = None,
         confidence: str = "",
         role: str = "",
+        compliance: dict[str, Any] | None = None,
+        verification: dict[str, Any] | None = None,
     ) -> bool:
         """存储查询结果到缓存。
 
@@ -218,6 +228,8 @@ class SemanticCache:
             citations: 引用列表
             confidence: 置信度
             role: 用户角色
+            compliance: 终态合规结果快照（P1-1）
+            verification: 终态验证结果快照（P1-1）
 
         Returns:
             是否存储成功
@@ -231,9 +243,7 @@ class SemanticCache:
         conn = self._get_conn()
         try:
             conn.execute(
-                "INSERT INTO cache_entries "
-                "(query, query_embedding, answer, citations, confidence, role, created_at, expires_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO cache_entries (query, query_embedding, answer, citations, confidence, role, created_at, expires_at, compliance, verification) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     query,
                     json.dumps(query_emb.tolist()),
@@ -243,6 +253,9 @@ class SemanticCache:
                     role,
                     now,
                     now + self.ttl_seconds,
+                    # P1-1: 终态快照随条目一起落库
+                    json.dumps(compliance or {}),
+                    json.dumps(verification or {}),
                 ),
             )
             conn.commit()

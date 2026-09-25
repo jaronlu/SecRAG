@@ -458,13 +458,14 @@ async def assistant_qa(
             thread_id, cache_hit["similarity"],
         )
         _record_metrics("success", is_cached=True)
+        # P1-1: 返回 store 时保存的终态合规快照，不再硬编码 passed=True
         return {
             "thread_id": thread_id,
             "turn_id": turn_id,
             "answer": cache_hit["answer"],
             "citations": cache_hit["citations"],
             "confidence": cache_hit["confidence"],
-            "compliance": {"passed": True},
+            "compliance": cache_hit["compliance"],
             "cached": True,
             "cache_similarity": cache_hit["similarity"],
         }
@@ -524,6 +525,8 @@ async def assistant_qa(
             citations=result.get(STATE_CITATIONS, []),
             confidence=result.get(STATE_CONFIDENCE, ""),
             role=user.role,
+            compliance=compliance,
+            verification=verification,
         )
 
     _record_metrics("success")
