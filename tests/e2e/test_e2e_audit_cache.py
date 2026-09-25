@@ -241,6 +241,8 @@ def test_tc032_cache_hit_returns_stored_snapshot_and_persists_audit_event(cache_
     assert body["compliance"] == _HitCache.STORED_COMPLIANCE, "必须返回存储的终态快照"
     assert body["answer"] == "货币基金风险等级为低。"
     assert "cached" not in body and "cache_similarity" not in body, "内部字段不得泄露"
+    # 统一终态出口：命中响应与普通路径返回同一结果对象（AssistantQAResponse 字段集）
+    assert set(body) == {"thread_id", "turn_id", "answer", "citations", "confidence", "compliance"}
 
     # 命中路径补持久化审计事件
     with sqlite3.connect(str(cache_api["audit_db"])) as conn:

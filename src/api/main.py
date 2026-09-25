@@ -48,7 +48,7 @@ from src.schemas.request_response import (
     ConversationThreadResponse,
 )
 from src.schemas.models import AuditEntry
-from src.schemas.typed_dicts import AuditQuery, AuditReasoning, AuditResponse, AuditRetrieval
+from src.schemas.typed_dicts import AnswerOutcome, AuditQuery, AuditReasoning, AuditResponse, AuditRetrieval
 from src.utils.rate_limit import check_rate_limit, get_rate_limit_key
 from src.utils.semantic_cache import get_semantic_cache
 from src.utils.metrics import get_metrics
@@ -445,6 +445,22 @@ def _persist_cache_hit_audit_event(
         _write_audit_outbox(dataclasses.asdict(entry), str(exc))
 
 
+def _qa_response_from_outcome(
+    outcome: AnswerOutcome, thread_id: str, turn_id: str
+) -> AssistantQAResponse:
+    """统一终态出口：普通执行与缓存命中都从这里构建对外响应，
+    保证两种入口返回同一种结果对象；命中/缓存相似度只进审计与指标，不进响应体。
+    """
+    return AssistantQAResponse(
+        thread_id=thread_id,
+        turn_id=turn_id,
+        answer=outcome["answer"],
+        citations=outcome["citations"],
+        confidence=outcome["confidence"],
+        compliance=outcome["compliance"],
+    )
+
+
 @app.post(API_ROUTE_ASSISTANT_QA, response_model=AssistantQAResponse)
 async def assistant_qa(
     request: AssistantQARequest,
@@ -514,16 +530,13 @@ async def assistant_qa(
         )
         _record_metrics("success", is_cached=True)
         # P1-1: 返回 store 时保存的终态合规快照，不再硬编码 passed=True
-        return {
-            "thread_id": thread_id,
-            "turn_id": turn_id,
-            "answer": cache_hit["answer"],
-            "citations": cache_hit["citations"],
-            "confidence": cache_hit["confidence"],
-            "compliance": cache_hit["compliance"],
-            "cached": True,
-            "cache_similarity": cache_hit["similarity"],
-        }
+        outcome = AnswerOutcome(
+            answer=cache_hit["answer"],
+            citations=cache_hit["citations"],
+            confidence=cache_hit["confidence"],
+            compliance=cache_hit["compliance"],
+        )
+        return _qa_response_from_outcome(outcome, thread_id, turn_id)
 
     try:
         result = await asyncio.wait_for(
@@ -585,13 +598,16 @@ async def assistant_qa(
         )
 
     _record_metrics("success")
-    return AssistantQAResponse(
-        thread_id=result.get(STATE_THREAD_ID, thread_id),
-        turn_id=result.get(STATE_TURN_ID, turn_id),
+    outcome = AnswerOutcome(
         answer=answer,
         citations=result[STATE_CITATIONS],
         confidence=result[STATE_CONFIDENCE],
         compliance=result[STATE_COMPLIANCE],
+    )
+    return _qa_response_from_outcome(
+        outcome,
+        result.get(STATE_THREAD_ID, thread_id),
+        result.get(STATE_TURN_ID, turn_id),
     )
 
 

@@ -103,6 +103,19 @@ class CitationDict(TypedDict, total=False):
     metadata: dict
 
 
+class AnswerOutcome(TypedDict, total=False):
+    """对外业务终态：普通执行与缓存命中共用的答案语义。
+
+    缓存命中、正常回答、合规拦截都收敛为这一种结果对象再对外返回，
+    传输层不得分别解释业务（AssistantQAResponse 是它的序列化投影）。
+    """
+
+    answer: str
+    citations: list[CitationDict]
+    confidence: str
+    compliance: ComplianceResult
+
+
 class ConversationThreadDict(TypedDict, total=False):
     """Conversation thread metadata."""
 

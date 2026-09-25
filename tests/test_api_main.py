@@ -174,8 +174,16 @@ async def test_assistant_qa_cache_hit_returns_stored_compliance_snapshot(monkeyp
         AuthenticatedUser("user_tech", ROLE_TECHNICAL, "tech"),
     )
 
-    assert response["compliance"] == stored_compliance
-    assert response["cached"] is True
+    assert response.compliance == stored_compliance
+    # 统一终态出口：命中与普通路径返回同一结果对象，内部 cached/similarity 只进指标与审计
+    assert set(response.model_dump()) == {
+        "thread_id",
+        "turn_id",
+        "answer",
+        "citations",
+        "confidence",
+        "compliance",
+    }
 
 
 @pytest.mark.asyncio
