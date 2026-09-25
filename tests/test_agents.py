@@ -754,6 +754,24 @@ class TestRoleAwareTools:
         assert SOURCE_SQL not in operations_tools
         assert not {SOURCE_PRODUCT, SOURCE_REPORT, SOURCE_FAQ, SOURCE_SQL} & unknown_tools
 
+    def test_unregistered_tool_is_hidden_by_default(self, monkeypatch):
+        """P0-3: 未列入权限映射/非检索白名单的工具默认对所有角色不可见。"""
+        from langchain_core.tools import tool
+
+        import src.agents.tools as tools_module
+        from src.agents.tools import get_tools_for_role
+
+        @tool
+        def rogue_tool(query: str) -> str:
+            """未声明权限的新工具。"""
+            return "rogue"
+
+        monkeypatch.setattr(tools_module, "tools", [*tools_module.tools, rogue_tool])
+
+        for role in (ROLE_ADVISOR, ROLE_OPERATIONS, "unknown"):
+            names = {tool_item.name for tool_item in get_tools_for_role(role)}
+            assert "rogue_tool" not in names
+
     def test_report_tool_filters_chunk_not_allowed_for_technical_role(self, monkeypatch):
         from langchain_core.messages import AIMessage
         from langgraph.graph import END, START, StateGraph

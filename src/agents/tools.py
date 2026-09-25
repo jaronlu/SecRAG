@@ -168,6 +168,17 @@ _RETRIEVAL_TOOL_SOURCES = {
     getattr(sql_query_tool, "name", "sql_query_tool"): SOURCE_SQL,
 }
 
+# 非检索工具共享白名单（P0-3 反转默认放行）：必须显式列入才可见。
+# 未在权限映射/白名单声明的新工具默认对所有角色不可见，避免漏配时
+# 可见性层与 authorize_reason_tool_call 授权层一致放行。
+_NON_RETRIEVAL_TOOL_WHITELIST: set[str] = {
+    calculator.name,
+    suitability_check.name,
+    market_data_tool.name,
+    financial_ratios_tool.name,
+    rerank_tool.name,
+}
+
 
 def get_tools_for_role(
     user_role: str,
@@ -183,5 +194,5 @@ def get_tools_for_role(
             _RETRIEVAL_TOOL_SOURCES.get(tool_item.name) in allowed_sources
             and _RETRIEVAL_TOOL_SOURCES.get(tool_item.name) not in excluded_sources
         )
-        or tool_item.name not in _RETRIEVAL_TOOL_SOURCES
+        or tool_item.name in _NON_RETRIEVAL_TOOL_WHITELIST
     ]
