@@ -236,3 +236,28 @@ def test_tc006_empty_document_fails_without_vector_writes(ingestion_env):
     doc = env.service.registry.get_document(items[0]["doc_id"])
     assert doc is not None and doc.status != "active"
     assert chunk_ids_for(env, items[0]["doc_id"]) == []
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-007 损坏文件
+# ══════════════════════════════════════════════════════════════════════
+
+
+def test_tc007_corrupt_pdf_fails_while_batch_continues(ingestion_env):
+    """TC-007：伪 PDF failed，同批合法 HTML 仍 created——逐文件容错互不影响。"""
+    env = ingestion_env
+    write_document(
+        env.category_dir, "broken_report.pdf", b"%PDF-1.4 \x00 garbage-bytes", VALID_META
+    )
+    write_document(env.category_dir, "good_report.html", FUND_REPORT_HTML, VALID_META)
+
+    summary, run_id = env.run()
+
+    assert summary["status"] == "failed"
+    items = {item["relative_path"].split("/")[-1]: item for item in env.service.list_run_items(run_id)}
+    assert items["broken_report.pdf"]["action"] == "failed"
+    assert items["broken_report.pdf"]["error_code"] == "document_processing_failed"
+    assert items["good_report.html"]["action"] == "created"
+
+    broken_doc_id = items["broken_report.pdf"]["doc_id"]
+    assert chunk_ids_for(env, broken_doc_id) == []
