@@ -45,6 +45,11 @@ class AssistantState(TypedDict):
     entities: QueryEntities
     ambiguity: list[str]
     query_type: str  # 值域见 src.schemas.constants.QueryType
+    # 安全/语言标记（DEF-002）：query_understand 产出，审计链路消费；
+    # 未声明进 state 会被 LangGraph 静默丢弃
+    query_sanitized: bool  # STATE_QUERY_SANITIZED；查询命中注入指令并已加固时为 True
+    pii_detected: list[dict[str, str]]  # STATE_PII_DETECTED；detect_pii 结果 [{type, match, position}]
+    language: str  # STATE_LANGUAGE；detect_language 结果（zh/en/mixed）
 
     # 检索计划 — STATE_RETRIEVAL_PLAN / STATE_RETRIEVAL_ATTEMPTS
     retrieval_plan: list[RetrievalPlanStep]
