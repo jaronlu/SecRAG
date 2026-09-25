@@ -261,3 +261,67 @@ def test_tc007_corrupt_pdf_fails_while_batch_continues(ingestion_env):
 
     broken_doc_id = items["broken_report.pdf"]["doc_id"]
     assert chunk_ids_for(env, broken_doc_id) == []
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-008 不支持的文件格式
+# ══════════════════════════════════════════════════════════════════════
+
+
+def test_tc008_unsupported_suffixes_never_enter_run(ingestion_env):
+    """TC-008：.txt/.zip 不被收集为业务文件，run 中不产生对应条目。"""
+    env = ingestion_env
+    write_document(env.category_dir, "notes.txt", "纯文本研报", VALID_META)
+    write_document(env.category_dir, "bundle.zip", b"PK\x03\x04", VALID_META)
+
+    files = env.service.list_category_files("reports")
+    collected = {f["relative_path"].split("/")[-1] for f in files}
+    assert "notes.txt" not in collected
+    assert "bundle.zip" not in collected
+
+    with pytest.raises(CategoryPreflightError):
+        env.run()  # 分类中没有可入库业务文件
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-009 缺少/非法权限清单（fail closed：预检拒绝建 run）
+# ══════════════════════════════════════════════════════════════════════
+
+
+@pytest.mark.parametrize("name,content,meta,desc", [
+    pytest.param(
+        "no_manifest.html", FUND_REPORT_HTML, None, "缺少 .meta.json", id="missing-manifest"
+    ),
+    pytest.param(
+        "bad_permission.html",
+        FUND_REPORT_HTML,
+        {**VALID_META, META_PERMISSION_LEVEL: "topsecret"},
+        "非法 permission_level",
+        id="bad-permission",
+    ),
+    pytest.param(
+        "bad_roles.html",
+        FUND_REPORT_HTML,
+        {**VALID_META, META_ALLOWED_ROLES: ["superuser"]},
+        "非法 allowed_roles",
+        id="bad-roles",
+    ),
+    pytest.param(
+        "internal_no_roles.html",
+        FUND_REPORT_HTML,
+        {**VALID_META, META_PERMISSION_LEVEL: "internal", META_ALLOWED_ROLES: []},
+        "internal 缺 allowed_roles",
+        id="internal-without-roles",
+    ),
+])
+def test_tc009_invalid_manifest_blocks_run_creation(ingestion_env, name, content, meta, desc):
+    """TC-009：清单缺失或非法时 create_run 直接拒绝（fail closed），不产生 run、不写向量库。"""
+    env = ingestion_env
+    write_document(env.category_dir, name, content, meta)
+
+    with pytest.raises(CategoryPreflightError) as excinfo:
+        env.service.create_run("reports", requested_by="tester")
+
+    files = {f["relative_path"].split("/")[-1]: f for f in excinfo.value.files}
+    assert files[name]["manifest_status"] != "valid", f"{desc} 应被预检标记"
+    assert env.service.list_recent_runs(1) == []
