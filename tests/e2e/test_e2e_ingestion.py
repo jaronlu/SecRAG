@@ -143,3 +143,70 @@ def test_tc003_ingest_financial_report_end_to_end(ingestion_env):
 
     stored_ids = chunk_ids_for(env, items[0]["doc_id"])
     assert len(stored_ids) == items[0]["chunk_count"]
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-004 重复入库幂等跳过
+# ══════════════════════════════════════════════════════════════════════
+
+
+def test_tc004_reingest_unchanged_document_is_skipped(ingestion_env):
+    """TC-004：内容/清单/解析器/分块器/模型均未变时重跑入库 → skipped，无重复 chunk。"""
+    env = ingestion_env
+    write_document(env.category_dir, "xx_money_fund_2024.html", FUND_REPORT_HTML, VALID_META)
+
+    first_summary, first_run_id = env.run()
+    assert first_summary["status"] == "success"
+    doc_id = env.service.list_run_items(first_run_id)[0]["doc_id"]
+    chunk_count = len(chunk_ids_for(env, doc_id))
+
+    second_summary, second_run_id = env.run()
+
+    assert second_summary["status"] == "success"
+    second_items = env.service.list_run_items(second_run_id)
+    assert len(second_items) == 1
+    assert second_items[0]["action"] == "skipped"
+    assert len(chunk_ids_for(env, doc_id)) == chunk_count
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-005 文档更新替换
+# ══════════════════════════════════════════════════════════════════════
+
+
+def test_tc005_updated_document_replaces_old_chunks(ingestion_env):
+    """TC-005：正文变化 → replaced，doc_version+1，旧 chunk 被清理不残留。"""
+    env = ingestion_env
+    file_path = write_document(
+        env.category_dir, "xx_money_fund_2024.html", FUND_REPORT_HTML, VALID_META
+    )
+    _, first_run_id = env.run()
+    doc_id = env.service.list_run_items(first_run_id)[0]["doc_id"]
+    old_version = env.service.registry.get_document(doc_id).doc_version
+    old_ids = set(chunk_ids_for(env, doc_id))
+
+    file_path.write_text(
+        FUND_REPORT_HTML.replace(
+            "</body>", "<p>新增：基金分红条款为每日分红，月末集中支付。</p></body>"
+        ),
+        encoding="utf-8",
+    )
+    second_summary, second_run_id = env.run()
+
+    assert second_summary["status"] == "success"
+    second_items = env.service.list_run_items(second_run_id)
+    assert second_items[0]["action"] == "replaced"
+    doc = env.service.registry.get_document(doc_id)
+    assert doc.doc_version == old_version + 1
+
+    new_ids = set(chunk_ids_for(env, doc_id))
+    assert new_ids and new_ids != old_ids
+    removed = old_ids - new_ids
+    if removed:
+        from src.ingestion.embedder import get_vectorstore
+
+        vs = get_vectorstore(
+            persist_directory=env.service.persist_directory, embedding_model=FakeEmbeddings()
+        )
+        remaining = set(vs.get(ids=sorted(removed))["ids"])
+        assert remaining.isdisjoint(removed), "旧 chunk 必须被清理"
