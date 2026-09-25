@@ -359,3 +359,100 @@ def test_tc022_context_mismatch_returns_409(qa_api):
     )
     assert res.status_code == 409
     assert "上下文" in res.json()["detail"] or "变化" in res.json()["detail"]
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-023 工具白名单与超时熔断
+# ══════════════════════════════════════════════════════════════════════
+
+
+@pytest.fixture()
+def _reset_circuit_breaker():
+    from src.agents import nodes as agent_nodes
+
+    agent_nodes._tool_circuit_breaker.clear()
+    yield
+    agent_nodes._tool_circuit_breaker.clear()
+
+
+def _tool_request(state: dict, name: str) -> Any:
+    from langgraph.prebuilt.tool_node import ToolCallRequest
+
+    return ToolCallRequest(
+        state=state,
+        tool_call={"name": name, "args": {}, "id": f"call_{name}"},
+        tool=None,
+        runtime=None,
+    )
+
+
+def test_tc023_unauthorized_tool_is_rejected_without_execution(_reset_circuit_breaker):
+    """TC-023：advisor 调用 faq_search（角色无 FAQ 源）→ 拒绝且工具不执行。"""
+    from langchain_core.messages import ToolMessage
+
+    from src.agents.nodes import authorize_reason_tool_call
+    from src.schemas.constants import (
+        ROLE_ADVISOR,
+        SOURCE_PRODUCT,
+        STATE_RETRIEVAL_PLAN,
+        STATE_RETRIEVAL_RESULTS,
+        STATE_USER_ROLE,
+    )
+
+    state = {
+        STATE_USER_ROLE: ROLE_ADVISOR,
+        STATE_RETRIEVAL_PLAN: [{"source": SOURCE_PRODUCT, "query": "q", "top_k": 3}],
+        STATE_RETRIEVAL_RESULTS: [],
+    }
+    executed: list[Any] = []
+
+    result = authorize_reason_tool_call(
+        _tool_request(state, "faq_search"), lambda request: executed.append(request)
+    )
+
+    assert isinstance(result, ToolMessage)
+    assert result.status == "error"
+    assert "无权调用" in result.content
+    assert executed == [], "越权工具不得执行"
+
+
+def test_tc023_tool_timeout_trips_circuit_breaker(
+    _reset_circuit_breaker, monkeypatch
+):
+    """TC-023：工具执行超时 → 错误 ToolMessage + 熔断，冷却期内直接拒绝。"""
+    import time
+    from langchain_core.messages import ToolMessage
+
+    from src.agents import nodes as agent_nodes
+    from src.agents.nodes import authorize_reason_tool_call
+    from src.schemas.constants import (
+        ROLE_ADVISOR,
+        SOURCE_PRODUCT,
+        STATE_RETRIEVAL_PLAN,
+        STATE_RETRIEVAL_RESULTS,
+        STATE_USER_ROLE,
+    )
+
+    monkeypatch.setattr(agent_nodes, "TOOL_TIMEOUT_SECONDS", 0.05)
+    state = {
+        STATE_USER_ROLE: ROLE_ADVISOR,
+        STATE_RETRIEVAL_PLAN: [{"source": SOURCE_PRODUCT, "query": "q", "top_k": 3}],
+        STATE_RETRIEVAL_RESULTS: [],
+    }
+
+    def slow_execute(request):
+        time.sleep(0.3)
+        return ToolMessage(content="ok", name="calculator", tool_call_id="x")
+
+    first = authorize_reason_tool_call(_tool_request(state, "calculator"), slow_execute)
+    assert isinstance(first, ToolMessage) and first.status == "error"
+    assert "超时" in first.content
+
+    # 熔断期内第二次调用直接拒绝，不再执行工具
+    calls: list[Any] = []
+    second = authorize_reason_tool_call(
+        _tool_request(state, "calculator"), lambda request: calls.append(request)
+    )
+    assert isinstance(second, ToolMessage) and second.status == "error"
+    assert "熔断" in second.content
+    assert calls == []
