@@ -705,7 +705,7 @@ def _try_rerank_candidates(
     返回 (reranked_or_original_candidates, status)。
     status: "applied" | "unavailable" | "error:<msg>"
 
-    设计原则（CLAUDE.md 设计驱动第5条）：reranker 未配置时必须显式降级，
+    设计原则（AGENTS.md 设计驱动第5条）：reranker 未配置时必须显式降级，
     不得用原始 cosine score 冒充语义重排。降级时保留原始 score 顺序，
     并通过 STATE_RERANKER_STATUS 告知上层置信度应受影响。
     """
