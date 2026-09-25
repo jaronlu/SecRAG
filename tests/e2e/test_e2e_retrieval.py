@@ -213,3 +213,73 @@ def test_tc014_vector_store_unavailable_yields_explicit_error_results(stub_facto
     assert error_result[RR_METADATA].get(META_ERROR) is not None, "必须携带显式错误信息"
     assert "ChromaDB connection refused" in error_result[RR_METADATA][META_ERROR]
     assert error_result[RR_CONTENT] == "", "失败检索不得返回看似可用的内容"
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-015 相关性过滤与重排降级
+# ══════════════════════════════════════════════════════════════════════
+
+
+def _grade_state(results: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "retrieval_results": results,
+        "resolved_query": "货币基金风险等级",
+        "rewritten_query": "货币基金 风险等级",
+        "original_query": "货币基金风险等级",
+        "user_role": ROLE_ADVISOR,
+    }
+
+
+def test_tc015_grade_filters_low_scores_dedupes_and_marks_reranker_unavailable(
+    monkeypatch,
+):
+    """TC-015：低分过滤、同 source+chunk 去重、top-10 截断、reranker 不可用显式标记。"""
+    from src.agents.nodes import grade_and_filter
+
+    monkeypatch.setitem(sys.modules, "src.tools.rerank", None)  # ImportError → unavailable
+
+    results = [
+        make_result(source="a.html", chunk_id="dup", score=0.95),
+        make_result(source="a.html", chunk_id="dup", score=0.93),  # 重复证据
+        make_result(source="b.html", chunk_id="b1", score=RETRIEVAL_MIN_SCORE + 0.1),
+        make_result(source="c.html", chunk_id="c1", score=0.2),  # 低于阈值
+    ]
+    results += [
+        make_result(source=f"bulk{i}.html", chunk_id=f"bk{i}", score=0.9 - i * 0.01)
+        for i in range(GRADE_TOP_K + 5)  # 撑爆候选池验证 top-k 截断
+    ]
+
+    update = grade_and_filter(_grade_state(results))
+
+    filtered = [r for r in update["retrieval_results"] if not r.get(RR_DENIED)]
+    assert all(float(r[RR_SCORE]) >= RETRIEVAL_MIN_SCORE for r in filtered)
+    keys = [(r[RR_METADATA][META_SOURCE], r[RR_METADATA][META_CHUNK_ID]) for r in filtered]
+    assert len(keys) == len(set(keys)), "重复证据必须去重"
+    assert len(filtered) <= GRADE_TOP_K
+    assert update["reranker_status"] == "unavailable"
+
+
+def test_tc015_reranker_applied_keeps_semantic_order(monkeypatch):
+    """TC-015：reranker 可用时 status=applied，结果按语义重排输出。"""
+    from src.agents.nodes import grade_and_filter
+
+    class FakeRerankService:
+        def rerank(self, query: str, candidates: list[dict], top_k: int) -> list[dict]:
+            # 语义重排：反转顺序模拟与原始分不同的语义序
+            return list(reversed(candidates))[:top_k]
+
+    from src.tools import rerank as rerank_module
+
+    monkeypatch.setattr(rerank_module, "RerankService", FakeRerankService)
+
+    results = [
+        make_result(source="a.html", chunk_id="a1", score=0.95),
+        make_result(source="b.html", chunk_id="b1", score=0.90),
+        make_result(source="c.html", chunk_id="c1", score=0.85),
+    ]
+
+    update = grade_and_filter(_grade_state(results))
+
+    order = [r[RR_METADATA][META_CHUNK_ID] for r in update["retrieval_results"]]
+    assert order == ["c1", "b1", "a1"]
+    assert update["reranker_status"] == "applied"
