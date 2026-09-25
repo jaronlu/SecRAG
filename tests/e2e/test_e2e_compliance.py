@@ -37,16 +37,10 @@ def test_tc024_investment_advice_patterns_blocked(text, expected_flag):
     assert expected_flag in result["flags"]
 
 
-# DEF-001（TC-024）：TP+数字的目标价表述漏检。
-# matches_investment_advice 先去除全部空白（防空格绕过），"TP 12.5" 归一化为
-# "TP12.5" 后 _TARGET_PRICE_REGEXES 的 \bTP\b 边界失效——空格防护与 TP 正则不兼容。
-# strict=True：若将来修复该缺陷，此测试将 XPASS 并提醒移除标记。
-@pytest.mark.xfail(
-    reason="DEF-001：TP+数字目标价写法（TP 12.5/建议TP 15元/TP12.5）漏检",
-    strict=True,
-)
-@pytest.mark.parametrize("text", ["TP 12.5 元", "建议TP 15元", "TP12.5"])
+# DEF-001 回归：TP 边界改用 ASCII 字母 lookaround 后，空白归一化与紧邻汉字均不再漏检
+@pytest.mark.parametrize("text", ["TP 12.5 元", "建议TP 15元", "TP12.5", "该基金TP为12.5元"])
 def test_tc024_tp_with_number_should_be_blocked(text):
+    """TC-024：TP+数字的目标价写法必须被拦截（DEF-001）。"""
     assert "advice:目标价" in ComplianceChecker().check(text, user_role=ROLE_ADVISOR)["flags"]
 
 

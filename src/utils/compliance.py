@@ -50,10 +50,12 @@ _ADVISE_DECREASE = (
     re.compile(r"推[荐议].{0,3}减[持]"),
 )
 # 目标价：目标价 / 目标价格 / TP / target price
+# TP 边界只排除 ASCII 字母相邻：匹配前的全空白归一化把 "TP 12.5" 变成 "TP12.5"，
+# 且 \b 的 \w 包含中文，"TP为12.5" 这类紧邻汉字写法同样令 \b 失效（DEF-001）
 _TARGET_PRICE_REGEXES = (
     re.compile(r"目标[价]"),
     re.compile(r"目标价格"),
-    re.compile(r"\bTP\b", re.IGNORECASE),
+    re.compile(r"(?<![A-Za-z])TP(?![A-Za-z])", re.IGNORECASE),
     re.compile(r"target\s*price", re.IGNORECASE),
 )
 
