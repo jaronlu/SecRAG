@@ -83,37 +83,6 @@ def test_tc016_qa_full_chain_happy_path(run_agent_graph, isolated_stores, fake_l
 
 
 # ══════════════════════════════════════════════════════════════════════
-# TC-018 验证失败重试与安全兜底
-# ══════════════════════════════════════════════════════════════════════
-
-
-def test_tc018_verification_failure_retries_then_safe_fallback(
-    run_agent_graph, isolated_stores, fake_llm
-):
-    """TC-018：编造数字的答案验证不通过 → 重推 1 次 → 仍失败 → 安全提示兜底。"""
-    from src.schemas.constants import MAX_REASON_ATTEMPTS
-
-    from tests.e2e.conftest import build_state
-
-    thread = isolated_stores.conversation.create_thread(
-        user_id="user_advisor", user_role=ROLE_ADVISOR, client_id=None, title="TC-018"
-    )
-    fake_llm.reason_content = "## 结论\n\n该基金年化收益率为3.9%，表现优异[来源1]。"
-
-    state = run_agent_graph(build_state(thread_id=thread["thread_id"]))
-
-    # 重试受 MAX_REASON_ATTEMPTS 限制，且确实发生了重推
-    assert state[STATE_REASON_ATTEMPTS] == MAX_REASON_ATTEMPTS
-    assert len([kind for kind, _ in fake_llm.calls if kind == "reason"]) == MAX_REASON_ATTEMPTS
-
-    # 不可靠答案不得返回给用户：替换为安全提示 + 清空引用 + 低置信
-    assert "未通过来源或数字验证" in state[STATE_FINAL_ANSWER]
-    assert "3.9%" not in state[STATE_FINAL_ANSWER]
-    assert state[STATE_CITATIONS] == []
-    assert state[STATE_CONFIDENCE] == CONFIDENCE_LOW
-
-
-# ══════════════════════════════════════════════════════════════════════
 # TC-017 SSE 流式事件协议
 # ══════════════════════════════════════════════════════════════════════
 
@@ -224,3 +193,101 @@ def test_tc018_verification_failure_retries_then_safe_fallback(
     assert "3.9%" not in state[STATE_FINAL_ANSWER]
     assert state[STATE_CITATIONS] == []
     assert state[STATE_CONFIDENCE] == CONFIDENCE_LOW
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-019/020/021/022 共享：QA API 客户端（真实路由 + 注入 Agent/存储）
+# ══════════════════════════════════════════════════════════════════════
+
+
+class _DisabledCache:
+    """语义缓存替身：永不命中，store 静默成功。"""
+
+    def lookup(self, query, role=""):
+        return None
+
+    def store(self, query, answer, citations=None, confidence="", role="",
+              compliance=None, verification=None):
+        return True
+
+
+@pytest.fixture()
+def qa_api(monkeypatch, tmp_path):
+    """QA API 上下文：holder["agent"] 注入 Agent 替身；holder["config"] 覆盖配置。"""
+    from src.utils.audit import SQLiteAuditStore
+    from src.utils.conversation import SQLiteConversationStore
+
+    store = SQLiteConversationStore(tmp_path / "conversations.db")
+    monkeypatch.setattr("src.api.main._get_conversation_store", lambda: store)
+    monkeypatch.setattr(
+        "src.api.main._get_cache_hit_audit_store",
+        lambda: SQLiteAuditStore(tmp_path / "audit.db"),
+    )
+    monkeypatch.setattr("src.api.main.get_semantic_cache", lambda: _DisabledCache())
+
+    holder: dict[str, Any] = {"agent": None}
+
+    def _agent():
+        assert holder["agent"] is not None, "测试未注入 agent 替身"
+        return holder["agent"]
+
+    monkeypatch.setattr("src.api.main._get_agent_app", _agent)
+
+    app.dependency_overrides[authenticate_user] = lambda: AuthenticatedUser(
+        "user_advisor", ROLE_ADVISOR, "wealth"
+    )
+    holder["client"] = TestClient(app)
+    holder["conversation"] = store
+    yield holder
+    app.dependency_overrides.clear()
+
+
+class _SleepyAgentApp:
+    def invoke(self, state, config=None):
+        import time
+
+        time.sleep(0.5)
+        return {**state, STATE_FINAL_ANSWER: "太慢", STATE_CITATIONS: [], STATE_CONFIDENCE: "low"}
+
+
+class _BrokenProviderAgentApp:
+    def invoke(self, state, config=None):
+        import httpx
+        from openai import APIConnectionError
+
+        raise APIConnectionError(request=httpx.Request("POST", "http://llm.invalid/v1"))
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-019 请求处理超时
+# ══════════════════════════════════════════════════════════════════════
+
+
+def test_tc019_qa_timeout_returns_504(qa_api, monkeypatch):
+    """TC-019：Agent 超过 api_request_timeout_seconds → 504，不返回部分答案。"""
+    qa_api["agent"] = _SleepyAgentApp()
+    monkeypatch.setattr(
+        "src.api.main.config", type("C", (), {"api_request_timeout_seconds": 0.05})
+    )
+
+    res = qa_api["client"].post(API_ROUTE_ASSISTANT_QA, json={"query": "货币基金风险"})
+
+    assert res.status_code == 504
+    assert "超时" in res.json()["detail"]
+
+
+# ══════════════════════════════════════════════════════════════════════
+# TC-020 LLM Provider 不可用
+# ══════════════════════════════════════════════════════════════════════
+
+
+def test_tc020_llm_provider_unavailable_returns_503(qa_api):
+    """TC-020：Agent 抛 APIConnectionError → 503 + 排查指引，而非 500。"""
+    qa_api["agent"] = _BrokenProviderAgentApp()
+
+    res = qa_api["client"].post(API_ROUTE_ASSISTANT_QA, json={"query": "货币基金风险"})
+
+    assert res.status_code == 503
+    detail = res.json()["detail"]
+    assert "LLM provider unavailable" in detail
+    assert "OPENAI_API_BASE" in detail or "Ollama" in detail
