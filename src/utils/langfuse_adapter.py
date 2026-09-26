@@ -390,7 +390,9 @@ class LangfuseAdapter:
     def _classify_failure(exc: BaseException) -> str:
         """将异常归类为 timeout/auth/exception 计数标签（尽力分类）。"""
         names = (type(exc).__name__ + " " + str(exc)).lower()
-        if "timeout" in names:
+        # "timed out" 是 stdlib socket / httpx 超时的常见措辞，类型名不含
+        # timeout（如 RuntimeError 包装）时靠消息命中
+        if "timeout" in names or "timed out" in names:
             return "timeout"
         if "auth" in names or "unauthorized" in names or "401" in names or "403" in names:
             return "auth"

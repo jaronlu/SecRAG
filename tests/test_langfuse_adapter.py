@@ -362,6 +362,8 @@ def test_failure_classification_labels():
     assert LangfuseAdapter._classify_failure(TimeoutError("x")) == "timeout"
     assert LangfuseAdapter._classify_failure(RuntimeError("HTTP 401 unauthorized")) == "auth"
     assert LangfuseAdapter._classify_failure(RuntimeError("boom")) == "exception"
+    # "timed out" 措辞（类型名不含 timeout，如 RuntimeError 包装）也命中 timeout
+    assert LangfuseAdapter._classify_failure(RuntimeError("request timed out")) == "timeout"
 
 
 # ─────────────────────────────── 采样 ───────────────────────────────
