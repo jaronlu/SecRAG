@@ -36,6 +36,13 @@ services:
       - TRANSFORMERS_CACHE=/data/hf_cache
       - APP_HOST=0.0.0.0
       - APP_PORT=8000
+      # Langfuse 观测配置透传（在 .env 中配置；显式声明便于按环境覆盖）
+      - LANGFUSE_ENABLED=${LANGFUSE_ENABLED:-false}
+      - LANGFUSE_HOST=${LANGFUSE_HOST:-https://cloud.langfuse.com}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+      - LANGFUSE_SAMPLE_RATE=${LANGFUSE_SAMPLE_RATE:-1.0}
+      - LANGFUSE_CAPTURE_CONTENT=${LANGFUSE_CAPTURE_CONTENT:-false}
     volumes:
       # 持久化数据：ChromaDB、SQLite、模型缓存
       - secrag_data:/data

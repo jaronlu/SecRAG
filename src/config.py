@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, SecretStr, model_validator
+from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from src.schemas.constants import (
@@ -32,6 +32,15 @@ class LLMConfig(BaseModel):
 
 class EmbeddingConfig(BaseModel):
     model: str
+
+
+class LangfuseConfig(BaseModel):
+    enabled: bool = False
+    host: str = "https://cloud.langfuse.com"
+    public_key: str = ""
+    secret_key: SecretStr = SecretStr("")
+    sample_rate: float = Field(default=1.0, ge=0.0, le=1.0)
+    capture_content: bool = False
 
 
 class Settings(BaseSettings):
@@ -78,10 +87,41 @@ class Settings(BaseSettings):
     audit_db_path: str = AUDIT_DB_PATH
     conversation_db_path: str = CONVERSATION_DB_PATH
 
+    # Langfuse — Agent/LLM 链路观测，默认关闭。职责边界：只观察链路元数据
+    # （耗时、token、模型调用）；权限/引用/合规审计仍在 SQLite，QPS/延迟/
+    # 错误率指标仍在 Prometheus。隐私红线：问题原文、模型回答、文档与 chunk
+    # 文本默认不进 payload；capture_content 仅供开发调试显式开启并经统一脱敏。
+    langfuse_enabled: bool = False
+    langfuse_host: str = "https://cloud.langfuse.com"
+    langfuse_public_key: str = ""
+    langfuse_secret_key: SecretStr = SecretStr("")
+    langfuse_sample_rate: float = Field(default=1.0, ge=0.0, le=1.0)
+    langfuse_capture_content: bool = False
+
     @model_validator(mode="after")
     def _check_openai_key(self):
         if self.llm_provider == LLM_PROVIDER_OPENAI and not self.openai_api_key:
             raise ValueError("OPENAI_API_KEY 未设置。请在 .env 文件中配置有效密钥")
+        return self
+
+    @model_validator(mode="after")
+    def _check_langfuse_config(self):
+        if not self.langfuse_enabled:
+            return self
+        missing = [
+            name
+            for name, value in (
+                ("LANGFUSE_HOST", self.langfuse_host),
+                ("LANGFUSE_PUBLIC_KEY", self.langfuse_public_key),
+                ("LANGFUSE_SECRET_KEY", self.langfuse_secret_key.get_secret_value()),
+            )
+            if not value
+        ]
+        if missing:
+            raise ValueError(
+                f"LANGFUSE_ENABLED=true 但 {'、'.join(missing)} 未设置。"
+                "请在 .env 文件中配置，或将 LANGFUSE_ENABLED 置为 false"
+            )
         return self
 
     @property
@@ -110,6 +150,17 @@ class Settings(BaseSettings):
     @property
     def embedding(self) -> EmbeddingConfig:
         return EmbeddingConfig(model=self.embedding_model)
+
+    @property
+    def langfuse(self) -> LangfuseConfig:
+        return LangfuseConfig(
+            enabled=self.langfuse_enabled,
+            host=self.langfuse_host,
+            public_key=self.langfuse_public_key,
+            secret_key=self.langfuse_secret_key,
+            sample_rate=self.langfuse_sample_rate,
+            capture_content=self.langfuse_capture_content,
+        )
 
 
 config = Settings()
