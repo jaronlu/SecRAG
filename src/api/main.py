@@ -51,6 +51,11 @@ from src.schemas.models import AuditEntry
 from src.schemas.typed_dicts import AnswerOutcome, AuditQuery, AuditReasoning, AuditResponse, AuditRetrieval
 from src.utils.rate_limit import check_rate_limit, get_rate_limit_key
 from src.utils.semantic_cache import get_semantic_cache
+from src.utils.langfuse_adapter import (
+    get_langfuse,
+    reset_current_trace,
+    set_current_trace,
+)
 from src.utils.metrics import get_metrics
 
 # 追踪日志记录器（结构化 JSON，可对接 ELK / Loki）
@@ -500,115 +505,142 @@ async def assistant_qa(
     # ensure_thread_for_qa 返回的 thread 保证含 thread_id（查找键或新建时赋值）
     thread_id = thread.get("thread_id", request.thread_id)
     turn_id = str(uuid.uuid4())
-    initial_state = build_assistant_initial_state(
-        request,
-        user,
-        thread_id=thread_id,
-        turn_id=turn_id,
-        turn_index=thread.get("turn_count", 0),
-    )
-
-    agent = _get_agent_app()
-    runnable_config: RunnableConfig = {
-        "configurable": {"thread_id": thread_id},
-        "recursion_limit": AGENT_RECURSION_LIMIT,
-    }
-
-    # P1-4: 语义缓存——查询前先查缓存，命中则直接返回。
-    # 缓存查询涉及 embedding 计算与全表扫描，放到线程池执行，
-    # 避免阻塞事件循环（issues.md 二.2）
-    cache = get_semantic_cache()
-    cache_hit = await asyncio.to_thread(cache.lookup, request.query, user.role)
-    if cache_hit:
-        audit_logger.info(
-            "Semantic cache hit: thread_id=%s similarity=%.4f",
-            thread_id, cache_hit["similarity"],
-        )
-        # P1-2: 命中路径补持久化审计事件（非阻塞，失败走 outbox）
-        await asyncio.to_thread(
-            _persist_cache_hit_audit_event, user, request, start_time, cache_hit
-        )
-        _record_metrics("success", is_cached=True)
-        # P1-1: 返回 store 时保存的终态合规快照，不再硬编码 passed=True
-        outcome = AnswerOutcome(
-            answer=cache_hit["answer"],
-            citations=cache_hit["citations"],
-            confidence=cache_hit["confidence"],
-            compliance=cache_hit["compliance"],
-        )
-        return _qa_response_from_outcome(outcome, thread_id, turn_id)
-
+    # request_id 显式生成后传入初始 state：Langfuse 根 trace 与 SQLite 审计
+    # （STATE_AUDIT_TRAIL.request_id）共用同一 id；trace metadata 只含
+    # request_id/thread_id，不携带任何用户身份信息（todo/TODO.md）
+    request_id = str(uuid.uuid4())
+    langfuse = get_langfuse()
+    trace = langfuse.start_request_trace(request_id, thread_id)
+    trace_token = set_current_trace(trace)
+    trace_status = "ok"
+    error_type: str | None = None
     try:
-        result = await asyncio.wait_for(
-            asyncio.to_thread(agent.invoke, initial_state, runnable_config),
-            timeout=config.api_request_timeout_seconds,
+        initial_state = build_assistant_initial_state(
+            request,
+            user,
+            thread_id=thread_id,
+            turn_id=turn_id,
+            turn_index=thread.get("turn_count", 0),
+            request_id=request_id,
         )
-    except asyncio.TimeoutError:
-        _record_metrics("timeout")
-        audit_logger.warning(
-            "Assistant QA timed out after %.1fs: thread_id=%s",
-            config.api_request_timeout_seconds,
-            thread_id,
-        )
-        raise HTTPException(
-            status_code=504,
-            detail=f"请求处理超时（{config.api_request_timeout_seconds:.0f}s），请简化问题或稍后重试。",
-        )
-    except Exception as exc:
-        if _is_provider_unavailable(exc):
-            _record_metrics("provider_unavailable")
+
+        agent = _get_agent_app()
+        runnable_config: RunnableConfig = {
+            "configurable": {"thread_id": thread_id},
+            "recursion_limit": AGENT_RECURSION_LIMIT,
+        }
+        # Langfuse：绑定根 trace 的 callback 经 RunnableConfig 传入 LangGraph，
+        # 覆盖节点内 llm.invoke / 工具调用；未启用或未采样时为 None，零感知
+        callback_handler = langfuse.get_callback_handler(trace)
+        if callback_handler is not None:
+            runnable_config["callbacks"] = [callback_handler]
+
+        # P1-4: 语义缓存——查询前先查缓存，命中则直接返回。
+        # 缓存查询涉及 embedding 计算与全表扫描，放到线程池执行，
+        # 避免阻塞事件循环（issues.md 二.2）
+        cache = get_semantic_cache()
+        cache_hit = await asyncio.to_thread(cache.lookup, request.query, user.role)
+        if cache_hit:
+            trace.update({"cache_hit": True})
+            audit_logger.info(
+                "Semantic cache hit: thread_id=%s similarity=%.4f",
+                thread_id, cache_hit["similarity"],
+            )
+            # P1-2: 命中路径补持久化审计事件（非阻塞，失败走 outbox）
+            await asyncio.to_thread(
+                _persist_cache_hit_audit_event, user, request, start_time, cache_hit
+            )
+            _record_metrics("success", is_cached=True)
+            # P1-1: 返回 store 时保存的终态合规快照，不再硬编码 passed=True
+            outcome = AnswerOutcome(
+                answer=cache_hit["answer"],
+                citations=cache_hit["citations"],
+                confidence=cache_hit["confidence"],
+                compliance=cache_hit["compliance"],
+            )
+            return _qa_response_from_outcome(outcome, thread_id, turn_id)
+
+        try:
+            result = await asyncio.wait_for(
+                asyncio.to_thread(agent.invoke, initial_state, runnable_config),
+                timeout=config.api_request_timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            trace_status = "error"
+            error_type = "timeout"
+            _record_metrics("timeout")
             audit_logger.warning(
-                "Assistant provider unavailable: thread_id=%s error=%s",
+                "Assistant QA timed out after %.1fs: thread_id=%s",
+                config.api_request_timeout_seconds,
                 thread_id,
-                exc.__class__.__name__,
             )
             raise HTTPException(
-                status_code=503,
-                detail=(
-                    "LLM provider unavailable. Check OPENAI_API_BASE, OPENAI_API_KEY, "
-                    "network/proxy settings, or start a local Ollama service and set "
-                    "LLM_PROVIDER=ollama."
-                ),
-            ) from exc
+                status_code=504,
+                detail=f"请求处理超时（{config.api_request_timeout_seconds:.0f}s），请简化问题或稍后重试。",
+            )
+        except Exception as exc:
+            trace_status = "error"
+            if _is_provider_unavailable(exc):
+                error_type = "provider_unavailable"
+                _record_metrics("provider_unavailable")
+                audit_logger.warning(
+                    "Assistant provider unavailable: thread_id=%s error=%s",
+                    thread_id,
+                    exc.__class__.__name__,
+                )
+                raise HTTPException(
+                    status_code=503,
+                    detail=(
+                        "LLM provider unavailable. Check OPENAI_API_BASE, OPENAI_API_KEY, "
+                        "network/proxy settings, or start a local Ollama service and set "
+                        "LLM_PROVIDER=ollama."
+                    ),
+                ) from exc
 
-        audit_logger.exception("Assistant QA failed: thread_id=%s", thread_id)
-        _record_metrics("error")
-        raise HTTPException(status_code=500, detail="内部处理错误") from exc
+            error_type = type(exc).__name__
+            audit_logger.exception("Assistant QA failed: thread_id=%s", thread_id)
+            _record_metrics("error")
+            raise HTTPException(status_code=500, detail="内部处理错误") from exc
 
-    # P1-4: 语义缓存——仅缓存验证与合规均通过的成功终态，避免把拒答/拦截结果
-    # 以"合规通过"语义缓存后再次返回（issues.md 一.1）
-    answer = result.get(STATE_FINAL_ANSWER, "")
-    compliance = result.get(STATE_COMPLIANCE, {})
-    verification = result.get(STATE_VERIFICATION, {})
-    if (
-        answer
-        and len(answer) > 10
-        and compliance.get("passed", False)
-        and verification.get("passed", False)
-    ):
-        await asyncio.to_thread(
-            cache.store,
-            query=request.query,
+        # P1-4: 语义缓存——仅缓存验证与合规均通过的成功终态，避免把拒答/拦截结果
+        # 以"合规通过"语义缓存后再次返回（issues.md 一.1）
+        answer = result.get(STATE_FINAL_ANSWER, "")
+        compliance = result.get(STATE_COMPLIANCE, {})
+        verification = result.get(STATE_VERIFICATION, {})
+        if (
+            answer
+            and len(answer) > 10
+            and compliance.get("passed", False)
+            and verification.get("passed", False)
+        ):
+            await asyncio.to_thread(
+                cache.store,
+                query=request.query,
+                answer=answer,
+                citations=result.get(STATE_CITATIONS, []),
+                confidence=result.get(STATE_CONFIDENCE, ""),
+                role=user.role,
+                compliance=compliance,
+                verification=verification,
+            )
+
+        _record_metrics("success")
+        outcome = AnswerOutcome(
             answer=answer,
-            citations=result.get(STATE_CITATIONS, []),
-            confidence=result.get(STATE_CONFIDENCE, ""),
-            role=user.role,
-            compliance=compliance,
-            verification=verification,
+            citations=result[STATE_CITATIONS],
+            confidence=result[STATE_CONFIDENCE],
+            compliance=result[STATE_COMPLIANCE],
         )
-
-    _record_metrics("success")
-    outcome = AnswerOutcome(
-        answer=answer,
-        citations=result[STATE_CITATIONS],
-        confidence=result[STATE_CONFIDENCE],
-        compliance=result[STATE_COMPLIANCE],
-    )
-    return _qa_response_from_outcome(
-        outcome,
-        result.get(STATE_THREAD_ID, thread_id),
-        result.get(STATE_TURN_ID, turn_id),
-    )
+        return _qa_response_from_outcome(
+            outcome,
+            result.get(STATE_THREAD_ID, thread_id),
+            result.get(STATE_TURN_ID, turn_id),
+        )
+    finally:
+        reset_current_trace(trace_token)
+        # 504 路径：to_thread 中的图线程不可取消、可能继续产生晚到 span；
+        # finish 只结束根 span、不等待子 span（_RequestTrace 晚到事件容忍）
+        trace.finish(status=trace_status, error_type=error_type)
 
 
 @app.post(API_ROUTE_ASSISTANT_QA_STREAM)
@@ -657,63 +689,100 @@ async def assistant_qa_stream(
 
         thread_id = thread.get("thread_id", request.thread_id)
         turn_id = str(uuid.uuid4())
-        initial_state = build_assistant_initial_state(
-            request,
-            user,
-            thread_id=thread_id,
-            turn_id=turn_id,
-            turn_index=thread.get("turn_count", 0),
-        )
-
-        agent = _get_agent_app()
-        runnable_config: RunnableConfig = {
-            "configurable": {"thread_id": thread_id},
-            "recursion_limit": AGENT_RECURSION_LIMIT,
-        }
-        # 进度节点集合由图模块声明，传输层不解释节点语义
-        from src.agents.graph import CLIENT_PROGRESS_NODES
-
+        # request_id 显式生成后传入初始 state：Langfuse 根 trace 与 SQLite 审计
+        # 共用同一 id；metadata 只含 request_id/thread_id，无用户身份信息
+        request_id = str(uuid.uuid4())
+        langfuse = get_langfuse()
+        trace = langfuse.start_request_trace(request_id, thread_id)
+        trace_token = set_current_trace(trace)
+        trace_status = "ok"
+        error_type: str | None = None
         try:
-            # 流式获取每个节点的状态更新；整条流受请求级总超时约束
-            #（issues.md 一.8：SSE 此前没有总超时包装）
-            async with asyncio.timeout(config.api_request_timeout_seconds):
-                async for state_update in agent.astream(
-                    initial_state, runnable_config, stream_mode="updates"
-                ):
-                    for node_name, node_output in state_update.items():
-                        if not isinstance(node_output, dict):
-                            continue
-                        # 只发送图模块声明的客户端可见节点进度，避免事件过多
-                        if node_name in CLIENT_PROGRESS_NODES:
-                            yield (
-                                "event: progress\n"
-                                f"data: {json.dumps({'type': 'progress', 'node': node_name, 'status': 'done'}, ensure_ascii=False)}\n\n"
-                            )
-                        # 终态以节点声明的 terminal 标记 + final_answer 为准，
-                        # 不按节点名推断；ReAct 尝试的中间 final_answer 不带标记，
-                        # 新增终态路径（拒答/澄清等）按契约声明 STATE_TERMINAL 即自动生效
-                        if node_output.get(STATE_TERMINAL) and STATE_FINAL_ANSWER in node_output:
-                            answer_data = json.dumps({
-                                "type": "answer",
-                                "answer": node_output[STATE_FINAL_ANSWER],
-                                "citations": node_output.get(STATE_CITATIONS, []),
-                                "confidence": node_output.get(STATE_CONFIDENCE, "unknown"),
-                                "thread_id": thread_id,
-                                "turn_id": turn_id,
-                            }, ensure_ascii=False)
-                            yield f"event: answer\ndata: {answer_data}\n\n"
-        except asyncio.TimeoutError:
-            yield (
-                "event: error\n"
-                f"data: {json.dumps({'type': 'error', 'detail': '请求处理超时'}, ensure_ascii=False)}\n\n"
-            )
-        except Exception as exc:
-            yield (
-                "event: error\n"
-                f"data: {json.dumps({'type': 'error', 'detail': str(exc)[:200]}, ensure_ascii=False)}\n\n"
+            initial_state = build_assistant_initial_state(
+                request,
+                user,
+                thread_id=thread_id,
+                turn_id=turn_id,
+                turn_index=thread.get("turn_count", 0),
+                request_id=request_id,
             )
 
-        yield f"event: done\ndata: {json.dumps({'type': 'done'})}\n\n"
+            agent = _get_agent_app()
+            runnable_config: RunnableConfig = {
+                "configurable": {"thread_id": thread_id},
+                "recursion_limit": AGENT_RECURSION_LIMIT,
+            }
+            # Langfuse：绑定根 trace 的 callback 经 RunnableConfig 传入 LangGraph
+            callback_handler = langfuse.get_callback_handler(trace)
+            if callback_handler is not None:
+                runnable_config["callbacks"] = [callback_handler]
+            # 进度节点集合由图模块声明，传输层不解释节点语义
+            from src.agents.graph import CLIENT_PROGRESS_NODES
+
+            try:
+                # 流式获取每个节点的状态更新；整条流受请求级总超时约束
+                #（issues.md 一.8：SSE 此前没有总超时包装）
+                async with asyncio.timeout(config.api_request_timeout_seconds):
+                    async for state_update in agent.astream(
+                        initial_state, runnable_config, stream_mode="updates"
+                    ):
+                        for node_name, node_output in state_update.items():
+                            if not isinstance(node_output, dict):
+                                continue
+                            # 只发送图模块声明的客户端可见节点进度，避免事件过多
+                            if node_name in CLIENT_PROGRESS_NODES:
+                                yield (
+                                    "event: progress\n"
+                                    f"data: {json.dumps({'type': 'progress', 'node': node_name, 'status': 'done'}, ensure_ascii=False)}\n\n"
+                                )
+                            # 终态以节点声明的 terminal 标记 + final_answer 为准，
+                            # 不按节点名推断；ReAct 尝试的中间 final_answer 不带标记，
+                            # 新增终态路径（拒答/澄清等）按契约声明 STATE_TERMINAL 即自动生效
+                            if node_output.get(STATE_TERMINAL) and STATE_FINAL_ANSWER in node_output:
+                                answer_data = json.dumps({
+                                    "type": "answer",
+                                    "answer": node_output[STATE_FINAL_ANSWER],
+                                    "citations": node_output.get(STATE_CITATIONS, []),
+                                    "confidence": node_output.get(STATE_CONFIDENCE, "unknown"),
+                                    "thread_id": thread_id,
+                                    "turn_id": turn_id,
+                                }, ensure_ascii=False)
+                                yield f"event: answer\ndata: {answer_data}\n\n"
+            except asyncio.TimeoutError:
+                trace_status = "error"
+                error_type = "timeout"
+                yield (
+                    "event: error\n"
+                    f"data: {json.dumps({'type': 'error', 'detail': '请求处理超时'}, ensure_ascii=False)}\n\n"
+                )
+            except Exception as exc:
+                trace_status = "error"
+                error_type = type(exc).__name__
+                yield (
+                    "event: error\n"
+                    f"data: {json.dumps({'type': 'error', 'detail': str(exc)[:200]}, ensure_ascii=False)}\n\n"
+                )
+
+            yield f"event: done\ndata: {json.dumps({'type': 'done'})}\n\n"
+        except GeneratorExit:
+            # 客户端断连：generator 在 yield 点被关闭，done 不会发出，
+            # trace 必须在此收尾（不能依赖 done 事件路径）
+            trace_status = "error"
+            error_type = "client_disconnected"
+            raise
+        except asyncio.CancelledError:
+            # 请求任务被取消（断连的另一形态）：同样不是 done 路径
+            trace_status = "error"
+            error_type = "cancelled"
+            raise
+        except Exception as exc:
+            # 图执行前的准备阶段异常（原样上抛，与既有行为一致）
+            trace_status = "error"
+            error_type = type(exc).__name__
+            raise
+        finally:
+            reset_current_trace(trace_token)
+            trace.finish(status=trace_status, error_type=error_type)
 
     return StreamingResponse(
         event_generator(),

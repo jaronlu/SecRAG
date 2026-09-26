@@ -33,6 +33,7 @@ from src.agents.nodes import (
 )
 from src.agents.state import AssistantState
 from src.agents.tools import tools
+from src.config import config
 from src.schemas.constants import (
     CONFIDENCE_HIGH_MIN_RESULTS,
     DEFAULT_MAX_HOPS,
@@ -42,11 +43,13 @@ from src.schemas.constants import (
     STATE_INTERMEDIATE_STEPS,
     STATE_REASON_ATTEMPTS,
     STATE_RETRIEVAL_ATTEMPTS,
+    STATE_RETRIEVAL_FILTERED_CHUNKS,
     STATE_RETRIEVAL_RESULTS,
     STATE_RERANKER_STATUS,
     STATE_VERIFICATION,
 )
 from src.schemas.typed_dicts import IntermediateStep
+from src.utils.langfuse_adapter import start_node_span
 
 
 logger = logging.getLogger(__name__)
@@ -82,6 +85,50 @@ def _node_execution_succeeded(result: dict[str, Any]) -> bool:
     return True
 
 
+def _node_span_metadata(
+    name: str,
+    state: AssistantState,
+    result: dict[str, Any],
+) -> dict[str, Any]:
+    """按节点提取 Langfuse span 的白名单 metadata（adapter 过滤兜底）。
+
+    只放标量业务结果：模型名、检索数量、重试次数、验证/合规结果；
+    查询词、文档内容、引用原文、回答原文一律不入 payload（todo/TODO.md）。
+    """
+    metadata: dict[str, Any] = {"node_name": name}
+    if name == "retrieve":
+        # 本轮新增 chunk 数 = 累计结果 - 进入节点前的结果
+        before = len(state.get(STATE_RETRIEVAL_RESULTS, []) or [])
+        after = len(result.get(STATE_RETRIEVAL_RESULTS, []) or [])
+        metadata["retrieval_count"] = max(after - before, 0)
+        # 多跳重试次数：本轮结束后的检索轮次（1 = 首轮）
+        metadata["retry_count"] = result.get(STATE_RETRIEVAL_ATTEMPTS, 0)
+    elif name == "grade_and_filter":
+        metadata["retrieval_count"] = result.get(STATE_RETRIEVAL_FILTERED_CHUNKS, 0)
+    elif name in ("verify", "permission_denied_response"):
+        verification = result.get(STATE_VERIFICATION, {})
+        metadata["verification_status"] = (
+            "passed" if verification.get("passed") else "failed"
+        )
+    elif name == "compliance_check":
+        compliance = result.get(STATE_COMPLIANCE, {})
+        metadata["compliance_status"] = (
+            "passed" if compliance.get("passed") else "blocked"
+        )
+    elif name == "compose":
+        # 终态编排：验证/合规结果取自 state（含被安全文案降级的终局）
+        metadata["verification_status"] = (
+            "passed" if state.get(STATE_VERIFICATION, {}).get("passed") else "failed"
+        )
+        metadata["compliance_status"] = (
+            "passed" if state.get(STATE_COMPLIANCE, {}).get("passed") else "blocked"
+        )
+    elif name in ("query_understand", "planner"):
+        # LLM 调用节点：模型名来自全局配置（节点共享同一 LLM 实例）
+        metadata["model_name"] = config.llm.model
+    return metadata
+
+
 def _traced_node(
     name: str,
     node: _AgentNode,
@@ -90,23 +137,43 @@ def _traced_node(
 
     节点抛异常时 state 更新会被 LangGraph 丢弃，无法在 intermediate_steps
     里留下 success=False 记录，只能记入应用日志后原样抛出。
+
+    同一包装器内创建 Langfuse 节点 span（未启用/未采样时为 no-op），
+    避免逐节点重复插桩；ReAct 子图节点在 nodes.py 内手动补 span。
     """
 
     def wrapped(state: AssistantState) -> dict[str, Any]:
         started = time.perf_counter()
+        span = start_node_span(name, metadata={"node_name": name})
         try:
             result = node(state)
-        except Exception:
+        except Exception as exc:
+            span.finish(
+                status="error",
+                error_type=type(exc).__name__,
+                metadata={"duration_ms": max((time.perf_counter() - started) * 1000, 0.0)},
+            )
             logger.exception(
                 "Node %s raised after %.1f ms",
                 name,
                 max((time.perf_counter() - started) * 1000, 0.0),
             )
             raise
+        duration_ms = max((time.perf_counter() - started) * 1000, 0.0)
+        succeeded = _node_execution_succeeded(result)
+        span_metadata = _node_span_metadata(name, state, result)
+        span_metadata["duration_ms"] = duration_ms
+        # 重排 error 降级是显式执行失败（见 _node_execution_succeeded），
+        # span 状态与之对齐；固定标签，不透出异常消息内容
+        span.finish(
+            status="ok" if succeeded else "error",
+            error_type=None if succeeded else "reranker_error",
+            metadata=span_metadata,
+        )
         step: IntermediateStep = {
             "step": name,
-            "duration_ms": max((time.perf_counter() - started) * 1000, 0.0),
-            "success": _node_execution_succeeded(result),
+            "duration_ms": duration_ms,
+            "success": succeeded,
         }
         return {
             **result,

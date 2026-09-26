@@ -38,10 +38,18 @@
 client 调用均按并发场景设计；``mask_otel_spans`` / ``should_export_span``
 在 SDK 批处理线程上运行，保持确定性、无请求局部依赖（types.py 对
 ``MaskOtelSpansFunction`` 的约束）。
+
+节点 span 传播：API 入口经 ``set_current_trace`` 把根 trace 挂到
+contextvar，节点侧用 ``start_node_span`` 取当前 trace 建 span。传播依赖
+Python 上下文语义：``asyncio.to_thread`` 复制调用方 context（已验证），
+LangGraph 的 astream 内部 task 亦复制创建时的 context（已验证）；工具
+线程池 executor.submit 不复制 context，但工具 span 在
+``authorize_reason_tool_call``（图线程内）创建，不受影响。
 """
 
 from __future__ import annotations
 
+import contextvars
 import logging
 import random
 import threading
@@ -74,6 +82,7 @@ class LangfuseTraceMetadata(TypedDict, total=False):
     total_tokens: int
     retry_count: int
     retrieval_count: int
+    cache_hit: bool
     verification_status: str
     compliance_status: str
     status: str
@@ -621,6 +630,42 @@ class LangfuseAdapter:
             self._client.flush()
         except Exception as exc:
             self._record_export_failure(exc)
+
+
+# ── 节点侧传播（API 入口 set，LangGraph 节点 get） ──────────────────
+
+# 当前请求的根 trace。API 入口在创建根 trace 后 set，请求结束 finally reset；
+# asyncio.to_thread / LangGraph astream 内部 task 复制 context（模块 docstring），
+# 因此节点函数、_traced_node 包装器可直接读取，无需改动 state 或节点签名。
+_current_trace: contextvars.ContextVar[_RequestTrace | None] = contextvars.ContextVar(
+    "secrag_langfuse_current_trace", default=None
+)
+
+
+def set_current_trace(trace: _RequestTrace) -> contextvars.Token[_RequestTrace | None]:
+    """在当前 context 绑定请求根 trace；返回 Token 供 finally 里 reset。"""
+    return _current_trace.set(trace)
+
+
+def reset_current_trace(token: contextvars.Token[_RequestTrace | None]) -> None:
+    """恢复 contextvar 绑定；由 API 入口在请求收尾调用。"""
+    _current_trace.reset(token)
+
+
+def start_node_span(
+    name: str,
+    *,
+    metadata: Mapping[str, Any] | None = None,
+) -> _LangfuseSpanHandle:
+    """在当前请求 trace 下创建节点/工具 span；无活跃 trace 时返回 no-op 句柄。
+
+    metadata 仍走 ``filter_metadata`` 白名单；调用方在 ``finish`` 时补充
+    耗时等白名单字段。所有路径 fail-open，绝不影响业务执行。
+    """
+    trace = _current_trace.get()
+    if trace is None:
+        return _LangfuseSpanHandle(None, None, None)
+    return trace.start_span(name, metadata=metadata)
 
 
 # 全局单例——与 metrics.get_metrics 相同的双重检查锁模式

@@ -108,6 +108,7 @@ from src.utils.compliance import (
     matches_investment_advice,
 )
 from src.utils.dates import parse_date_day
+from src.utils.langfuse_adapter import start_node_span
 from src.utils.verifier import CitationExtractor, ComprehensiveVerifier
 
 
@@ -179,6 +180,27 @@ def _request_deadline_exceeded(state: AssistantState) -> bool:
     而不是让图继续调用模型或工具。"""
     deadline = state.get(STATE_REQUEST_DEADLINE)
     return deadline is not None and time.monotonic() > float(deadline)
+
+
+def _llm_usage_metadata(response: Any) -> dict[str, Any]:
+    """从 LLM 响应提取白名单 token 计量；provider 未返回用量时为空 dict。
+
+    只读 langchain 标准 ``usage_metadata``，字段缺失或类型不符时跳过；
+    token 计数是聚合标量，不涉及提示词/回答内容。
+    """
+    usage = getattr(response, "usage_metadata", None)
+    if not isinstance(usage, dict):
+        return {}
+    metadata: dict[str, Any] = {}
+    for source_key, target_key in (
+        ("input_tokens", "prompt_tokens"),
+        ("output_tokens", "completion_tokens"),
+        ("total_tokens", "total_tokens"),
+    ):
+        value = usage.get(source_key)
+        if isinstance(value, int) and not isinstance(value, bool):
+            metadata[target_key] = value
+    return metadata
 
 
 def _time_range_to_filters(time_range: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -970,12 +992,36 @@ def call_reason_model(state: AssistantState) -> dict[str, Any]:
     if _request_deadline_exceeded(state):
         return {STATE_MESSAGES: [AIMessage(content="请求处理已超时，本轮生成已停止。")]}
     bound_model = _get_bound_reason_model(role, _excluded_retrieval_sources(state))
-    response = bound_model.invoke([
-        SystemMessage(content=_build_reason_system_prompt(state)),
-        *attempt_messages,
-    ])
-    if not isinstance(response, AIMessage):
-        raise TypeError("ReAct 模型必须返回 AIMessage")
+    started = time.perf_counter()
+    # Langfuse LLM span：metadata 只含模型名/耗时/token/尝试序号；
+    # 系统提示词、检索证据与用户问题原文不进 payload（todo/TODO.md）
+    span = start_node_span(
+        "call_reason_model",
+        metadata={
+            "node_name": "call_reason_model",
+            "model_name": config.llm.model,
+            # 当前 ReAct 尝试序号（1 = 首次；验证失败重推时 >1）
+            "retry_count": state.get(STATE_REASON_ATTEMPTS, 0),
+        },
+    )
+    try:
+        response = bound_model.invoke([
+            SystemMessage(content=_build_reason_system_prompt(state)),
+            *attempt_messages,
+        ])
+        if not isinstance(response, AIMessage):
+            raise TypeError("ReAct 模型必须返回 AIMessage")
+    except Exception as exc:
+        span.finish(
+            status="error",
+            error_type=type(exc).__name__,
+            metadata={"duration_ms": max((time.perf_counter() - started) * 1000, 0.0)},
+        )
+        raise
+    span.finish(metadata={
+        "duration_ms": max((time.perf_counter() - started) * 1000, 0.0),
+        **_llm_usage_metadata(response),
+    })
     return {STATE_MESSAGES: [response]}
 
 
@@ -1022,14 +1068,23 @@ def authorize_reason_tool_call(
     # 超时保护：线程中执行，超时立即返回错误。
     # 不能用 with 上下文管理 executor——__exit__ 会 join 残留线程，
     # 使实际等待时间被拉长为任务耗时而非超时上限（issues.md 一.8）
+    started = time.perf_counter()
+    # 工具 span 在权限/截止时间/熔断校验之后创建：未授权调用不产生任何
+    # 观测数据；span 名为工具名，metadata 只含耗时与结果状态，工具原始
+    # 参数与输出一律不进 payload（todo/TODO.md）
+    tool_span = start_node_span(tool_name, metadata={"node_name": tool_name})
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     _tool_executors.add(executor)
     try:
         future = executor.submit(execute, request)
         result = future.result(timeout=TOOL_TIMEOUT_SECONDS)
-        return result
     except concurrent.futures.TimeoutError:
         _tool_circuit_breaker[tool_name] = time.time()
+        tool_span.finish(
+            status="error",
+            error_type="timeout",
+            metadata={"duration_ms": max((time.perf_counter() - started) * 1000, 0.0)},
+        )
         return ToolMessage(
             content=f"工具 {tool_name} 调用超时（{TOOL_TIMEOUT_SECONDS:.0f}s），已暂时熔断。",
             name=tool_name,
@@ -1038,12 +1093,25 @@ def authorize_reason_tool_call(
         )
     except Exception as exc:
         _tool_circuit_breaker[tool_name] = time.time()
+        tool_span.finish(
+            status="error",
+            error_type=type(exc).__name__,
+            metadata={"duration_ms": max((time.perf_counter() - started) * 1000, 0.0)},
+        )
         return ToolMessage(
             content=f"工具 {tool_name} 调用失败: {exc}",
             name=tool_name,
             tool_call_id=tool_call_id,
             status="error",
         )
+    else:
+        # 工具自身返回 status="error" 的 ToolMessage 同样按失败记录
+        tool_success = isinstance(result, ToolMessage) and result.status != "error"
+        tool_span.finish(
+            status="ok" if tool_success else "error",
+            metadata={"duration_ms": max((time.perf_counter() - started) * 1000, 0.0)},
+        )
+        return result
     finally:
         # 立即释放调用方等待；残留任务无法强制终止，但不再阻塞本轮请求
         executor.shutdown(wait=False, cancel_futures=True)
