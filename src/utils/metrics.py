@@ -19,6 +19,8 @@
 - secrag_verification_failed_total: 验证失败数
 - secrag_compliance_blocked_total: 合规拦截数
 - secrag_active_requests: 当前活跃请求数（Gauge）
+- secrag_langfuse_dropped_total: Langfuse adapter 丢弃的 trace/span（按 reason）
+- secrag_langfuse_export_errors_total: Langfuse 客户端操作失败数（按 reason）
 """
 
 from __future__ import annotations
@@ -268,6 +270,18 @@ class MetricsRegistry:
         self.compliance_blocked_total = Counter(
             "secrag_compliance_blocked_total",
             "Total number of queries blocked by compliance check",
+        )
+
+        # Langfuse 观测链路指标——只计数，不参与业务判定（fail-open）
+        self.langfuse_dropped_total = Counter(
+            "secrag_langfuse_dropped_total",
+            "Traces/spans dropped by the Langfuse adapter",
+            labels=["reason"],
+        )
+        self.langfuse_export_errors_total = Counter(
+            "secrag_langfuse_export_errors_total",
+            "Langfuse client operation failures seen by the adapter",
+            labels=["reason"],
         )
 
         # 注册所有指标
