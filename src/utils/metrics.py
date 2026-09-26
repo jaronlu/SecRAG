@@ -280,7 +280,7 @@ class MetricsRegistry:
         )
         self.langfuse_export_errors_total = Counter(
             "secrag_langfuse_export_errors_total",
-            "Langfuse client operation failures seen by the adapter",
+            "Langfuse failures seen by the adapter or the OTLP export pipeline",
             labels=["reason"],
         )
 

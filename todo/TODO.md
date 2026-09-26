@@ -49,11 +49,11 @@
 - [ ] 先确认真实环境的数据驻留、网络出口和密钥管理要求。
 - [x] 明确 trace metadata 的允许字段白名单，禁止通过“新增字段”绕过脱敏策略。
   已落地：`LangfuseTraceMetadata` 白名单（TypedDict）+ `filter_metadata` 标量过滤，
-  见 `src/utils/langfuse_adapter.py:72-92` 与 `src/utils/langfuse_adapter.py:421`；
+  见 `src/utils/langfuse_adapter.py:84-105` 与 `src/utils/langfuse_adapter.py:514`；
   未登记的键在入口即丢弃，新增字段必须修改 adapter 源码才能通过。
 - [x] 明确采样策略：开发环境可全量，生产环境按比例采样并保留错误请求。
   已落地：`LANGFUSE_SAMPLE_RATE` 在 adapter 请求边界做头部采样，错误请求不参与采样、
-  未采样的失败请求在收尾时补建错误 trace，见 `src/utils/langfuse_adapter.py:445` 与
-  `src/utils/langfuse_adapter.py:525`；SDK 采样固定 1.0，采样决策集中在 adapter。
+  未采样的失败请求在收尾时补建错误 trace，见 `src/utils/langfuse_adapter.py:538` 与
+  `src/utils/langfuse_adapter.py:688`；SDK 采样固定 1.0，采样决策集中在 adapter。
 
 记录日期：2026-09-24

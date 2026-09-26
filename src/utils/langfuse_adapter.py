@@ -16,12 +16,23 @@
    的 ``mask`` 只作用于 SDK API 写入的数据（client.py:220）。因此统一在
    ``mask_otel_spans`` 导出层兜底——它对该 client 导出的每个 span 生效
    （span_exporter.py:120-121），默认删除内容属性；仅当开发环境显式开启
-   ``LANGFUSE_CAPTURE_CONTENT`` 时改为经 ``redact_pii`` 脱敏后保留。
+   ``LANGFUSE_CAPTURE_CONTENT`` 时改为经 ``redact_pii`` 脱敏后保留。内容属性
+   集合还须覆盖 ``langfuse.observation.status_message``：handler 的错误回调
+   （on_llm/chain/tool/retriever_error）把 ``str(error)`` 原文整段写入该属性，
+   provider 4xx 响应体可能回显请求内容片段。
+3. 媒体预上传关闭：SDK 导出管线先做媒体预上传、后执行 mask
+   （span_exporter.export 先 ``_process_media_attributes`` 再
+   ``_apply_mask_otel_spans``），属性值形如 base64 data-URI 或内联媒体 dict
+   时内容会先进入 blob 上传队列，删除发生在内容已离开进程之后。本 adapter
+   从不上送媒体，构造 client 前以 ``LANGFUSE_MEDIA_UPLOAD_ENABLED=false``
+   无条件关闭（见 ``_disable_langfuse_media_upload``）。
 
 可靠性红线（fail-open）：Langfuse 未配置、初始化失败、超时、鉴权失败、
 写入异常时，业务链路照常完成；错误只写本地日志和
 ``secrag_langfuse_export_errors_total`` / ``secrag_langfuse_dropped_total``
-计数，绝不抛进业务路径。
+计数，绝不抛进业务路径。export 阶段（OTLP 批处理线程内部消化、不抛出到
+adapter）的失败由 OTLP exporter 日志钩子（``_OtelExportFailureLogHandler``）
+转入同一本地告警与计数。
 
 采样：``LANGFUSE_SAMPLE_RATE`` 在 adapter 请求边界做头部采样；被采样掉的
 请求不创建任何 span。错误请求的 trace 必须保留：
@@ -51,6 +62,7 @@ from __future__ import annotations
 
 import contextvars
 import logging
+import os
 import random
 import threading
 from collections import OrderedDict
@@ -92,13 +104,22 @@ class LangfuseTraceMetadata(TypedDict, total=False):
 _METADATA_WHITELIST = frozenset(LangfuseTraceMetadata.__annotations__)
 
 # 内容属性：langchain handler 与 SDK API 写入的原文都落在这些键上
-# （attributes.py:35-44）；gen_ai.* 是 OTel 生成式 AI 语义约定的兜底前缀。
+# （langfuse 4.15.6 attributes.py:35-44）；observation.status_message 是 handler
+# 错误回调整段写入异常原文的位置（_get_error_level_and_status_message 返回
+# str(error)），一并纳入删除集合；gen_ai.* 前缀与其余 gen_ai 消息/工具原文键
+# （SDK 媒体键集合将其视为内容）是 OTel 生成式 AI 语义约定的兜底覆盖。
 _CONTENT_ATTRIBUTE_KEYS = frozenset(
     {
         "langfuse.trace.input",
         "langfuse.trace.output",
         "langfuse.observation.input",
         "langfuse.observation.output",
+        "langfuse.observation.status_message",
+        "gen_ai.input.messages",
+        "gen_ai.output.messages",
+        "gen_ai.system_instructions",
+        "gen_ai.tool.call.arguments",
+        "gen_ai.tool.call.result",
     }
 )
 _CONTENT_ATTRIBUTE_PREFIXES = ("gen_ai.prompt.", "gen_ai.completion.", "gen_ai.request.")
@@ -110,6 +131,22 @@ _TRACE_REGISTRY_MAX = 4096
 
 def _is_content_attribute(key: str) -> bool:
     return key in _CONTENT_ATTRIBUTE_KEYS or key.startswith(_CONTENT_ATTRIBUTE_PREFIXES)
+
+
+def _disable_langfuse_media_upload() -> None:
+    """关闭 SDK 媒体预上传（进程级，必须在构造 client 前调用）。
+
+    锁定版本 langfuse 4.15.6 的导出管线先做媒体预上传、后执行
+    ``mask_otel_spans``（span_exporter.export 先 ``_process_media_attributes``
+    再 ``_apply_mask_otel_spans``；``_process_media_string`` 对 base64 data-URI
+    与 JSON 内联媒体调用 media_manager 入上传队列）。若不关闭，任何形如媒体的
+    内容会先离开进程（blob 上传），随后 mask 才删除属性——违反"默认不离开
+    进程"红线。本 adapter 的内容属性默认删除（或开发环境脱敏保留），从不刻意
+    上送媒体，媒体预上传只构成泄漏路径，因此无条件关闭；``MediaManager`` 在
+    client 资源初始化时读取该环境变量（resource_manager.py:324），构造后再设置
+    无效。
+    """
+    os.environ["LANGFUSE_MEDIA_UPLOAD_ENABLED"] = "false"
 
 
 def is_valid_langfuse_host(host: str) -> bool:
@@ -296,6 +333,47 @@ class _RequestTrace:
         )
 
 
+# 锁定版本 opentelemetry OTLPSpanExporter 的导出失败只写自身 logger
+# （"Failed to export span batch ..."，__init__.py:217/:236）并返回 FAILURE，
+# 异常不会抛进 adapter 的 try/except——挂日志钩子才能让
+# secrag_langfuse_export_errors_total 覆盖"Langfuse 服务不可用"的主要场景
+# （网络超时、401/403、连接拒绝）。
+_OTEL_EXPORTER_LOGGER_NAME = "opentelemetry.exporter.otlp.proto.http.trace_exporter"
+
+
+class _OtelExportFailureLogHandler(logging.Handler):
+    """把 OTLP exporter 的导出失败日志转成本地告警 + Prometheus 计数。
+
+    对该 logger 的 ERROR 记录做尽力分类（消息含 401/403/unauthorized → auth；
+    timeout/timed out → timeout；其余 → exception）后计入
+    ``secrag_langfuse_export_errors_total``，并以 ``secrag.langfuse`` 名义重发
+    本地 warning。emit 绝不上抛——观测自身失败只降级。adapter 为进程级单例，
+    每个 client 实例只挂一个 handler，避免重复计数。
+    """
+
+    def __init__(self, metrics: MetricsRegistry) -> None:
+        super().__init__(level=logging.ERROR)
+        self._metrics = metrics
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            message = record.getMessage()
+            reason = self._classify(message)
+            self._metrics.langfuse_export_errors_total.inc(labels={"reason": reason})
+            logger.warning("Langfuse export 失败（业务不受影响）：%s", message)
+        except Exception:  # pragma: no cover - 指标自身绝不影响业务
+            logger.debug("langfuse export failure metric inc failed", exc_info=True)
+
+    @staticmethod
+    def _classify(message: str) -> str:
+        lowered = message.lower()
+        if "401" in lowered or "403" in lowered or "unauthorized" in lowered:
+            return "auth"
+        if "timeout" in lowered or "timed out" in lowered:
+            return "timeout"
+        return "exception"
+
+
 class LangfuseAdapter:
     """Langfuse client、根 trace、节点 span 与 LangChain callback 的统一封装。
 
@@ -368,10 +446,13 @@ class LangfuseAdapter:
 
     def _init_client(self) -> Any | None:
         """构造 Langfuse client。SDK 采样固定 1.0，采样决策集中在 adapter。"""
+        # 媒体预上传先于 mask 执行（见 _disable_langfuse_media_upload），
+        # 必须在 client 资源初始化前关闭。
+        _disable_langfuse_media_upload()
         try:
             from langfuse import Langfuse as LangfuseClient
 
-            return LangfuseClient(
+            client = LangfuseClient(
                 public_key=self._cfg.public_key,
                 secret_key=self._cfg.secret_key.get_secret_value(),
                 host=self._cfg.host,
@@ -385,6 +466,19 @@ class LangfuseAdapter:
             self._record_export_failure(exc)
             logger.error("Langfuse client 初始化失败，Langfuse 已禁用：%s", exc)
             return None
+        self._attach_export_failure_log_handler()
+        return client
+
+    def _attach_export_failure_log_handler(self) -> None:
+        """把 OTLP exporter 日志钩子接到本 adapter 的指标上（fail-open）。"""
+        try:
+            self._export_log_handler = _OtelExportFailureLogHandler(self._metrics)
+            logging.getLogger(_OTEL_EXPORTER_LOGGER_NAME).addHandler(
+                self._export_log_handler
+            )
+        except Exception:  # pragma: no cover - 观测自身绝不影响业务
+            logger.debug("langfuse export log hook attach failed", exc_info=True)
+
 
     @staticmethod
     def _classify_failure(exc: BaseException) -> str:

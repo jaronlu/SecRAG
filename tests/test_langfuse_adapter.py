@@ -7,6 +7,8 @@ fake 代替；锁定版 langfuse.types 的 patch 类型用真实定义以校验�
 
 from __future__ import annotations
 
+import logging
+import os
 import uuid
 from types import SimpleNamespace
 from typing import Any
@@ -18,6 +20,9 @@ from src.utils.langfuse_adapter import (
     ERROR_TRACE_NAME,
     ROOT_TRACE_NAME,
     LangfuseAdapter,
+    _CONTENT_ATTRIBUTE_KEYS,
+    _CONTENT_ATTRIBUTE_PREFIXES,
+    _OTEL_EXPORTER_LOGGER_NAME,
     _is_content_attribute,
     get_langfuse,
     is_valid_langfuse_host,
@@ -234,8 +239,203 @@ def test_sanitize_text_redacts_pii():
 def test_is_content_attribute_matches_langfuse_and_genai_keys():
     assert _is_content_attribute("langfuse.observation.input")
     assert _is_content_attribute("langfuse.trace.output")
+    assert _is_content_attribute("langfuse.observation.status_message")
+    assert _is_content_attribute("gen_ai.input.messages")
     assert not _is_content_attribute("langfuse.observation.model.name")
     assert not _is_content_attribute("langfuse.observation.metadata.request_id")
+
+
+def test_mask_deletes_error_status_message_by_default():
+    """langchain handler 的错误回调把异常原文整段写入 status_message 属性
+    （_get_error_level_and_status_message 返回 str(error)），provider 4xx 响应体
+    可能回显请求内容片段——默认必须整段删除；capture_content 下经脱敏保留。"""
+    exception_message = (
+        "Error code: 400 - {'error': {'message': '问题原文 客户 13812345678'}}"
+    )
+    span = SimpleNamespace(
+        attributes={"langfuse.observation.status_message": exception_message}
+    )
+    params = SimpleNamespace(spans={("t", "s"): span})
+
+    adapter, _ = _adapter(_enabled_cfg())
+    result = adapter._mask_otel_spans(params=params)
+
+    patch = result.span_patches[("t", "s")]
+    assert patch.delete_attributes == ("langfuse.observation.status_message",)
+    assert patch.set_attributes == {}
+
+    capture_adapter, _ = _adapter(_enabled_cfg(capture_content=True))
+    capture_result = capture_adapter._mask_otel_spans(params=params)
+    kept = capture_result.span_patches[("t", "s")].set_attributes[
+        "langfuse.observation.status_message"
+    ]
+    assert "13812345678" not in kept  # PII 必须被 redact_pii 替换
+
+
+def test_mask_set_covers_all_sdk_registered_free_text_keys():
+    """mask 删除集合完备性回归网：对照锁定版本 SDK 的真实属性注册表。
+
+    1. SDK 注册的 langfuse.* 自由文本键（trace/observation input/output、
+       observation.status_message）必须全部被默认删除；
+    2. SDK 媒体键集合中的 gen_ai.* 内容键必须被删除集合或前缀覆盖；
+    3. 其余 SDK 注册键必须显式登记在 reviewed-keep 清单——SDK 升级新增键会让
+       本测试失败，强制先审阅再放行，杜绝"handler 写入键集合之外的属性"类
+       缺口（真实 CallbackHandler 只写 langfuse.* 键；第三方 gen_ai
+       instrumentation 本进程未启用，此处按 SDK 注册表兜底）。
+    """
+    from langfuse._client.attributes import LangfuseOtelSpanAttributes
+    from langfuse._client.span_exporter import (
+        _INPUT_MEDIA_ATTRIBUTE_KEYS,
+        _OUTPUT_MEDIA_ATTRIBUTE_KEYS,
+    )
+
+    free_text_keys = {
+        LangfuseOtelSpanAttributes.TRACE_INPUT,
+        LangfuseOtelSpanAttributes.TRACE_OUTPUT,
+        LangfuseOtelSpanAttributes.OBSERVATION_INPUT,
+        LangfuseOtelSpanAttributes.OBSERVATION_OUTPUT,
+        LangfuseOtelSpanAttributes.OBSERVATION_STATUS_MESSAGE,
+    }
+    assert free_text_keys <= set(_CONTENT_ATTRIBUTE_KEYS)
+
+    genai_content_keys = {
+        key
+        for key in _INPUT_MEDIA_ATTRIBUTE_KEYS | _OUTPUT_MEDIA_ATTRIBUTE_KEYS
+        if key.startswith("gen_ai.")
+    }
+    assert genai_content_keys <= set(_CONTENT_ATTRIBUTE_KEYS) | set(
+        _CONTENT_ATTRIBUTE_PREFIXES
+    )
+
+    # reviewed-keep 清单：SDK 注册表中允许通过 mask 的键（均不含内容原文）
+    reviewed_keep = {
+        # 标识与结构：名称/标签/等级/环境/内部标记
+        LangfuseOtelSpanAttributes.TRACE_NAME,
+        LangfuseOtelSpanAttributes.TRACE_USER_ID,
+        LangfuseOtelSpanAttributes.TRACE_SESSION_ID,
+        LangfuseOtelSpanAttributes.TRACE_TAGS,
+        LangfuseOtelSpanAttributes.TRACE_PUBLIC,
+        LangfuseOtelSpanAttributes.OBSERVATION_TYPE,
+        LangfuseOtelSpanAttributes.OBSERVATION_LEVEL,
+        LangfuseOtelSpanAttributes.ENVIRONMENT,
+        LangfuseOtelSpanAttributes.RELEASE,
+        LangfuseOtelSpanAttributes.VERSION,
+        LangfuseOtelSpanAttributes.AS_ROOT,
+        LangfuseOtelSpanAttributes.IS_APP_ROOT,
+        # 观测数据：模型名与数值型用量/成本/时序
+        LangfuseOtelSpanAttributes.OBSERVATION_MODEL,
+        LangfuseOtelSpanAttributes.OBSERVATION_MODEL_PARAMETERS,
+        LangfuseOtelSpanAttributes.OBSERVATION_USAGE_DETAILS,
+        LangfuseOtelSpanAttributes.OBSERVATION_COST_DETAILS,
+        LangfuseOtelSpanAttributes.OBSERVATION_COMPLETION_START_TIME,
+        LangfuseOtelSpanAttributes.OBSERVATION_PROMPT_NAME,
+        LangfuseOtelSpanAttributes.OBSERVATION_PROMPT_VERSION,
+        # metadata 逐键展平（langfuse.*.metadata.<key>）：adapter 侧只放行
+        # LangfuseTraceMetadata 白名单标量；langchain 侧为 ls_* 运行标识
+        LangfuseOtelSpanAttributes.TRACE_METADATA,
+        LangfuseOtelSpanAttributes.OBSERVATION_METADATA,
+        # 实验键：本进程不使用 Langfuse 实验；若启用需先复核 expected_output
+        # 等内容承载键
+        LangfuseOtelSpanAttributes.EXPERIMENT_ID,
+        LangfuseOtelSpanAttributes.EXPERIMENT_NAME,
+        LangfuseOtelSpanAttributes.EXPERIMENT_DESCRIPTION,
+        LangfuseOtelSpanAttributes.EXPERIMENT_METADATA,
+        LangfuseOtelSpanAttributes.EXPERIMENT_DATASET_ID,
+        LangfuseOtelSpanAttributes.EXPERIMENT_ITEM_ID,
+        LangfuseOtelSpanAttributes.EXPERIMENT_ITEM_EXPECTED_OUTPUT,
+        LangfuseOtelSpanAttributes.EXPERIMENT_ITEM_METADATA,
+        LangfuseOtelSpanAttributes.EXPERIMENT_ITEM_ROOT_OBSERVATION_ID,
+    }
+    registered = {
+        value
+        for name, value in vars(LangfuseOtelSpanAttributes).items()
+        if isinstance(value, str) and not name.startswith("__")
+    }
+    assert registered <= set(_CONTENT_ATTRIBUTE_KEYS) | reviewed_keep
+
+
+def test_mask_deletes_every_sdk_free_text_key_end_to_end():
+    """行为级：span 携带全部 SDK 注册自由文本键的 canary 时，导出补丁必须
+    整段删除每一个键，不留任何 canary。"""
+    from langfuse._client.attributes import LangfuseOtelSpanAttributes
+
+    free_text_keys = (
+        LangfuseOtelSpanAttributes.TRACE_INPUT,
+        LangfuseOtelSpanAttributes.TRACE_OUTPUT,
+        LangfuseOtelSpanAttributes.OBSERVATION_INPUT,
+        LangfuseOtelSpanAttributes.OBSERVATION_OUTPUT,
+        LangfuseOtelSpanAttributes.OBSERVATION_STATUS_MESSAGE,
+        "gen_ai.input.messages",
+        "gen_ai.output.messages",
+        "gen_ai.system_instructions",
+        "gen_ai.tool.call.arguments",
+        "gen_ai.tool.call.result",
+    )
+    span = SimpleNamespace(
+        attributes={key: f"canary-{key}-原文" for key in free_text_keys}
+    )
+    adapter, _ = _adapter(_enabled_cfg())
+
+    result = adapter._mask_otel_spans(
+        params=SimpleNamespace(spans={("t", "s"): span})
+    )
+
+    patch = result.span_patches[("t", "s")]
+    assert set(patch.delete_attributes) == set(free_text_keys)
+    assert patch.set_attributes == {}
+
+
+def test_init_client_disables_media_upload_before_client_construction(monkeypatch):
+    """SDK 先做媒体预上传、后执行 mask：媒体形内容会在删除前离开进程，
+    必须在构造 client（MediaManager 读取环境变量）之前整体关闭。"""
+    captured: dict[str, str | None] = {}
+
+    class EnvCapturingClient(FakeLangfuseClient):
+        def __init__(self, **kwargs: Any) -> None:
+            super().__init__()
+            captured["media_upload_enabled"] = os.environ.get(
+                "LANGFUSE_MEDIA_UPLOAD_ENABLED"
+            )
+
+    monkeypatch.setattr("langfuse.Langfuse", EnvCapturingClient)
+    monkeypatch.setenv("LANGFUSE_MEDIA_UPLOAD_ENABLED", "true")
+
+    adapter = LangfuseAdapter(
+        cfg=_enabled_cfg(), app_env="development", metrics=MetricsRegistry()
+    )
+
+    assert adapter.enabled is True
+    assert captured["media_upload_enabled"] == "false"
+
+
+def test_exporter_log_failures_count_into_prometheus_and_warn_locally(caplog):
+    """export 阶段失败（网络超时/401/403/连接拒绝）由 OTLPSpanExporter 只写自身
+    logger 并返回 FAILURE，不抛进 adapter——日志钩子必须把它们转入本地告警与
+    secrag_langfuse_export_errors_total。"""
+    adapter, _ = _adapter(_enabled_cfg())
+    adapter._attach_export_failure_log_handler()
+    exporter_logger = logging.getLogger(_OTEL_EXPORTER_LOGGER_NAME)
+    try:
+        with caplog.at_level(logging.WARNING, logger="secrag.langfuse"):
+            exporter_logger.error(
+                "Failed to export span batch code: 401, reason: Unauthorized"
+            )
+            exporter_logger.error(
+                "Failed to export span batch due to timeout, max retries or shutdown."
+            )
+            exporter_logger.error(
+                "Failed to export span batch code: None, reason: Connection refused"
+            )
+    finally:
+        exporter_logger.removeHandler(adapter._export_log_handler)
+
+    metrics = adapter._metrics
+    assert metrics.langfuse_export_errors_total.get(labels={"reason": "auth"}) == 1.0
+    assert metrics.langfuse_export_errors_total.get(labels={"reason": "timeout"}) == 1.0
+    assert (
+        metrics.langfuse_export_errors_total.get(labels={"reason": "exception"}) == 1.0
+    )
+    assert "Langfuse export 失败（业务不受影响）" in caplog.text
 
 
 def test_mask_deletes_content_attributes_by_default():
