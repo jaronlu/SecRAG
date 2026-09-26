@@ -120,6 +120,64 @@ uv run python scripts/demo.py
 演示脚本覆盖授权查询和权限拒绝场景，并打印回答、引用、置信度和合规状态。完整审计只在
 服务端持久化，不通过问答接口返回。
 
+开启 Langfuse（见下节）后，演示的每次请求在 Langfuse 控制台有一条完整观测视图：
+
+- **Agent 链路**：根 trace（`agent.request`）之下，会话加载、查询理解、检索计划、检索、
+  结果过滤、ReAct 推理、引用验证、合规检查、回答编排等每个节点一个 span，父子关系就是
+  真实执行顺序。
+- **节点耗时**：每个节点 span 的 `duration_ms` 元数据给出耗时，可直接定位慢在检索还是推理。
+- **模型调用次数**：查询理解和 ReAct 推理产生的每次 LLM 调用是一条 generation 观测，
+  trace 内 generation 的条数即本次请求的模型调用次数（含验证失败后的重试）。
+- **token 用量与成本**：每次 LLM 调用记录 prompt / completion / total token，Langfuse 按
+  模型定价汇总整个 trace 的 token 与成本（需在 Langfuse 项目中定义模型价格，未定义时
+  只显示 token 数）。
+
+注意隐私边界：Langfuse 只接收链路元数据。问题原文、模型完整回答、文档与引用原文不会进入
+Langfuse，仍然只能在受控本地 SQLite 审计系统中查看——观测平台看耗时和结构，审计系统看内容。
+
+### 6. 链路追踪（Langfuse，可选）
+
+SecRAG 用 [Langfuse](https://langfuse.com) 观测 Agent / LLM 链路（节点耗时、token、模型
+调用），默认关闭。职责边界：权限、引用、合规审计仍在本地 SQLite；QPS、延迟、错误率与
+缓存指标仍在 Prometheus（`/metrics`），Langfuse 不重复建设。
+
+配置项（`cp .env.example .env` 后按需修改）：
+
+| 配置项 | 默认值 | 说明 |
+|---|---|---|
+| `LANGFUSE_ENABLED` | `false` | 总开关。开启时 `LANGFUSE_HOST`、`LANGFUSE_PUBLIC_KEY`、`LANGFUSE_SECRET_KEY` 必填，缺失会在启动时报错 |
+| `LANGFUSE_HOST` | `https://cloud.langfuse.com` | Langfuse 实例地址，自托管时改为自有地址（仅接受 http/https） |
+| `LANGFUSE_PUBLIC_KEY` | 空 | 项目公钥，Langfuse 控制台 → Settings → API Keys 创建 |
+| `LANGFUSE_SECRET_KEY` | 空 | 项目私钥，与公钥成对，不要提交进仓库 |
+| `LANGFUSE_SAMPLE_RATE` | `1.0` | 采样比例 0.0~1.0，`1.0` 全量。开发可全量，生产按比例；失败请求不参与采样，保证错误可查 |
+| `LANGFUSE_CAPTURE_CONTENT` | `false` | 内容捕获，默认关闭。仅 `APP_ENV=development` 生效，且内容先经统一 PII 脱敏；其他环境强制关闭 |
+
+默认脱敏是两层防线：
+
+1. **metadata 白名单**：Langfuse 只接受固定标量字段——`request_id`、`thread_id`、节点名、
+   模型名、耗时、token 用量、检索数量、重试次数、验证/合规结果等。新增字段必须显式登记到
+   `LangfuseTraceMetadata` 白名单（`src/utils/langfuse_adapter.py`），未登记的键一律丢弃。
+2. **导出层兜底脱敏**：LangChain callback 自动挂到 span 上的 input / output 内容属性，
+   导出前默认整段删除；只有开发环境显式开启 `LANGFUSE_CAPTURE_CONTENT` 才保留，且先经
+   `redact_pii` 统一脱敏。用户原始问题、模型完整回答、文档与 chunk 原文、工具原始参数、
+   SQL、客户 ID、持仓明细和 PII 默认不离开进程。
+
+可靠性（fail-open）：Langfuse 未配置、超时、鉴权失败或服务不可用时，问答、审计与合规
+链路照常完成，错误只写本地日志并累计 Prometheus 计数器
+`secrag_langfuse_export_errors_total`（按 timeout / auth / exception 分类）与
+`secrag_langfuse_dropped_total`（按丢弃原因），不会抛进业务路径。
+
+查看 trace：
+
+1. `.env` 中设置 `LANGFUSE_ENABLED=true` 并填入密钥，重启服务后发一次问答请求
+   （`uv run python scripts/demo.py` 即可）。
+2. 打开 `LANGFUSE_HOST` 的 Web UI → **Traces**，按名称 `agent.request` 过滤（失败请求为
+   `agent.request.error`）。
+3. trace 详情即上一节的节点 span 树；LLM 调用是 generation 观测（含模型名与 token 用量），
+   工具调用有独立 span。
+4. trace metadata 中的 `request_id` 与本地 SQLite 审计记录共用同一 ID，`thread_id` 与 API
+   响应一致；需要核对回答原文时，用这个 `request_id` 回本地审计库查询。
+
 ## 身份验证
 
 问答、会话和入库接口都要求 `Authorization: Bearer <token>`。仓库内置以下 demo token：

@@ -675,6 +675,30 @@ Body: {"query": "货币基金的风险等级是什么？"}
 
 **整个流程经过了 15 个步骤、4 个条件路由点、2 层图、3 层权限过滤、4 层验证**——这就是 SecRAG 和"简单 RAG"的本质区别。
 
+### 附加视图：一次请求在 Langfuse 里的样子（链路追踪）
+
+系统已接入 Langfuse 做 Agent / LLM 链路观测（可选组件，默认关闭，见 README「链路追踪」一节）。
+开启后，上面 15 步旅程在 Langfuse 中呈现为一棵 span 树：
+
+- 根 trace `agent.request` 对应一次 API 请求，metadata 记录 `request_id` / `thread_id` 与
+  最终状态（成功 / 超时 / 失败类型），失败请求单独命名为 `agent.request.error`。
+- 每个图节点（查询理解、检索计划、检索、过滤、验证、合规、回答编排等）是一个节点 span：
+  `duration_ms` 给出节点耗时，检索类节点带 `retrieval_count`，重试类节点带 `retry_count`，
+  验证 / 合规节点带结果状态。
+- 查询理解与 ReAct 推理产生的每次 LLM 调用是一条 generation 观测：模型名、耗时、
+  prompt / completion token 用量。trace 内 generation 条数即模型调用次数（含验证失败重试），
+  Langfuse 按模型定价汇总整个 trace 的 token 与成本。
+- 每次工具调用有独立 span，只记工具名、耗时与成功 / 失败，不含原始参数与输出。
+
+**隐私边界（面试高频追问）**：Langfuse 是第三方（或自托管）观测平台，只接收链路元数据。
+用户原始问题、模型完整回答、文档与引用原文、工具参数与 SQL 一律不出进程——默认走
+metadata 白名单 + 导出层内容属性删除两层防线。回答原文只存在于受控本地 SQLite 审计系统，
+用 trace metadata 里的 `request_id` 可与审计记录关联。一句话：**观测平台看结构与耗时，
+审计系统看内容，两者用 request_id 对上**。
+
+**可靠性设计**：Langfuse 故障（未配置、超时、鉴权失败、服务不可用）绝不影响问答主链路，
+失败只进本地日志与 Prometheus 计数器（fail-open）。观测是加分项，不是依赖项。
+
 ---
 
 ## 6. 项目优缺点深度分析
@@ -947,7 +971,7 @@ Body: {"query": "货币基金的风险等级是什么？"}
 | **评估体系** | 召回率/准确率、LLM-as-judge、A/B 测试 | ⚠️ 仅检索评估脚本，无回答质量评估 | 大 | 明显短板 |
 | **流式输出** | SSE/WebSocket、Token 级流式 | ❌ 未实现（同步返回） | 中 | 用户体验减分 |
 | **生产部署** | Docker、CI/CD、监控告警、水平扩展 | ⚠️ 单机原型，无容器化 | 大 | 工程能力质疑 |
-| **可观测性** | 链路追踪、指标监控、日志聚合 | ⚠️ 仅节点级耗时记录，无系统化监控 | 中 | 可被追问 |
+| **可观测性** | 链路追踪、指标监控、日志聚合 | ✅ Langfuse 链路追踪 + Prometheus 指标（`/metrics`）；日志聚合未接 | 小 | 基本满足 |
 | **缓存优化** | 语义缓存、结果缓存、Redis | ❌ 未实现 | 中 | 性能优化话题缺失 |
 | **多模态** | PDF 图表解析、表格理解、图片 OCR | ❌ 未实现（仅文本） | 小 | 非必需但加分 |
 | **前端/全栈** | React/Vue、会话界面、可视化 | ⚠️ 基础 HTML，无现代化前端 | 中 | 全栈能力质疑 |
@@ -1280,7 +1304,7 @@ curl http://localhost:8000/health | jq .metrics
 | 需求 | 状态 | 实际产出 |
 |---|---|---|
 | P1-4 语义缓存 | ✅ 已完成 | `src/utils/semantic_cache.py` + API 集成 + 管理端点 |
-| P1-5 可观测性 | ✅ 已完成 | `src/utils/metrics.py` + `/metrics` 端点 + 健康检查增强 |
+| P1-5 可观测性 | ✅ 已完成 | `src/utils/metrics.py` + `/metrics` 端点 + 健康检查增强；Langfuse 链路追踪（`src/utils/langfuse_adapter.py`） |
 | P1-6 现代化前端 | ⏳ 待做 | React 前端 + 会话管理 |
 
 **第二阶段已完成语义缓存和可观测性**，面试时可以讲性能优化和监控体系。
