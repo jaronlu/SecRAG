@@ -506,7 +506,7 @@ async def assistant_qa(
     turn_id = str(uuid.uuid4())
     # request_id 显式生成后传入初始 state：Langfuse 根 trace 与 SQLite 审计
     # （STATE_AUDIT_TRAIL.request_id）共用同一 id；trace metadata 只含
-    # request_id/thread_id，不携带任何用户身份信息（todo/TODO.md）
+    # request_id/thread_id，不携带任何用户身份信息
     request_id = str(uuid.uuid4())
     langfuse = get_langfuse()
     trace = langfuse.start_request_trace(request_id, thread_id)

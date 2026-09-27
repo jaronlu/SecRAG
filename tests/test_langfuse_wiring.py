@@ -1,6 +1,6 @@
 """Langfuse 接线测试：API 根 trace/callbacks 注入与节点 span。
 
-覆盖 todo/TODO.md 验收项：
+覆盖验收项：
 - API 入口创建根 trace，request_id 与 SQLite 审计共用，metadata 无用户身份；
 - callbacks 经 RunnableConfig 注入 LangGraph（未启用时零感知）；
 - _traced_node / reason 子图节点按白名单 metadata 建 span，查询/回答/

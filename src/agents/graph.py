@@ -93,7 +93,7 @@ def _node_span_metadata(
     """按节点提取 Langfuse span 的白名单 metadata（adapter 过滤兜底）。
 
     只放标量业务结果：模型名、检索数量、重试次数、验证/合规结果；
-    查询词、文档内容、引用原文、回答原文一律不入 payload（todo/TODO.md）。
+    查询词、文档内容、引用原文、回答原文一律不入 payload。
     """
     metadata: dict[str, Any] = {"node_name": name}
     if name == "retrieve":

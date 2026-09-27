@@ -994,7 +994,7 @@ def call_reason_model(state: AssistantState) -> dict[str, Any]:
     bound_model = _get_bound_reason_model(role, _excluded_retrieval_sources(state))
     started = time.perf_counter()
     # Langfuse LLM span：metadata 只含模型名/耗时/token/尝试序号；
-    # 系统提示词、检索证据与用户问题原文不进 payload（todo/TODO.md）
+    # 系统提示词、检索证据与用户问题原文不进 payload
     span = start_node_span(
         "call_reason_model",
         metadata={
@@ -1071,7 +1071,7 @@ def authorize_reason_tool_call(
     started = time.perf_counter()
     # 工具 span 在权限/截止时间/熔断校验之后创建：未授权调用不产生任何
     # 观测数据；span 名为工具名，metadata 只含耗时与结果状态，工具原始
-    # 参数与输出一律不进 payload（todo/TODO.md）
+    # 参数与输出一律不进 payload
     tool_span = start_node_span(tool_name, metadata={"node_name": tool_name})
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     _tool_executors.add(executor)

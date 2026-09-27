@@ -1,4 +1,4 @@
-"""Langfuse 验收测试（todo/TODO.md 测试与验收）——graph 级传播与 payload 卫生。
+"""Langfuse 验收测试——graph 级传播与 payload 卫生。
 
 与 tests/e2e/test_e2e_langfuse_wiring.py 互补，覆盖验收点：
 - callbacks 从 RunnableConfig 传播到 LangGraph 节点内 LLM 调用**和工具调用**

@@ -1,4 +1,4 @@
-"""Langfuse 验收测试（todo/TODO.md 测试与验收）——API 入口层。
+"""Langfuse 验收测试——API 入口层。
 
 逐条覆盖验收点（与实现自带单测 tests/test_langfuse_adapter.py、
 tests/test_langfuse_wiring.py 互补，断言口径为验收语义）：

@@ -1,6 +1,6 @@
 """统一 Langfuse adapter——Agent/LLM 链路观测的唯一入口。
 
-职责边界（todo/TODO.md）：
+职责边界：
 - Langfuse：Agent/LLM 运行链路、耗时、token、成本观察。
 - SQLite（audit.py）：权限、引用、合规和业务审计，不经过本模块。
 - Prometheus（metrics.py）：QPS/延迟/错误率/缓存指标，不重复建设。
@@ -152,8 +152,8 @@ def _disable_langfuse_media_upload() -> None:
 def is_valid_langfuse_host(host: str) -> bool:
     """校验 LANGFUSE_HOST：仅接受 http/https 绝对地址。
 
-    刻意**不**拒绝 localhost / 内网地址：自托管 Langfuse 是 todo/TODO.md 的
-    明确选项，实例地址是运维配置而非用户输入——本 adapter 只从 Settings
+    刻意**不**拒绝 localhost / 内网地址：自托管 Langfuse 是明确支持的
+    部署方式，实例地址是运维配置而非用户输入——本 adapter 只从 Settings
     （环境变量/.env）读取 host，绝不接受来自用户输入或请求数据的 URL。
     """
     if not host:
