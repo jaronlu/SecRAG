@@ -391,9 +391,10 @@ def test_retrieve_and_planner_span_metadata():
 @pytest.fixture()
 def bound_fake_llm(monkeypatch):
     monkeypatch.setattr(agent_nodes, "llm", _BindToolsFakeModel())
-    agent_nodes._get_bound_reason_model.cache_clear()
+    # Pylance types the lru_cache wrapper as FunctionType; the attribute exists at runtime
+    agent_nodes._get_bound_reason_model.cache_clear()  # pyright: ignore[reportFunctionMemberAccess]
     yield
-    agent_nodes._get_bound_reason_model.cache_clear()
+    agent_nodes._get_bound_reason_model.cache_clear()  # pyright: ignore[reportFunctionMemberAccess]
 
 
 def _reason_state() -> AssistantState:

@@ -110,9 +110,10 @@ def fake_llm(monkeypatch):
     """替换节点模块级 LLM；清理 _get_bound_reason_model 的 lru_cache 防止跨用例污染。"""
     fake = FakeChatModel()
     monkeypatch.setattr(agent_nodes, "llm", fake)
-    agent_nodes._get_bound_reason_model.cache_clear()
+    # Pylance types the lru_cache wrapper as FunctionType; the attribute exists at runtime
+    agent_nodes._get_bound_reason_model.cache_clear()  # pyright: ignore[reportFunctionMemberAccess]
     yield fake
-    agent_nodes._get_bound_reason_model.cache_clear()
+    agent_nodes._get_bound_reason_model.cache_clear()  # pyright: ignore[reportFunctionMemberAccess]
 
 
 @pytest.fixture()

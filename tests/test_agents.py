@@ -730,9 +730,10 @@ class TestRetrieve:
 class TestRoleAwareTools:
     @pytest.fixture(autouse=True)
     def _clear_reason_model_cache(self):
-        _get_bound_reason_model.cache_clear()
+        # Pylance types the lru_cache wrapper as FunctionType; the attribute exists at runtime
+        _get_bound_reason_model.cache_clear()  # pyright: ignore[reportFunctionMemberAccess]
         yield
-        _get_bound_reason_model.cache_clear()
+        _get_bound_reason_model.cache_clear()  # pyright: ignore[reportFunctionMemberAccess]
 
     def test_technical_role_gets_all_design_allowed_retrieval_tools(self):
         from src.agents.tools import get_tools_for_role

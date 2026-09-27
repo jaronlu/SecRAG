@@ -209,9 +209,10 @@ def tool_calling_llm(monkeypatch: pytest.MonkeyPatch):
     ToolCallingChatModel.final_content = REASON_CONTENT
     fake = ToolCallingChatModel()
     monkeypatch.setattr(agent_nodes, "llm", fake)
-    agent_nodes._get_bound_reason_model.cache_clear()
+    # Pylance types the lru_cache wrapper as FunctionType; the attribute exists at runtime
+    agent_nodes._get_bound_reason_model.cache_clear()  # pyright: ignore[reportFunctionMemberAccess]
     yield fake
-    agent_nodes._get_bound_reason_model.cache_clear()
+    agent_nodes._get_bound_reason_model.cache_clear()  # pyright: ignore[reportFunctionMemberAccess]
 
 
 def _run_graph_with_callbacks(

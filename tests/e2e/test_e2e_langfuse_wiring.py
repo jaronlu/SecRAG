@@ -119,9 +119,10 @@ def recording_llm(monkeypatch):
     RecordingChatModel.seen_configs = []
     fake = RecordingChatModel()
     monkeypatch.setattr(agent_nodes, "llm", fake)
-    agent_nodes._get_bound_reason_model.cache_clear()
+    # Pylance types the lru_cache wrapper as FunctionType; the attribute exists at runtime
+    agent_nodes._get_bound_reason_model.cache_clear()  # pyright: ignore[reportFunctionMemberAccess]
     yield fake
-    agent_nodes._get_bound_reason_model.cache_clear()
+    agent_nodes._get_bound_reason_model.cache_clear()  # pyright: ignore[reportFunctionMemberAccess]
 
 
 def test_graph_callbacks_reach_node_llm_and_node_spans_attach_to_trace(
