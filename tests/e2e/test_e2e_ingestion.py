@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
+from langchain_huggingface import HuggingFaceEmbeddings
 
 from src.ingestion.service import (
     CategoryPreflightError,
@@ -26,6 +27,7 @@ from src.schemas.constants import (
     ROLE_OPERATIONS,
     ROLE_TECHNICAL,
 )
+from src.schemas.typed_dicts import IngestionCategoryConfig
 
 FAKE_EMBED_MODEL = "fake-embed-e2e"
 
@@ -77,7 +79,7 @@ def ingestion_env(tmp_path):
     """隔离的入库环境：返回 (service, category_dir, helper)。"""
     category_dir = tmp_path / "data" / "raw" / "reports"
     category_dir.mkdir(parents=True)
-    category = {
+    category: IngestionCategoryConfig = {
         "category_id": "reports",
         "label": "财报公告",
         "group": "reports",
@@ -90,7 +92,7 @@ def ingestion_env(tmp_path):
         registry_path=tmp_path / "registry.db",
         persist_directory=str(tmp_path / "chroma"),
         catalog=(category,),
-        embedding_model_factory=lambda model: FakeEmbeddings(),
+        embedding_model_factory=lambda model: cast(HuggingFaceEmbeddings, FakeEmbeddings()),
     )
 
     def run(category_id: str = "reports"):
@@ -115,7 +117,7 @@ def chunk_ids_for(env, doc_id: str) -> list[str]:
     return list_chunk_ids_by_doc_id(
         doc_id=doc_id,
         persist_directory=env.service.persist_directory,
-        embedding_model=FakeEmbeddings(),
+        embedding_model=cast(HuggingFaceEmbeddings, FakeEmbeddings()),
     )
 
 
@@ -206,7 +208,8 @@ def test_tc005_updated_document_replaces_old_chunks(ingestion_env):
         from src.ingestion.embedder import get_vectorstore
 
         vs = get_vectorstore(
-            persist_directory=env.service.persist_directory, embedding_model=FakeEmbeddings()
+            persist_directory=env.service.persist_directory,
+            embedding_model=cast(HuggingFaceEmbeddings, FakeEmbeddings()),
         )
         remaining = set(vs.get(ids=sorted(removed))["ids"])
         assert remaining.isdisjoint(removed), "旧 chunk 必须被清理"
@@ -344,7 +347,7 @@ def ingestion_api_client(monkeypatch, tmp_path):
     category_dir = tmp_path / "data" / "raw" / "reports"
     category_dir.mkdir(parents=True)
     write_document(category_dir, "xx_money_fund_2024.html", FUND_REPORT_HTML, VALID_META)
-    category = {
+    category: IngestionCategoryConfig = {
         "category_id": "reports",
         "label": "财报公告",
         "group": "reports",
@@ -357,7 +360,7 @@ def ingestion_api_client(monkeypatch, tmp_path):
         registry_path=tmp_path / "registry.db",
         persist_directory=str(tmp_path / "chroma"),
         catalog=(category,),
-        embedding_model_factory=lambda model: FakeEmbeddings(),
+        embedding_model_factory=lambda model: cast(HuggingFaceEmbeddings, FakeEmbeddings()),
     )
     monkeypatch.setattr("src.api.ingestion._get_ingestion_service", lambda: service)
 

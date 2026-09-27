@@ -8,13 +8,14 @@ from __future__ import annotations
 
 import json
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from langchain_core.messages import AIMessage, BaseMessage
 
 from src.agents import nodes as agent_nodes
 from src.agents.graph import build_agent_with_checkpoint
+from src.agents.state import AssistantState
 from src.api.auth import AuthenticatedUser, build_assistant_initial_state
 from src.retrieval import result_cache
 from src.schemas.constants import (
@@ -148,7 +149,7 @@ def fake_retriever_factory(monkeypatch):
         def retrieve(self, plan: list[dict[str, Any]]) -> list[dict[str, Any]]:
             results = holder["results"]
             if callable(results):
-                return results(plan, self)
+                return cast(list[dict[str, Any]], results(plan, self))
             return list(results)
 
     monkeypatch.setattr(agent_nodes, "HybridRetriever", FakeHybridRetriever)
@@ -156,7 +157,9 @@ def fake_retriever_factory(monkeypatch):
     return holder
 
 
-def build_state(query: str = "XX货币市场基金的风险等级是什么？", **user_kwargs: Any) -> dict[str, Any]:
+def build_state(
+    query: str = "XX货币市场基金的风险等级是什么？", **user_kwargs: Any
+) -> AssistantState:
     """构造 Agent Graph 初始 state（advisor 默认）。"""
     from src.schemas.request_response import AssistantQARequest
 
@@ -174,10 +177,13 @@ def run_agent_graph(fake_llm, isolated_stores, fake_retriever_factory):
     """返回可调用的图执行器：fresh checkpointer 保证用例独立。"""
     from src.schemas.constants import STATE_THREAD_ID
 
-    def _run(state: dict[str, Any]) -> dict[str, Any]:
+    def _run(state: AssistantState) -> dict[str, Any]:
         graph = build_agent_with_checkpoint()
-        return graph.invoke(
-            state, {"configurable": {STATE_THREAD_ID: state["thread_id"]}}
+        return cast(
+            dict[str, Any],
+            graph.invoke(
+                state, {"configurable": {STATE_THREAD_ID: state["thread_id"]}}
+            ),
         )
 
     return _run

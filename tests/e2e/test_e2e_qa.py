@@ -7,7 +7,7 @@ TC-016/018 为 Graph 级 E2E：真实 Agent Graph + 真实验证器/合规器 +
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from fastapi.testclient import TestClient
@@ -411,7 +411,7 @@ def _tool_request(state: dict, name: str) -> Any:
         state=state,
         tool_call={"name": name, "args": {}, "id": f"call_{name}"},
         tool=None,
-        runtime=None,
+        runtime=cast(Any, None),
     )
 
 
@@ -434,9 +434,11 @@ def test_tc023_unauthorized_tool_is_rejected_without_execution(_reset_circuit_br
     }
     executed: list[Any] = []
 
-    result = authorize_reason_tool_call(
-        _tool_request(state, "faq_search"), lambda request: executed.append(request)
-    )
+    def _record(request: Any) -> ToolMessage:
+        executed.append(request)
+        return ToolMessage(content="", name="faq_search", tool_call_id="")
+
+    result = authorize_reason_tool_call(_tool_request(state, "faq_search"), _record)
 
     assert isinstance(result, ToolMessage)
     assert result.status == "error"
@@ -477,9 +479,12 @@ def test_tc023_tool_timeout_trips_circuit_breaker(
 
     # 熔断期内第二次调用直接拒绝，不再执行工具
     calls: list[Any] = []
-    second = authorize_reason_tool_call(
-        _tool_request(state, "calculator"), lambda request: calls.append(request)
-    )
+
+    def _record(request: Any) -> ToolMessage:
+        calls.append(request)
+        return ToolMessage(content="", name="calculator", tool_call_id="")
+
+    second = authorize_reason_tool_call(_tool_request(state, "calculator"), _record)
     assert isinstance(second, ToolMessage) and second.status == "error"
     assert "熔断" in second.content
     assert calls == []

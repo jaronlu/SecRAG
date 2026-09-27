@@ -17,7 +17,8 @@ from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
-from langchain_core.runnables.config import var_child_runnable_config
+from langchain_core.runnables.config import RunnableConfig, var_child_runnable_config
+from pydantic import SecretStr
 
 from src.agents import nodes as agent_nodes
 from src.agents.graph import build_agent_with_checkpoint
@@ -42,7 +43,7 @@ QUERY = "XX货币市场基金的风险等级是什么？"
 class RecordingChatModel(BaseChatModel):
     """记录 ensure_config 注入的 RunnableConfig 的 BaseChatModel 替身。"""
 
-    seen_configs: ClassVar[list[dict[str, Any] | None]] = []
+    seen_configs: ClassVar[list[RunnableConfig | None]] = []
 
     def _generate(
         self, messages: Any, stop: Any = None, run_manager: Any = None, **kwargs: Any
@@ -135,7 +136,7 @@ def test_graph_callbacks_reach_node_llm_and_node_spans_attach_to_trace(
             enabled=True,
             host="https://cloud.langfuse.com",
             public_key=f"pk-lf-{uuid.uuid4().hex}",
-            secret_key=f"sk-lf-{uuid.uuid4().hex}",
+            secret_key=SecretStr(f"sk-lf-{uuid.uuid4().hex}"),
             sample_rate=1.0,
             capture_content=False,
         ),

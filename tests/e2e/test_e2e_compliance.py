@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 
+from src.agents.state import AssistantState
 from src.schemas.constants import (
     CONFIDENCE_LOW,
     ROLE_ADVISOR,
@@ -33,15 +36,17 @@ from src.utils.compliance import ComplianceChecker, matches_investment_advice
 def test_tc024_investment_advice_patterns_blocked(text, expected_flag):
     """TC-024：直接表述、改写绕过、空格分隔的建议全部被模糊匹配拦截。"""
     result = ComplianceChecker().check(text, user_role=ROLE_ADVISOR)
-    assert result["passed"] is False
-    assert expected_flag in result["flags"]
+    assert result.get("passed") is False
+    assert expected_flag in (result.get("flags") or [])
 
 
 # DEF-001 回归：TP 边界改用 ASCII 字母 lookaround 后，空白归一化与紧邻汉字均不再漏检
 @pytest.mark.parametrize("text", ["TP 12.5 元", "建议TP 15元", "TP12.5", "该基金TP为12.5元"])
 def test_tc024_tp_with_number_should_be_blocked(text):
     """TC-024：TP+数字的目标价写法必须被拦截（DEF-001）。"""
-    assert "advice:目标价" in ComplianceChecker().check(text, user_role=ROLE_ADVISOR)["flags"]
+    assert "advice:目标价" in (
+        ComplianceChecker().check(text, user_role=ROLE_ADVISOR).get("flags") or []
+    )
 
 
 def test_tc024_compose_blocks_non_compliant_answer():
@@ -62,7 +67,7 @@ def test_tc024_compose_blocks_non_compliant_answer():
         "reranker_status": "unavailable",
     }
 
-    update = compose(state)
+    update = compose(cast(AssistantState, state))
 
     answer = update[STATE_FINAL_ANSWER]
     assert "当前请求或生成内容未通过合规检查" in answer
@@ -75,7 +80,7 @@ def test_tc024_normal_discussion_is_not_blocked():
     """TC-024：中性表述（评级引用、风险描述）不触发建议拦截。"""
     text = "根据2024年年度报告，该基金风险等级为R1，主要投资于货币市场工具[来源1]。"
     result = ComplianceChecker().check(text, user_role=ROLE_ADVISOR)
-    assert result["passed"] is True
+    assert result.get("passed") is True
     assert matches_investment_advice(text) == []
 
 
@@ -92,8 +97,8 @@ def test_tc024_normal_discussion_is_not_blocked():
 def test_tc025_sensitive_keywords_flagged(text, flag):
     """TC-025：敏感词命中 → flags 带 sensitive: 前缀且不通过。"""
     result = ComplianceChecker().check(text, user_role=ROLE_ADVISOR)
-    assert flag in result["flags"]
-    assert result["passed"] is False
+    assert flag in (result.get("flags") or [])
+    assert result.get("passed") is False
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -106,17 +111,17 @@ def test_tc026_compliance_role_requires_article_reference():
     checker = ComplianceChecker()
     plain = "该基金投资范围包括货币市场工具。"
     result = checker.check(plain, user_role=ROLE_COMPLIANCE)
-    assert "citation_precision:missing_article" in result["flags"]
-    assert result["passed"] is False
+    assert "citation_precision:missing_article" in (result.get("flags") or [])
+    assert result.get("passed") is False
 
     cited = "依据《公开募集开放式证券投资基金流动性风险管理规定》第五条，基金应保持流动性。"
     result = checker.check(cited, user_role=ROLE_COMPLIANCE)
-    assert "citation_precision:missing_article" not in result["flags"]
-    assert result["passed"] is True
+    assert "citation_precision:missing_article" not in (result.get("flags") or [])
+    assert result.get("passed") is True
 
     # 其他角色不要求条款引用
     result = checker.check(plain, user_role=ROLE_ADVISOR)
-    assert result["passed"] is True
+    assert result.get("passed") is True
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -130,16 +135,16 @@ def test_tc027_suitability_warning_for_high_risk_product():
     result = checker.check(
         "这款私募产品采用摊余成本法估值。", user_role=ROLE_ADVISOR, client_id="C001"
     )
-    assert any(f.startswith("suitability:") for f in result["flags"])
-    assert result["suitability_warning"].startswith("\n\n【适当性提示】")
-    assert result["passed"] is True, "适当性是提示不是拦截"
+    assert any(f.startswith("suitability:") for f in result.get("flags") or [])
+    assert (result.get("suitability_warning") or "").startswith("\n\n【适当性提示】")
+    assert result.get("passed") is True, "适当性是提示不是拦截"
 
     # 无客户号时不提示
     result = checker.check(
         "这款私募产品采用摊余成本法估值。", user_role=ROLE_ADVISOR, client_id=None
     )
-    assert result["suitability_warning"] == ""
-    assert result["passed"] is True
+    assert result.get("suitability_warning") == ""
+    assert result.get("passed") is True
 
 
 def test_tc027_suitability_appended_to_final_answer():
@@ -161,7 +166,7 @@ def test_tc027_suitability_appended_to_final_answer():
         "reranker_status": "unavailable",
     }
 
-    update = compose(state)
+    update = compose(cast(AssistantState, state))
     assert update[STATE_FINAL_ANSWER].endswith(warning)
     assert update[STATE_CITATIONS] == [{"source": "a.pdf"}], "合规通过时引用保留"
 

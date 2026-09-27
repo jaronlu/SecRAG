@@ -7,10 +7,11 @@ HybridRetriever 的角色/权限/容错逻辑保持真实，底层向量检索�
 from __future__ import annotations
 
 import sys
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
+from src.agents.state import AssistantState
 from src.retrieval import hybrid_retriever as hr_module
 from src.retrieval.hybrid_retriever import HybridRetriever
 from src.schemas.constants import (
@@ -34,7 +35,7 @@ from src.schemas.constants import (
     SOURCE_FAQ,
     SOURCE_PRODUCT,
 )
-from src.schemas.typed_dicts import RetrievalPlanStep
+from src.schemas.typed_dicts import RetrievalPlanStep, RetrievalResult
 
 PUBLIC_CHUNK = "本基金风险等级为R1（低风险），适合保守型投资者。"
 
@@ -109,7 +110,7 @@ def test_tc011_plan_level_source_permission_filtering(stub_factories):
     usable = [r for r in results if not r.get(RR_DENIED)]
     assert len(denied) == 1
     assert denied[0][RR_METADATA][META_SOURCE] == SOURCE_FAQ
-    assert "无权限" in denied[0]["reason"]
+    assert "无权限" in (denied[0].get("reason") or "")
     assert len(usable) == 1
     assert usable[0][RR_METADATA][META_SOURCE] == "p1.html"
 
@@ -145,7 +146,7 @@ def test_tc012_result_level_permission_filtering(stub_factories):
                     allowed_roles="compliance,technical"),
     ]
 
-    filtered = retriever._filter_results_by_role(results)
+    filtered = retriever._filter_results_by_role(cast(list[RetrievalResult], results))
 
     verdicts = {f[RR_METADATA][META_SOURCE]: not f.get(RR_DENIED) for f in filtered}
     assert verdicts == {
@@ -217,14 +218,17 @@ def test_tc014_vector_store_unavailable_yields_explicit_error_results(stub_facto
 # ══════════════════════════════════════════════════════════════════════
 
 
-def _grade_state(results: list[dict[str, Any]]) -> dict[str, Any]:
-    return {
-        "retrieval_results": results,
-        "resolved_query": "货币基金风险等级",
-        "rewritten_query": "货币基金 风险等级",
-        "original_query": "货币基金风险等级",
-        "user_role": ROLE_ADVISOR,
-    }
+def _grade_state(results: list[dict[str, Any]]) -> AssistantState:
+    return cast(
+        AssistantState,
+        {
+            "retrieval_results": results,
+            "resolved_query": "货币基金风险等级",
+            "rewritten_query": "货币基金 风险等级",
+            "original_query": "货币基金风险等级",
+            "user_role": ROLE_ADVISOR,
+        },
+    )
 
 
 def test_tc015_grade_filters_low_scores_dedupes_and_marks_reranker_unavailable(

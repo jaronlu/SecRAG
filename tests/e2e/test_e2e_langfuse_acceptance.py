@@ -24,7 +24,7 @@ from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
-from langchain_core.runnables.config import var_child_runnable_config
+from langchain_core.runnables.config import RunnableConfig, var_child_runnable_config
 
 from src.agents import nodes as agent_nodes
 from src.agents.graph import build_agent_with_checkpoint
@@ -70,7 +70,7 @@ class ToolCallingChatModel(BaseChatModel):
     （金丝雀确实进入过系统内部，payload 断言才不是空证）。
     """
 
-    seen_configs: ClassVar[list[dict[str, Any] | None]] = []
+    seen_configs: ClassVar[list[RunnableConfig | None]] = []
     seen_prompts: ClassVar[list[str]] = []
     seen_outputs: ClassVar[list[str]] = []
     # ToolMessage 分支返回的最终回答，由用例注入（如金丝雀回答）
@@ -224,7 +224,7 @@ def _run_graph_with_callbacks(
         user_id="user_advisor", user_role=ROLE_ADVISOR, client_id=None, title="lf-accept"
     )
     state = build_state(thread_id=thread["thread_id"], query=query)
-    config: dict[str, Any] = {"configurable": {"thread_id": state["thread_id"]}}
+    config = RunnableConfig(configurable={"thread_id": state["thread_id"]})
     if callbacks:
         config["callbacks"] = callbacks
     graph = build_agent_with_checkpoint()
