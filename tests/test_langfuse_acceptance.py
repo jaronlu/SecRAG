@@ -25,6 +25,7 @@ from typing import Any
 
 import pytest
 from fastapi import HTTPException
+from pydantic import SecretStr
 
 from src.api.auth import AuthenticatedUser
 from src.api.main import assistant_qa
@@ -80,7 +81,9 @@ def _enabled_cfg(**overrides: Any) -> LangfuseConfig:
 
 
 def _disabled_cfg() -> LangfuseConfig:
-    return LangfuseConfig(enabled=False, host="", public_key="", secret_key="")
+    return LangfuseConfig(
+        enabled=False, host="", public_key="", secret_key=SecretStr("")
+    )
 
 
 class FakeLangfuseSpan:

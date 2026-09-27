@@ -15,14 +15,17 @@ from __future__ import annotations
 import json
 import uuid
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from fastapi import HTTPException
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langgraph.prebuilt.tool_node import ToolCallRequest
+from pydantic import SecretStr
 
 from src.agents import nodes as agent_nodes
 from src.agents.graph import _node_span_metadata, _traced_node
+from src.agents.state import AssistantState
 from src.api.auth import AuthenticatedUser, build_assistant_initial_state
 from src.api.main import assistant_qa
 from src.config import LangfuseConfig, config
@@ -201,6 +204,7 @@ async def test_qa_creates_root_trace_and_injects_bound_callback(langfuse_env, mo
     assert agent.state[STATE_AUDIT_TRAIL][AUDIT_REQUEST_ID] == metadata["request_id"]
 
     # callbacks 注入 RunnableConfig，并绑定到根 trace
+    assert agent.config is not None
     callbacks = agent.config["callbacks"]
     assert len(callbacks) == 1
     assert isinstance(callbacks[0], FakeCallbackHandler)
@@ -268,7 +272,9 @@ async def test_qa_error_finishes_trace_as_error(langfuse_env, monkeypatch):
 @pytest.mark.asyncio
 async def test_qa_without_langfuse_has_no_callbacks(monkeypatch):
     adapter = LangfuseAdapter(
-        cfg=LangfuseConfig(enabled=False, host="", public_key="", secret_key=""),
+        cfg=LangfuseConfig(
+            enabled=False, host="", public_key="", secret_key=SecretStr("")
+        ),
         app_env="development",
         client=FakeLangfuseClient(),
         metrics=MetricsRegistry(),
@@ -283,6 +289,7 @@ async def test_qa_without_langfuse_has_no_callbacks(monkeypatch):
     )
 
     # Langfuse 关闭：RunnableConfig 无 callbacks 键，问答行为不变
+    assert agent.config is not None
     assert "callbacks" not in agent.config
     assert agent.config["recursion_limit"] > 0
     assert adapter.enabled is False
@@ -303,7 +310,7 @@ def test_traced_node_creates_span_with_whitelisted_metadata():
     token = set_current_trace(trace)
     try:
         node = _traced_node("verify", lambda state: {STATE_VERIFICATION: {"passed": True}})
-        result = node({})
+        result = node(cast(AssistantState, {}))
     finally:
         reset_current_trace(token)
 
@@ -325,7 +332,7 @@ def test_traced_node_without_trace_is_noop():
     _wire_adapter(client)  # adapter 存在但 contextvar 无活跃 trace
 
     node = _traced_node("retrieve", lambda state: {})
-    result = node({})
+    result = node(cast(AssistantState, {}))
 
     assert result[STATE_INTERMEDIATE_STEPS][0]["step"] == "retrieve"
     assert client.started == []
@@ -335,13 +342,13 @@ def test_traced_node_error_span_and_reraise():
     trace, client = _trace_with_client()
     token = set_current_trace(trace)
 
-    def _boom(state: dict[str, Any]) -> dict[str, Any]:
+    def _boom(state: AssistantState) -> dict[str, Any]:
         raise RuntimeError("node failed")
 
     try:
         node = _traced_node("compose", _boom)
         with pytest.raises(RuntimeError):
-            node({})
+            node(cast(AssistantState, {}))
     finally:
         reset_current_trace(token)
 
@@ -353,10 +360,13 @@ def test_traced_node_error_span_and_reraise():
 
 
 def test_retrieve_and_planner_span_metadata():
-    state = {
-        STATE_RETRIEVAL_RESULTS: [{"a": 1}, {"b": 2}],
-        STATE_RETRIEVAL_PLAN: [],
-    }
+    state = cast(
+        AssistantState,
+        {
+            STATE_RETRIEVAL_RESULTS: [{"a": 1}, {"b": 2}],
+            STATE_RETRIEVAL_PLAN: [],
+        },
+    )
     result = {
         STATE_RETRIEVAL_RESULTS: [{"a": 1}, {"b": 2}, {"c": 3}, {"d": 4}, {"e": 5}],
         STATE_RETRIEVAL_ATTEMPTS: 2,
@@ -366,10 +376,12 @@ def test_retrieve_and_planner_span_metadata():
     assert retrieve_meta["retry_count"] == 2
     assert retrieve_meta["node_name"] == "retrieve"
 
-    planner_meta = _node_span_metadata("planner", {}, {})
+    planner_meta = _node_span_metadata("planner", cast(AssistantState, {}), {})
     assert planner_meta["model_name"] == config.llm.model
 
-    grade_meta = _node_span_metadata("grade_and_filter", {}, {STATE_RETRIEVAL_FILTERED_CHUNKS: 4})
+    grade_meta = _node_span_metadata(
+        "grade_and_filter", cast(AssistantState, {}), {STATE_RETRIEVAL_FILTERED_CHUNKS: 4}
+    )
     assert grade_meta["retrieval_count"] == 4
 
 
@@ -384,7 +396,7 @@ def bound_fake_llm(monkeypatch):
     agent_nodes._get_bound_reason_model.cache_clear()
 
 
-def _reason_state(**overrides: Any) -> dict[str, Any]:
+def _reason_state() -> AssistantState:
     state = build_assistant_initial_state(
         AssistantQARequest(query="问题"),
         AuthenticatedUser("user_lf_node", ROLE_TECHNICAL, "tech"),
@@ -392,7 +404,6 @@ def _reason_state(**overrides: Any) -> dict[str, Any]:
     state[STATE_MESSAGES] = [HumanMessage(content="问题")]
     state[STATE_REASON_ATTEMPTS] = 1
     state.pop(STATE_REQUEST_DEADLINE, None)
-    state.update(overrides)
     return state
 
 
@@ -425,18 +436,26 @@ def test_tool_span_created_after_authorization():
     trace, client = _trace_with_client()
     token = set_current_trace(trace)
     try:
-        request = SimpleNamespace(
-            state=_reason_state(),
-            tool_call={"name": tool_name, "args": {"expression": "1+1"}, "id": "call-1"},
+        request = cast(
+            ToolCallRequest,
+            SimpleNamespace(
+                state=_reason_state(),
+                tool_call={
+                    "name": tool_name,
+                    "args": {"expression": "1+1"},
+                    "id": "call-1",
+                },
+            ),
         )
 
-        def _execute(req: Any) -> ToolMessage:
+        def _execute(req: ToolCallRequest) -> ToolMessage:
             return ToolMessage(content="2", name=tool_name, tool_call_id="call-1", status="success")
 
         result = agent_nodes.authorize_reason_tool_call(request, _execute)
     finally:
         reset_current_trace(token)
 
+    assert isinstance(result, ToolMessage)
     assert result.content == "2"
     span, kwargs = client.started[1]
     assert kwargs["name"] == tool_name
@@ -454,9 +473,12 @@ def test_unauthorized_tool_creates_no_span():
     trace, client = _trace_with_client()
     token = set_current_trace(trace)
     try:
-        request = SimpleNamespace(
-            state=_reason_state(),
-            tool_call={"name": f"not_{calculator.name}", "args": {}, "id": "call-2"},
+        request = cast(
+            ToolCallRequest,
+            SimpleNamespace(
+                state=_reason_state(),
+                tool_call={"name": f"not_{calculator.name}", "args": {}, "id": "call-2"},
+            ),
         )
         result = agent_nodes.authorize_reason_tool_call(
             request, lambda req: pytest.fail("未授权工具不应执行")
@@ -464,6 +486,7 @@ def test_unauthorized_tool_creates_no_span():
     finally:
         reset_current_trace(token)
 
+    assert isinstance(result, ToolMessage)
     assert result.status == "error"
     # 权限校验失败的调用不产生任何工具 span（client.started[0] 是根 trace 自身）
     assert len(client.started) == 1

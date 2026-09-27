@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -16,12 +17,14 @@ from scripts.evaluate_ablation import (
     is_refusal,
     keyword_recall,
 )
+from src.retrieval.hybrid_retriever import HybridRetriever
 from src.schemas.constants import (
     SOURCE_FAQ,
     SOURCE_PRODUCT,
     SOURCE_REGULATION,
     SOURCE_REPORT,
 )
+from src.schemas.typed_dicts import RetrievalResult
 
 
 def _write(tmp_path: Path, payload: list[dict]) -> Path:
@@ -30,7 +33,9 @@ def _write(tmp_path: Path, payload: list[dict]) -> Path:
     return path
 
 
-def _result(content: str, score: float = 0.9, source: str = "report_search", chunk: str = "c1"):
+def _result(
+    content: str, score: float = 0.9, source: str = "report_search", chunk: str = "c1"
+) -> RetrievalResult:
     return {
         "content": content,
         "score": score,
@@ -42,7 +47,7 @@ def _result(content: str, score: float = 0.9, source: str = "report_search", chu
 class _FakeRetriever:
     """按角色返回固定候选，记录收到的检索计划。"""
 
-    def __init__(self, results: list[dict]):
+    def __init__(self, results: list[RetrievalResult]):
         self.results = results
         self.plans: list[list[dict]] = []
 
@@ -97,10 +102,10 @@ def test_is_refusal_matches_safety_fallback_text():
 
 def test_build_plan_maps_category_and_expands_unknown_categories():
     plan = build_plan({"category": "report", "question": "Q"})
-    assert len(plan) == 1 and plan[0]["source"] == SOURCE_REPORT
+    assert len(plan) == 1 and plan[0].get("source") == SOURCE_REPORT
 
     expanded = build_plan({"category": "multi_hop", "question": "Q"})
-    assert {step["source"] for step in expanded} == {
+    assert {step.get("source") for step in expanded} == {
         SOURCE_REPORT, SOURCE_PRODUCT, SOURCE_REGULATION, SOURCE_FAQ,
     }
 
@@ -164,7 +169,7 @@ def test_evaluate_ablation_reports_all_paths_with_fake_components(tmp_path):
         dataset,
         paths=ALL_PATHS,
         llm=llm,
-        retriever_factory=lambda role: retriever,
+        retriever_factory=lambda role: cast(HybridRetriever, retriever),
         agent_runner=fake_agent_runner,
     )
 
@@ -201,7 +206,7 @@ def test_evaluate_ablation_counts_refusal_false_positive(tmp_path):
         dataset,
         paths=("plain_rag",),
         llm=llm,
-        retriever_factory=lambda role: retriever,
+        retriever_factory=lambda role: cast(HybridRetriever, retriever),
     )
 
     assert summary["plain_rag"]["refusal_false_positive_rate"] == 1.0
@@ -212,4 +217,9 @@ def test_evaluate_ablation_rejects_unknown_path(tmp_path):
     dataset = _write(tmp_path, [{"question": "Q", "expected_keywords": []}])
 
     with pytest.raises(ValueError, match="未知路径"):
-        evaluate_ablation(dataset, paths=("nope",), llm=_CountingLLM(_FakeLLM()), retriever_factory=lambda role: _FakeRetriever([]))
+        evaluate_ablation(
+            dataset,
+            paths=("nope",),
+            llm=_CountingLLM(_FakeLLM()),
+            retriever_factory=lambda role: cast(HybridRetriever, _FakeRetriever([])),
+        )

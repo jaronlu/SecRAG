@@ -118,6 +118,7 @@ from src.schemas.constants import (
     STATE_VERIFICATION,
 )
 from src.utils.audit import SQLiteAuditStore
+from src.schemas.typed_dicts import RetrievalResult
 from src.utils.verifier import CitationExtractor, SourceVerifier
 
 
@@ -137,7 +138,7 @@ def test_agent_ollama_client_ignores_environment_proxy(monkeypatch):
     }
 
 
-def _result(content: str, score: float = 0.9, meta: dict[str, Any] | None = None) -> dict[str, Any]:
+def _result(content: str, score: float = 0.9, meta: dict[str, Any] | None = None) -> RetrievalResult:
     """快捷构造检索结果 dict"""
     return {
         RR_CONTENT: content,
@@ -287,9 +288,9 @@ class TestVerify:
         )
 
         assert len(citations) == 1
-        assert "机构=诚通证券" in citations[0]["quote"]
-        assert "评级=买入" in citations[0]["quote"]
-        assert "来源日期=2026-05-25" in citations[0]["quote"]
+        assert "机构=诚通证券" in (citations[0].get("quote") or "")
+        assert "评级=买入" in (citations[0].get("quote") or "")
+        assert "来源日期=2026-05-25" in (citations[0].get("quote") or "")
 
     def test_source_verifier_rejects_visible_citation_that_omits_structured_claim(self):
         verifier = SourceVerifier()
@@ -781,7 +782,9 @@ class TestRoleAwareTools:
         from src.retrieval.base import BaseRetriever
 
         class RestrictedReportRetriever(BaseRetriever):
-            def retrieve(self, query: str, top_k: int = 5, filters=None):
+            def retrieve(
+                self, query: str, top_k: int = 5, filters: dict | None = None
+            ) -> list[RetrievalResult]:
                 return [{
                     RR_CONTENT: "confidential report content",
                     RR_METADATA: {
@@ -1110,10 +1113,10 @@ class TestCompose:
 
         graph = StateGraph(AssistantState)
         graph.add_node("retrieve", lambda state: {
-            STATE_RETRIEVAL_RESULTS: state.get(STATE_RETRIEVAL_RESULTS, []) + [_result("new")]
+            STATE_RETRIEVAL_RESULTS: cast(dict, state).get(STATE_RETRIEVAL_RESULTS, []) + [_result("new")]
         })
         graph.add_node("filter", lambda state: {
-            STATE_RETRIEVAL_RESULTS: [state[STATE_RETRIEVAL_RESULTS][-1]]
+            STATE_RETRIEVAL_RESULTS: [cast(dict, state)[STATE_RETRIEVAL_RESULTS][-1]]
         })
         graph.add_edge(START, "retrieve")
         graph.add_edge("retrieve", "filter")

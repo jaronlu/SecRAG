@@ -1,6 +1,6 @@
 """rag/chain.py 单元测试"""
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -11,6 +11,7 @@ from src.schemas.constants import (
     RR_CONTENT,
     RR_METADATA,
 )
+from src.schemas.typed_dicts import RetrievalResult
 
 
 # ── format_docs ──────────────────────────────────────────────────────────
@@ -22,10 +23,10 @@ class TestFormatDocs:
     def test_basic(self):
         from src.rag.chain import format_docs
 
-        docs = [
+        docs = cast(list[RetrievalResult], [
             {RR_CONTENT: "示例公司净利润747亿", RR_METADATA: {META_TITLE: "年报", META_DATE: "2024"}},
             {RR_CONTENT: "对照公司净利润302亿", RR_METADATA: {META_TITLE: "年报", META_DATE: "2024"}},
-        ]
+        ])
         result = format_docs(docs)
         assert "[来源1]" in result
         assert "[来源2]" in result
@@ -42,9 +43,9 @@ class TestFormatDocs:
     def test_single(self):
         from src.rag.chain import format_docs
 
-        docs = [
+        docs = cast(list[RetrievalResult], [
             {RR_CONTENT: "单条结果", RR_METADATA: {META_TITLE: "测试", META_DATE: "2025"}}
-        ]
+        ])
         result = format_docs(docs)
         assert "[来源1] 测试 (2025)" in result
         assert "单条结果" in result
@@ -53,10 +54,10 @@ class TestFormatDocs:
         """metadata 缺少 title / date 时应使用默认值"""
         from src.rag.chain import format_docs
 
-        docs = [
+        docs = cast(list[RetrievalResult], [
             {RR_CONTENT: "无标题", RR_METADATA: {}},
             {RR_CONTENT: "无日期", RR_METADATA: {META_TITLE: "报告"}},
-        ]
+        ])
         result = format_docs(docs)
         assert "未知文档" in result  # title 回退
         assert "报告" in result
@@ -67,7 +68,7 @@ class TestFormatDocs:
         """metadata={'title': '文档'} 时 key lookup 使用传递值"""
         from src.rag.chain import format_docs
 
-        docs = [{RR_CONTENT: "内容", RR_METADATA: {META_TITLE: "文档"}}]
+        docs = cast(list[RetrievalResult], [{RR_CONTENT: "内容", RR_METADATA: {META_TITLE: "文档"}}])
         result = format_docs(docs)
         assert "文档" in result
         assert "内容" in result
@@ -76,11 +77,11 @@ class TestFormatDocs:
         """来源编号从 1 开始"""
         from src.rag.chain import format_docs
 
-        docs = [
+        docs = cast(list[RetrievalResult], [
             {RR_CONTENT: "a", RR_METADATA: {META_TITLE: "A"}},
             {RR_CONTENT: "b", RR_METADATA: {META_TITLE: "B"}},
             {RR_CONTENT: "c", RR_METADATA: {META_TITLE: "C"}},
-        ]
+        ])
         result = format_docs(docs)
         assert "[来源1]" in result
         assert "[来源2]" in result

@@ -63,7 +63,7 @@ def test_conversation_store_persists_turn_and_is_idempotent(tmp_path):
         thread_id=state["thread_id"],
         user_id=state["user_id"],
     )
-    assert [message["role"] for message in messages] == ["assistant", "user"]
+    assert [message.get("role") for message in messages] == ["assistant", "user"]
     assert store.get_outbox_status("request-1") == "pending"
 
 

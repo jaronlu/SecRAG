@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, Optional, cast
 
 import pytest
 
+from src.agents.state import AssistantState
 from src.retrieval.base import BaseRetriever
 from src.retrieval.hybrid_retriever import HybridRetriever
 from src.schemas.constants import (
@@ -32,6 +33,7 @@ from src.schemas.constants import (
     SOURCE_REGULATION,
     SOURCE_REPORT,
 )
+from src.schemas.typed_dicts import RetrievalPlanStep, RetrievalResult
 
 
 class FakeRetriever(BaseRetriever):
@@ -43,7 +45,7 @@ class FakeRetriever(BaseRetriever):
         query: str,
         top_k: int = 5,
         filters: Optional[Dict] = None,
-    ) -> List[Dict]:
+    ) -> list[RetrievalResult]:
         self.calls.append({"query": query, "top_k": top_k, "filters": filters})
         return [
             {
@@ -60,7 +62,7 @@ class FailingRetriever(BaseRetriever):
         query: str,
         top_k: int = 5,
         filters: Optional[Dict] = None,
-    ) -> List[Dict]:
+    ) -> list[RetrievalResult]:
         raise RuntimeError("boom")
 
 
@@ -70,7 +72,7 @@ class RoleTaggedRetriever(BaseRetriever):
         query: str,
         top_k: int = 5,
         filters: Optional[Dict] = None,
-    ) -> List[Dict]:
+    ) -> list[RetrievalResult]:
         return [
             {
                 RR_CONTENT: "tech-only",
@@ -91,7 +93,7 @@ class RoleTaggedRetriever(BaseRetriever):
 
 
 class RestrictedRetriever(BaseRetriever):
-    def retrieve(self, query: str, top_k: int = 5, filters: Optional[Dict] = None) -> List[Dict]:
+    def retrieve(self, query: str, top_k: int = 5, filters: Optional[Dict] = None) -> list[RetrievalResult]:
         return [
             {
                 RR_CONTENT: "confidential",
@@ -148,8 +150,8 @@ class TestHybridRetriever:
         ])
 
         assert len(results) == 1
-        assert results[0][RR_DENIED] is True
-        assert "无权限访问" in results[0][RR_REASON]
+        assert results[0].get(RR_DENIED) is True
+        assert "无权限访问" in (results[0].get(RR_REASON) or "")
         assert results[0][RR_METADATA][META_SOURCE] == SOURCE_REPORT
 
     def test_unknown_role_fails_closed(self):
@@ -162,7 +164,7 @@ class TestHybridRetriever:
             }
         ])
 
-        assert results[0][RR_DENIED] is True
+        assert results[0].get(RR_DENIED) is True
         assert results[0][RR_CONTENT] == ""
 
     def test_unknown_source_returns_error_result(self):
@@ -177,7 +179,7 @@ class TestHybridRetriever:
 
         assert results[0][RR_SCORE] == 0.0
         assert results[0][RR_CONTENT] == ""
-        assert results[0][RR_REASON] == "未知检索源"
+        assert results[0].get(RR_REASON) == "未知检索源"
         assert results[0][RR_METADATA][META_ERROR] == "未知检索源: unknown_search"
 
     def test_retriever_exception_returns_error_result(self):
@@ -193,7 +195,7 @@ class TestHybridRetriever:
 
         assert results[0][RR_SCORE] == 0.0
         assert results[0][RR_CONTENT] == ""
-        assert results[0][RR_REASON] == "检索失败"
+        assert results[0].get(RR_REASON) == "检索失败"
         assert results[0][RR_METADATA][META_ERROR] == "boom"
 
     def test_merges_multiple_allowed_sources(self):
@@ -230,7 +232,7 @@ class TestHybridRetriever:
         ])
 
         assert results[0][RR_CONTENT] == f"FAQ:{5 * PERMISSION_OVERFETCH_FACTOR}"
-        assert results[1][RR_DENIED] is True
+        assert results[1].get(RR_DENIED) is True
         assert "confidential" not in results[1][RR_CONTENT]
 
     def test_filters_allowed_roles_metadata_within_allowed_source(self):
@@ -262,8 +264,10 @@ class TestHybridRetriever:
         faq = retriever._get_retriever(SOURCE_FAQ)
 
         assert len(created_engines) == 1
-        assert product._engine is created_engines[0]
-        assert faq._engine is created_engines[0]
+        assert product is not None and faq is not None
+        # _engine 是领域检索器包装的私有属性，经 getattr 断言共享同一向量引擎
+        assert getattr(product, "_engine") is created_engines[0]
+        assert getattr(faq, "_engine") is created_engines[0]
 
 
 def test_bm25_results_kept_with_realistic_source_metadata():
@@ -292,9 +296,10 @@ def test_bm25_results_kept_with_realistic_source_metadata():
 
     retriever = HybridRetriever(user_role=ROLE_ADVISOR)
     retriever._retriever_cache[SOURCE_REPORT] = _FakeVectorSource([vector_result])
-    retriever._bm25_retriever = _FakeBM25([bm25_result])
+    fake_bm25 = _FakeBM25([bm25_result])
+    retriever._bm25_retriever = cast(Any, fake_bm25)
 
-    plan = [
+    plan: list[RetrievalPlanStep] = [
         {
             PLAN_SOURCE: SOURCE_REPORT,
             PLAN_QUERY: "贵州茅台 评级",
@@ -304,7 +309,7 @@ def test_bm25_results_kept_with_realistic_source_metadata():
     results = retriever.retrieve(plan)
 
     # BM25 收到精确的 retrieval_source 前置过滤
-    bm25_filters = retriever._bm25_retriever.calls[0]["filters"]
+    bm25_filters = fake_bm25.calls[0]["filters"]
     assert bm25_filters.get("retrieval_source") == SOURCE_REPORT
 
     # BM25 独有结果没有因 metadata.source 是文件路径而被过滤掉
@@ -330,14 +335,15 @@ def test_role_filter_happens_before_truncation(monkeypatch):
     monkeypatch.setattr(HybridRetriever, "_get_bm25_retriever", lambda self: None)
     from src.schemas.constants import PERMISSION_PUBLIC
 
-    pool = [
+    denied_pool: list[RetrievalResult] = [
         {
             RR_CONTENT: f"secret-{i}",
             RR_METADATA: {META_SOURCE: "s", META_PERMISSION_LEVEL: "confidential"},
             RR_SCORE: 0.95 - i * 0.01,
         }
         for i in range(3)
-    ] + [
+    ]
+    public_pool: list[RetrievalResult] = [
         {
             RR_CONTENT: f"public-{i}",
             RR_METADATA: {META_SOURCE: "s", META_PERMISSION_LEVEL: PERMISSION_PUBLIC},
@@ -345,9 +351,12 @@ def test_role_filter_happens_before_truncation(monkeypatch):
         }
         for i in range(2)
     ]
+    pool = denied_pool + public_pool
 
     class _PooledRetriever(BaseRetriever):
-        def retrieve(self, query, top_k=5, filters=None):
+        def retrieve(
+            self, query: str, top_k: int = 5, filters: Optional[Dict] = None
+        ) -> list[RetrievalResult]:
             return list(pool[:top_k])
 
     retriever = HybridRetriever(user_role=ROLE_ADVISOR)
@@ -387,16 +396,16 @@ def test_rrf_order_survives_grade_and_filter():
         STATE_RETRIEVAL_RESULTS,
     )
 
-    vec_a = {RR_CONTENT: "A", RR_METADATA: {META_SOURCE: "s", META_CHUNK_ID: "a"}, RR_SCORE: 0.9}
-    vec_b = {RR_CONTENT: "B", RR_METADATA: {META_SOURCE: "s", META_CHUNK_ID: "b"}, RR_SCORE: 0.8}
-    bm_b = {RR_CONTENT: "B", RR_METADATA: {META_SOURCE: "s", META_CHUNK_ID: "b"}, RR_SCORE: 12.0}
-    bm_c = {RR_CONTENT: "C", RR_METADATA: {META_SOURCE: "s", META_CHUNK_ID: "c"}, RR_SCORE: 9.0}
+    vec_a: RetrievalResult = {RR_CONTENT: "A", RR_METADATA: {META_SOURCE: "s", META_CHUNK_ID: "a"}, RR_SCORE: 0.9}
+    vec_b: RetrievalResult = {RR_CONTENT: "B", RR_METADATA: {META_SOURCE: "s", META_CHUNK_ID: "b"}, RR_SCORE: 0.8}
+    bm_b: RetrievalResult = {RR_CONTENT: "B", RR_METADATA: {META_SOURCE: "s", META_CHUNK_ID: "b"}, RR_SCORE: 12.0}
+    bm_c: RetrievalResult = {RR_CONTENT: "C", RR_METADATA: {META_SOURCE: "s", META_CHUNK_ID: "c"}, RR_SCORE: 9.0}
 
     fused = rrf_fuse([vec_a, vec_b], [bm_b, bm_c], top_k=5)
     assert [r[RR_CONTENT] for r in fused] == ["B", "A", "C"]
     assert fused[0][RR_METADATA]["rrf_score"] > fused[1][RR_METADATA]["rrf_score"]
 
-    updated = grade_and_filter({STATE_RETRIEVAL_RESULTS: list(fused)})
+    updated = grade_and_filter(cast(AssistantState, {STATE_RETRIEVAL_RESULTS: list(fused)}))
     graded = [r[RR_CONTENT] for r in updated[STATE_RETRIEVAL_RESULTS]]
     # C 的 BM25 原始分 9.0 不应再把 B、A 挤到后面
     assert graded == ["B", "A", "C"]
@@ -413,19 +422,19 @@ def test_mixed_pool_does_not_demote_fused_results():
     from src.retrieval.bm25_retriever import rrf_fuse
     from src.schemas.constants import STATE_RETRIEVAL_RESULTS
 
-    vec_a1 = {RR_CONTENT: "A1", RR_METADATA: {META_SOURCE: "s-a", META_CHUNK_ID: "a1"}, RR_SCORE: 0.9}
-    vec_a2 = {RR_CONTENT: "A2", RR_METADATA: {META_SOURCE: "s-a", META_CHUNK_ID: "a2"}, RR_SCORE: 0.8}
-    bm25_a1 = {RR_CONTENT: "A1", RR_METADATA: {META_SOURCE: "s-a", META_CHUNK_ID: "a1"}, RR_SCORE: 12.0}
+    vec_a1: RetrievalResult = {RR_CONTENT: "A1", RR_METADATA: {META_SOURCE: "s-a", META_CHUNK_ID: "a1"}, RR_SCORE: 0.9}
+    vec_a2: RetrievalResult = {RR_CONTENT: "A2", RR_METADATA: {META_SOURCE: "s-a", META_CHUNK_ID: "a2"}, RR_SCORE: 0.8}
+    bm25_a1: RetrievalResult = {RR_CONTENT: "A1", RR_METADATA: {META_SOURCE: "s-a", META_CHUNK_ID: "a1"}, RR_SCORE: 12.0}
     # 来源 A 有 BM25 命中：结果带 rrf_score，A1 同时命中双路
     fused = rrf_fuse([vec_a1, vec_a2], [bm25_a1], top_k=5)
 
     # 来源 B 没有 BM25 命中：结果是纯向量结果，没有 rrf_score
-    unfused = [
+    unfused: list[RetrievalResult] = [
         {RR_CONTENT: "B1", RR_METADATA: {META_SOURCE: "s-b", META_CHUNK_ID: "b1"}, RR_SCORE: 0.95},
         {RR_CONTENT: "B2", RR_METADATA: {META_SOURCE: "s-b", META_CHUNK_ID: "b2"}, RR_SCORE: 0.7},
     ]
 
-    updated = grade_and_filter({STATE_RETRIEVAL_RESULTS: fused + unfused})
+    updated = grade_and_filter(cast(AssistantState, {STATE_RETRIEVAL_RESULTS: fused + unfused}))
     graded = [r[RR_CONTENT] for r in updated[STATE_RETRIEVAL_RESULTS]]
 
     # 双路命中的 A1 必须排在最前，而不是被高 cosine 的未融合结果压底

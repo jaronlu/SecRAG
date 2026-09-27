@@ -23,6 +23,7 @@ from src.schemas.constants import (
     SOURCE_REGULATION,
     SOURCE_REPORT,
 )
+from src.schemas.typed_dicts import RetrievalResult
 
 
 @pytest.fixture
@@ -57,7 +58,7 @@ class RecordingEngine(BaseRetriever):
     def __init__(self):
         self.calls: list[dict] = []
 
-    def retrieve(self, query: str, top_k: int = 5, filters: dict | None = None) -> list[dict]:
+    def retrieve(self, query: str, top_k: int = 5, filters: dict | None = None) -> list[RetrievalResult]:
         self.calls.append({"query": query, "top_k": top_k, "filters": filters})
         return [{RR_CONTENT: query, RR_METADATA: {}, RR_SCORE: 1.0}]
 

@@ -144,6 +144,7 @@ async def test_assistant_qa_uses_graph_recursion_limit_for_multi_hop_flow(monkey
 
     assert response.answer == "ok"
     assert "audit_trail" not in response.model_dump()
+    assert agent.config is not None
     assert agent.config["recursion_limit"] == AGENT_RECURSION_LIMIT
     assert AGENT_RECURSION_LIMIT >= 40
 

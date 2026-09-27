@@ -1,8 +1,10 @@
 """工具超时与请求截止时间测试（issues.md 一.8）。"""
 
 import time
+from typing import cast
 
 from langchain_core.messages import ToolMessage
+from langgraph.prebuilt.tool_node import ToolCallRequest
 
 import src.agents.nodes as nodes
 from src.agents.nodes import authorize_reason_tool_call
@@ -39,10 +41,11 @@ def test_tool_timeout_returns_promptly(monkeypatch):
         time.sleep(TOOL_TIMEOUT_SECONDS + 0.5)
         return ToolMessage(content="done", name="fake_tool", tool_call_id="call_1")
 
-    result = authorize_reason_tool_call(_FakeRequest(), slow_execute)
+    result = authorize_reason_tool_call(cast(ToolCallRequest, _FakeRequest()), slow_execute)
     elapsed = time.monotonic() - started
 
     # 返回的是错误 ToolMessage，且等待时间接近超时上限而非任务耗时
+    assert isinstance(result, ToolMessage)
     assert "超时" in result.content
     assert elapsed < TOOL_TIMEOUT_SECONDS + 0.5
 
@@ -54,6 +57,7 @@ def test_request_deadline_blocks_tool_execution(monkeypatch):
         raise AssertionError("deadline exceeded 后不应执行工具")
 
     state = {STATE_REQUEST_DEADLINE: time.monotonic() - 1}
-    result = authorize_reason_tool_call(_FakeRequest(state), execute)
+    result = authorize_reason_tool_call(cast(ToolCallRequest, _FakeRequest(state)), execute)
+    assert isinstance(result, ToolMessage)
     assert "超时" in result.content
     assert result.status == "error"

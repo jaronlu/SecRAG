@@ -1,10 +1,11 @@
 """数字验证与引用编号对齐的反例测试（issues.md 一.7）。"""
 
 from src.schemas.constants import META_CHUNK_ID, META_SOURCE, RR_CONTENT, RR_METADATA, RR_SCORE
+from src.schemas.typed_dicts import RetrievalResult
 from src.utils.verifier import CitationExtractor, HallucinationDetector, NumberVerifier, SourceVerifier
 
 
-def _result(content: str, source: str, chunk_id: str) -> dict:
+def _result(content: str, source: str, chunk_id: str) -> RetrievalResult:
     return {
         RR_CONTENT: content,
         RR_METADATA: {META_SOURCE: source, META_CHUNK_ID: chunk_id, "title": "报告"},
@@ -84,7 +85,7 @@ class TestCitationAlignment:
         citations = extractor.extract(results, query="评级 风险")
 
         # 编号应基于 prompt 序号：a1 -> 1，b1 -> 3（不再因去重移位成 2）
-        ids = [c["citation_id"] for c in citations]
+        ids = [c.get("citation_id") for c in citations]
         assert ids == ["cite_001", "cite_003"]
 
     def test_source_verifier_uses_prompt_source_count(self):

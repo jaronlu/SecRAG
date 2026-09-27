@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -6,15 +7,21 @@ from pydantic import ValidationError
 from src.config import Settings
 
 
+def _settings(**kwargs: Any) -> Settings:
+    """基于 basedpyright 会从模型字段合成 Settings.__init__（不含 pydantic-settings
+    的 _env_file 等下划线参数），经 **kwargs 收口；运行时仍走 BaseSettings.__init__。"""
+    return Settings(**kwargs)
+
+
 def test_app_env_accepts_documented_development_value():
-    settings = Settings(_env_file=None, app_env="development", openai_api_key="test-key")
+    settings = _settings(_env_file=None, app_env="development", openai_api_key="test-key")
 
     assert settings.app_env == "development"
 
 
 def test_app_env_rejects_ambiguous_dev_alias():
     with pytest.raises(ValidationError):
-        Settings(_env_file=None, app_env="dev", openai_api_key="test-key")
+        _settings(_env_file=None, app_env="dev", openai_api_key="test-key")
 
 
 def _langfuse_stub_keys() -> dict[str, str]:
@@ -26,7 +33,7 @@ def _langfuse_stub_keys() -> dict[str, str]:
 
 
 def test_langfuse_disabled_by_default_and_omits_key_check():
-    settings = Settings(
+    settings = _settings(
         _env_file=None,
         llm_provider="ollama",
         langfuse_enabled=False,
@@ -42,7 +49,7 @@ def test_langfuse_disabled_by_default_and_omits_key_check():
 
 def test_langfuse_enabled_requires_host_and_keys():
     with pytest.raises(ValidationError, match="LANGFUSE_PUBLIC_KEY"):
-        Settings(
+        _settings(
             _env_file=None,
             llm_provider="ollama",
             langfuse_enabled=True,
@@ -52,7 +59,7 @@ def test_langfuse_enabled_requires_host_and_keys():
         )
 
     with pytest.raises(ValidationError, match="LANGFUSE_HOST"):
-        Settings(
+        _settings(
             _env_file=None,
             llm_provider="ollama",
             langfuse_enabled=True,
@@ -63,7 +70,7 @@ def test_langfuse_enabled_requires_host_and_keys():
 
 
 def test_langfuse_enabled_with_full_config_passes_and_rejects_bad_sample_rate():
-    settings = Settings(
+    settings = _settings(
         _env_file=None,
         llm_provider="ollama",
         langfuse_enabled=True,
@@ -80,7 +87,7 @@ def test_langfuse_enabled_with_full_config_passes_and_rejects_bad_sample_rate():
     assert settings.langfuse.secret_key.get_secret_value() != ""
 
     with pytest.raises(ValidationError):
-        Settings(
+        _settings(
             _env_file=None,
             llm_provider="ollama",
             langfuse_enabled=True,

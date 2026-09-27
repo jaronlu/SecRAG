@@ -14,6 +14,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from pydantic import SecretStr
 
 from src.config import LangfuseConfig
 from src.utils.langfuse_adapter import (
@@ -46,7 +47,9 @@ def _enabled_cfg(**overrides: Any) -> LangfuseConfig:
 
 
 def _disabled_cfg() -> LangfuseConfig:
-    return LangfuseConfig(enabled=False, host="", public_key="", secret_key="")
+    return LangfuseConfig(
+        enabled=False, host="", public_key="", secret_key=SecretStr("")
+    )
 
 
 class FakeLangfuseSpan:
@@ -123,7 +126,9 @@ def test_disabled_adapter_is_fully_inert():
 
 
 def test_enabled_but_missing_keys_is_noop():
-    cfg = LangfuseConfig(enabled=True, host="https://x", public_key="", secret_key="")
+    cfg = LangfuseConfig(
+        enabled=True, host="https://x", public_key="", secret_key=SecretStr("")
+    )
     adapter, fake = _adapter(cfg)
 
     assert adapter.enabled is False
