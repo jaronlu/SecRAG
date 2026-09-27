@@ -46,9 +46,10 @@ def parse_date_day(value: object) -> int | None:
         match = pattern.match(text)
         if match is None:
             continue
+        lastindex = match.lastindex or 0
         year = int(match.group(1))
-        month = int(match.group(2)) if match.lastindex >= 2 else 1
-        day = int(match.group(3)) if match.lastindex >= 3 else 1
+        month = int(match.group(2)) if lastindex >= 2 else 1
+        day = int(match.group(3)) if lastindex >= 3 else 1
         try:
             date(year, month, day)
         except ValueError:
