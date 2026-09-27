@@ -214,7 +214,7 @@ def _run_agent_path(
     started = time.perf_counter()
     calls_before = getattr(llm, "calls", 0)
     try:
-        result = build_agent_graph().invoke(
+        result = build_agent_graph().compile().invoke(
             initial_state,
             {"recursion_limit": AGENT_RECURSION_LIMIT},
         )
