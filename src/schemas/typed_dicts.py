@@ -103,11 +103,12 @@ class CitationDict(TypedDict, total=False):
     metadata: dict
 
 
-class AnswerOutcome(TypedDict, total=False):
+class AnswerOutcome(TypedDict):
     """对外业务终态：普通执行与缓存命中共用的答案语义。
 
     缓存命中、正常回答、合规拦截都收敛为这一种结果对象再对外返回，
     传输层不得分别解释业务（AssistantQAResponse 是它的序列化投影）。
+    所有构造点（缓存命中、图执行终态）均填全字段，故键为必填。
     """
 
     answer: str
@@ -116,8 +117,12 @@ class AnswerOutcome(TypedDict, total=False):
     compliance: ComplianceResult
 
 
-class ConversationThreadDict(TypedDict, total=False):
-    """Conversation thread metadata."""
+class ConversationThreadDict(TypedDict):
+    """Conversation thread metadata。
+
+    唯一生产者是 SQLiteConversationStore（create_thread 全量构造、行查询
+    SELECT 全列），键必定存在；client_id/deleted_at 值可为 NULL。
+    """
 
     thread_id: str
     user_id: str

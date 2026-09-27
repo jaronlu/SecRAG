@@ -345,8 +345,7 @@ async def create_assistant_thread(
         client_id=request.client_id,
         title=request.title,
     )
-    # create_thread 返回全量字段，收窄类型以消除 TypedDict(total=False) 的访问警告
-    assert "thread_id" in thread and "title" in thread and "created_at" in thread
+    # create_thread 返回的 ConversationThreadDict 全键必填（SQLiteConversationStore 全量构造）
     return ConversationThreadResponse(
         thread_id=thread["thread_id"],
         title=thread["title"],
@@ -503,7 +502,7 @@ async def assistant_qa(
     except Exception as exc:
         raise _conversation_http_error(exc) from exc
     # ensure_thread_for_qa 返回的 thread 保证含 thread_id（查找键或新建时赋值）
-    thread_id = thread.get("thread_id", request.thread_id)
+    thread_id = thread["thread_id"]
     turn_id = str(uuid.uuid4())
     # request_id 显式生成后传入初始 state：Langfuse 根 trace 与 SQLite 审计
     # （STATE_AUDIT_TRAIL.request_id）共用同一 id；trace metadata 只含
@@ -687,7 +686,7 @@ async def assistant_qa_stream(
             yield f"event: error\ndata: {json.dumps({'detail': str(exc)})}\n\n"
             return
 
-        thread_id = thread.get("thread_id", request.thread_id)
+        thread_id = thread["thread_id"]
         turn_id = str(uuid.uuid4())
         # request_id 显式生成后传入初始 state：Langfuse 根 trace 与 SQLite 审计
         # 共用同一 id；metadata 只含 request_id/thread_id，无用户身份信息
