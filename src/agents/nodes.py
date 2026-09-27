@@ -509,7 +509,7 @@ time_range 说明：如果查询涉及时间范围（如"最近3个月"、"2024�
     entities = result.get("entities")
     if not isinstance(entities, dict):
         entities = {}
-    clean_entities = {
+    clean_entities: dict[str, str | dict[str, str]] = {
         key: value
         for key, value in entities.items()
         if isinstance(key, str) and isinstance(value, str)
