@@ -5,8 +5,10 @@ description: 本页用一条问答请求说明 AssistantState 如何贯穿 SecRA
 tags: [architecture, state, authorization, security, audit]
 verified:
   - by: openwiki/0.5.2
-    at: 2026-09-24T17:03:23.068Z
+    at: 2026-09-25T04:47:56.817Z
 sources:
+  - id: openwiki-source-61267d3d2b88d5be53534466
+    resource: repo://docs/architecture-overview.json
   - id: openwiki-source-ce706aa9fc0c231bbb5791c7
     resource: repo://src/agents/graph.py
   - id: openwiki-source-1204a4ec52aa8e3c70a8eac9
@@ -27,12 +29,25 @@ sources:
     resource: repo://src/utils/conversation.py
   - id: openwiki-source-fc350d8da22ace16e2b8e8c4
     resource: repo://src/utils/verifier.py
-generated: { by: "codex", at: "2026-09-24T17:03:23.068Z" }
+generated: { by: "codex", at: "2026-09-25T04:47:56.817Z" }
 ---
 
 # 状态、权限与安全边界
 
 先记住一个核心观点：SecRAG 不是“先生成答案，再把敏感文字删掉”。权限和安全检查分布在请求的多个阶段；任何一层发现不能安全继续，都会返回拒绝、重试或安全兜底。
+
+## 1.1 架构总览图如何对应安全边界
+
+面试版的[整体架构图](../../docs/architecture-overview.svg)把实现压缩成四个阅读区域：FastAPI 服务层、外层 StateGraph、内层 ReAct 子图、验证与输出，以及底部基础设施。图中的 `ReAct 推理` 是聚合节点，实际仍包含准备证据、调用按角色绑定的模型、工具授权、超时与熔断；图中的 `执行检索` 也不是“只查向量库”，而是包含计划级权限过滤、向量/BM25 融合和结果级权限过滤。
+
+因此，图适合先记住主链：
+
+```text
+认证 → 问答 API → 查询理解 → 生成检索计划 → 执行检索
+                                      → ReAct 推理 → 验证与输出
+```
+
+安全边界并没有因为图被简化而减少：认证在 API 入口绑定身份，检索层拒绝越权数据，ReAct 工具在执行边界再次授权，验证和合规共同决定最终是否能对外显示。
 
 ## 1. `AssistantState` 是整条链路的共享内存
 

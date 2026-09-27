@@ -5,24 +5,30 @@ description: 本页跟踪 POST /v1/assistant/qa 的一次完整执行，解释�
 tags: [workflow, fastapi, langgraph, agent, qa]
 verified:
   - by: openwiki/0.5.2
-    at: 2026-09-24T17:03:23.068Z
+    at: 2026-09-25T04:47:56.817Z
 sources:
+  - id: openwiki-source-61267d3d2b88d5be53534466
+    resource: repo://docs/architecture-overview.json
   - id: openwiki-source-ce706aa9fc0c231bbb5791c7
     resource: repo://src/agents/graph.py
   - id: openwiki-source-1204a4ec52aa8e3c70a8eac9
     resource: repo://src/agents/nodes.py
   - id: openwiki-source-9abd0efc90fa978f061bb160
     resource: repo://src/api/main.py
+  - id: openwiki-source-e532544007c5ed049c805ecd
+    resource: repo://src/retrieval/hybrid_retriever.py
   - id: openwiki-source-d7fe4b257987f8cbf763fe5e
     resource: repo://src/utils/audit.py
   - id: openwiki-source-ca13b5edb6eb87b3be9baecf
     resource: repo://src/utils/conversation.py
-generated: { by: "codex", at: "2026-09-24T17:03:23.068Z" }
+generated: { by: "codex", at: "2026-09-25T04:47:56.817Z" }
 ---
 
 # 问答请求执行链路：从 HTTP 到最终答案
 
 可以把一次问答想成一条“传送带”：API 先把请求装进 `AssistantState`，LangGraph 节点依次加工这份状态，最后只把安全的结果返回给用户。
+
+先区分两张图的用途：`docs/architecture-overview.svg` 是面试和架构阅读用的总览图，只保留认证、问答 API、查询理解、检索、ReAct、验证输出这条主链；本页流程图则展开真实运行时的澄清、权限拒绝、检索重试、工具上限、验证重推和合规阻断分支。总览图中的“ReAct 推理”对应本页的 `prepare_reason → call_reason_model → execute_reason_tools / finalize_reason` 子图，“验证与输出”对应引用提取、验证、合规和 `compose`。
 
 ```text
 POST /v1/assistant/qa
@@ -40,6 +46,8 @@ POST /v1/assistant/qa
   │                 └─ 继续 → 合规检查 → 组织答案
   └─ 保存会话 → 写审计 → 返回 answer/citations/confidence/compliance
 ```
+
+这张详细图表达的是“控制流”，不是每个基础设施调用的物理拓扑：向量库、BM25/RRF、Embedding 和 SQLite 由相应节点或服务按需使用，最终状态仍沿着外层 StateGraph 汇聚到持久化和审计。
 
 ## 1. 请求先经过 FastAPI，而不是直接进入 LLM
 
