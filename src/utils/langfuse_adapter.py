@@ -167,7 +167,7 @@ class _LangfuseSpanHandle:
 
     __slots__ = ("_adapter", "_otel_span_id", "_span")
 
-    def __init__(self, adapter: LangfuseAdapter, span: Any, span_id: str | None):
+    def __init__(self, adapter: LangfuseAdapter | None, span: Any, span_id: str | None):
         self._adapter = adapter
         self._span = span
         self._otel_span_id = span_id
@@ -183,7 +183,7 @@ class _LangfuseSpanHandle:
         error_type: str | None = None,
         metadata: Mapping[str, Any] | None = None,
     ) -> None:
-        if self._span is None:
+        if self._span is None or self._adapter is None:
             return
         try:
             filtered = self._adapter.filter_metadata(metadata)
@@ -671,7 +671,7 @@ class LangfuseAdapter:
         mask/should_export_span 随实例保留），因此其自动捕获的原文也会被
         export 层统一脱敏。调用方将返回值放入 ``RunnableConfig.callbacks``。
         """
-        if not self._enabled or trace.span_id is None:
+        if not self._enabled or trace.span_id is None or trace.trace_id is None:
             return None
         try:
             from langfuse.langchain import CallbackHandler
