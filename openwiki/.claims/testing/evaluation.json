@@ -1,0 +1,230 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:7cc8b468210a745084298d9319ae19b1a499aa0fe9ac565c1bff8b09684d6049",
+  "claims": [
+    {
+      "id": "claim_eadae1be56584858bf539593dc85f5a6",
+      "statement": "开发验证用 `uv run ruff check .` 与 `uv run pytest`；dev 依赖（pytest>=9,<10、pytest-asyncio、ruff）声明在 pyproject.toml 的 [project.optional-dependencies].dev，必须用 `uv sync --all-extras` 或 `--extra dev` 安装——裸 `uv sync` 会卸载未声明包。",
+      "evidence": [
+        {
+          "resource": "repo://pyproject.toml#L41-L46",
+          "version": "repo-lines-v1:sha256:9ae25ce95cf04a8f36003aa124748cc16fef36cca9202ce7c5c4a28edbceff83:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTkyMThkYzRjZTk3MWNiZTNkMzhkNzc0MzBlNjM5OTE4ODg0ZGQ3N2Q3MTg0YzdiOTNkZmRjMmU5OTg2OTFiNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjk0MTZlMDlmNzhiYTMxNmMwMzI1NjgyMTNiODU1ZWU3NTZlNDE1NjVkOTE4ZjA5NTE5YzgxZmQ2MjBmNDA2MCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOTdmYmQyMTAxN2JjZGEwM2E3ZWI5MmE4YjBhNDg5YzdiM2ZhNDhjZGU4M2I5ZWU2Mzk2YTRjYzU0MDNhNjMyMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjg0Yjg2YjYyMTI4YjZiYmQ0YTUyZDRkMzg2NjNhNmY3OTc1YzAwM2Y3YWZlNTc3MTAwNDc1OWY1OWVhYmZkNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_335fe00b8a284266ad14e14a6fa8ed1c",
+      "statement": "pytest 配置在 pyproject.toml：asyncio_mode=\"auto\"、testpaths=[\"tests\"]，tests/ 单元测试与 tests/e2e/ 端到端用例由同一套 pytest 驱动。",
+      "evidence": [
+        {
+          "resource": "repo://pyproject.toml#L62-L64",
+          "version": "repo-lines-v1:sha256:82982065fc69775e2e41ec5d44bcad76534a97392b066d20e9fdf64d31c2fa4c:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODY3NmU2NDE0NjVhNjU1MWU5ZTljZmZkN2ZhYTFlNmE0MmY5YjcyNDgwOTgxM2M5MDNkN2VkY2I1MmYzMDA2ZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDEwODVhZDA5MDQyNTcxMWFkYjRmMTVmMjhlMjVjMTcxMDc5MmMxZDQ1ZGE3Mzk0ZWU5MTJlMDM4MTkwNDU5MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMWVkZDczNmUwNjc0MzRiZWIwYjA2MzFjMzM5Nzg1NmUwMmI5ZThjY2Q2ZTk3MDE4YjA3Y2ViYjk0YjQ3MjE5OCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTdhNWY5OWY1YTVjZTMxYmU5YmE4MDYxNTU4MmQ3NjdmNGQ4NjdkYTkwMWFhMjgwMzAwZjBiNDM2OTMyMTc2MCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_c58bffab7b1e4d19a98e9791acb4c4a6",
+      "statement": "测试分 tests/（单元测试，含 test_agents.py、test_hybrid_retriever.py、test_api_*.py，以及评估脚本自身的 test_evaluate_retrieval.py、test_evaluate_ablation.py、test_evaluation_scripts.py）与 tests/e2e/（TC-001~TC-035 编号端到端用例，按 docs/test-plans/e2e-test-cases.md 的环节分文件：test_e2e_auth.py、test_e2e_ingestion.py、test_e2e_retrieval.py、test_e2e_qa.py、test_e2e_compliance.py、test_e2e_audit_cache.py）。",
+      "evidence": [
+        {
+          "resource": "repo://docs/test-plans/e2e-test-cases.md#L40-L302",
+          "version": "repo-lines-v1:sha256:cc15c6f3333c42d665b1b564e6b4b58ad56e2c2883d95d27cf29fc60cabb49e1:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYzLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiJkNTE1NjM2MmU2MzlmMjE1MWE4ZTcyYjNkZjYxYTc4ZWE4YjMwOTRmNTNmMzJhMGM5MDgyMzIxMDQ4YjA0ZDAxIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiI3Nzc2NmE3ZDNiMTczMTgyODM4ZmE0MzQ0NzhlMGVkNDk0YzlhOGY3YjVjYzBlY2IxYTk1MmRhZGEzMTkyNTEyIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiI5NzMzMWM5Y2QxODBjNDBlMjFjOGU3Mzc0ZWIxZjE4MTE1NzNjZDg0MTFmZmI0MDA3MGY2ZjY0M2U3MTNiNjk0IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiIwMWRkMzcxMGU0MjllMGQ3MjBlYzI2NzY2ZWI2YWU2NzQzZmVjZWEwN2UxY2I5YTEyYjM1MmIzN2JjODM0YjYwIn0"
+        },
+        {
+          "resource": "repo://tests/e2e/test_e2e_retrieval.py#L1-L4",
+          "version": "repo-lines-v1:sha256:a1c194f385642109f79a3d2f27dad741ed7d7f2387243bbaf907a366b9a697ab:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDk5ODZiYjJiNzRjZDhhZTliNTQ1NjgzYWVjMzJhMjFmNTQzMTQzNmRjZTc3NTYyMWI0MGQyODQ4ODBjM2I3YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGRmYjkwZWQ5MWRhNmQ2ZDdmMzg5NTFkYzQ5OWI0ZmM4NGE0YzMxY2U3NjM5ZTUzOGVhZTZmMTM5YWIyYjhmMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWFhZjc2MzdjYjZlN2U1ZGI4NWQ2MzQyNzQ2MDE0ZGYwNDFjY2Q1NThhOTIwYjI5ZWI2YWM3MTlkN2JhZjVjMiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_4547790841f94c8da7cbb67f47bc683e",
+      "statement": "tests/e2e/conftest.py 的共享 fixture 遵循「LLM/向量检索/外部网络一律替换为测试替身、SQLite 存储/ChromaDB/注册表落到 tmp_path」原则；isolated_stores 把会话/审计/outbox 落到 tmp_path 并在用例前后调用 result_cache.invalidate_retrieval_caches() 清理检索 TTL 缓存与 BM25 索引缓存；run_agent_graph 组合 fake_llm + isolated_stores + fake_retriever_factory 并用 fresh checkpointer 保证用例独立。",
+      "evidence": [
+        {
+          "resource": "repo://tests/e2e/conftest.py#L1-L5",
+          "version": "repo-lines-v1:sha256:64b2ee0e534343b82075c9a68b2dfd33fa8519d9530ef2c71c30673996b0909d:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2RlM2E0ZGY1YThlNGQ3NmU3N2ZlNDQyNDVmYWRmZjI5ODBlYzM4MzgzMzUxZWJkZmM0YzE3ODZmNTNjYTNkNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTMwM2VjZGQ0YTRkMTBmMTljNzNmZDQyZmQxMjQzN2ZkMzM1NGE4MjY4MTYwNWRhNTI1NWE5N2EzOTA2OGRiYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTViNmU4NzA2YjQzMDQ3ZjJhNmRiNjdmMTMyNjM4NTk1NjA0ZTY3ZjM2OTY2ODc2Y2UwMTU4ZjAwNTNlNmJkMSJ9"
+        },
+        {
+          "resource": "repo://tests/e2e/conftest.py#L119-L136",
+          "version": "repo-lines-v1:sha256:9dfeb3be57ad55a20d470ed571bcc3a175f7bb61363889be0cc047d5904a40cf:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNmYjYxNTVkY2VjNTBlMDQ0NzYyZmE2MmU2YWU2NjYxNDVmMDNmYjE0NGNlMGIwM2RiZGY0ODYyYjQyNWNhY2QiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIwOGNhOGQ0NTQ5YzdkOTE0ZTk4ZGYwYWMwMTA0MzM2NjRjYzU0MjIwNTM1NDlmMDI2MzFjN2ZiZmY2YWQ4MzEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM1ZDZlNmQ1ZWFlYjMzNDBjNjk2Y2ViY2JlY2JmNTNmMWI2Y2RkOTUyMzllMjY3ZWY2YmMzNmYzNTg1NjMwYzYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImYzYmY2ODkxZWQxODZjN2ExOTk5MWM0NzlmYWFmZjgzNDNkNmRiNmM4MzcxNmE2MGY0YzZhOTY0YmJlYmI5MDQifQ"
+        },
+        {
+          "resource": "repo://tests/e2e/conftest.py#L176-L190",
+          "version": "repo-lines-v1:sha256:3e8a1fc1c31bbb6860c74e9017a98ed3a0509224e5f09c38476baf9e9bf181bf:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNmYjYxNTVkY2VjNTBlMDQ0NzYyZmE2MmU2YWU2NjYxNDVmMDNmYjE0NGNlMGIwM2RiZGY0ODYyYjQyNWNhY2QiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFmN2Y0M2QzMzZlNjNkZmE0NGMxZTIzYTFhYWE0YzRmMjdhZTkwNjZjNThmOGNlYjVmOTRlYjg0ZGIyYzFlNDMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjYwNzc3Y2MyZGM5NDNmMDY2ZGYyNzM4OGYzZjk4NTFiMTliODZiYTQzNDI2NGQxZmUxYjk1MmUxZDk3MDg5YTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_014842a21926427e9baff0e601e304da",
+      "statement": "scripts/evaluate_retrieval.py 用 JSON 数组评估集（query/user_role/检索计划或 source 或 expected_query_type + relevant_chunk_ids/relevant_doc_ids；预期拒绝样本用 expected_permission_denied=true 且相关文档为空）；_normalize_plan 依次取显式 plan、source、expected_query_type→source 映射（如 technical_inquiry→faq_search）推导检索计划。",
+      "evidence": [
+        {
+          "resource": "repo://scripts/evaluate_retrieval.py#L38-L45",
+          "version": "repo-lines-v1:sha256:6f21ca9f2409af0a8b9959d77442c7ba35312cc6e05dd43058c00b27a315a123:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmQ4OWQzNjAzM2MzMDYwNTc1ZTVlZTFkYTE4NTBjMWVmZGJkZWM3MDEwM2NjMmI2NTA0NWE0MjJkNzM5NTJkYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYWNhOGJlY2IzMTc4ZTAyNjIyNjI4OGE2NDZiNGI1MGI0OTliZjg1ZDliZDk1YmQ2NWM4YmNkYzlmOGU4YjU1MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNmFiOWY2OGQxMjY4ZTBhNTExMmI0ZDEzODJkY2ZjMmE4NjRjNGFiMjA3ZjlkYmRkNTI0Njk0MGIzMWRlNDEzOCJ9"
+        },
+        {
+          "resource": "repo://scripts/evaluate_retrieval.py#L55-L112",
+          "version": "repo-lines-v1:sha256:ba57f2b50e70558615683e63ec5394a97bff00414cbd72dcf865509b40304be4:eyJzZWxlY3RlZExpbmVDb3VudCI6NTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI2NWEzMDFkNGRmMjJhMzYyY2M2YWYwNjY4YTRiYTY1NzM5MjVhNDhlYjk4MTZhMzZmY2I5ZGJiOWYwNDI5ZjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFkZDI0NDU4MmI2ZmIwM2QyM2I4NDE1YWJlY2QzNDZiMGM5ZjQ2NmI2Zjc1MmIwNjgxODljZTdlOWEyZGMzNTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA5ZjkzMDgzYzE5NzEyMWI5ODI3MDBiYThhZmFiZDE3MjJjZjFkM2U3NDA0NTA5ZTgwZWZhMjcyNDdmNjJmMDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBhMzcyNDQxNWYzMmYzMDMwMWJlMDY4MWIzOWI3ZmUxMmU4NGY1YzI4NzIyNTE0YzA5MmNlMzc4MGJlMmRjMzAifQ"
+        },
+        {
+          "resource": "repo://scripts/evaluate_retrieval.sample.json#L1-L41",
+          "version": "repo-lines-v1:sha256:5dfc7c3281b77c6addf3d128cff5b249bc54a234a288ced243acf44c1e1cf749:eyJzZWxlY3RlZExpbmVDb3VudCI6NDEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk1ZDJiMTkzNDkzMTY5MTY2OWNjMzVhODc2MTk1MTgwMTUzMzYyMTNkZGEwYTYwZmUxYjA5ZjliOGUzZTk5M2QiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY5NDE2ZTA5Zjc4YmEzMTZjMDMyNTY4MjEzYjg1NWVlNzU2ZTQxNTY1ZDkxOGYwOTUxOWM4MWZkNjIwZjQwNjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_4fa3d138ea3a470d98a4ca09ab2534cd",
+      "statement": "evaluate_retrieval 对每个样本用真实 HybridRetriever（角色与 ROLE_DATA_PERMISSIONS 注入）执行计划后聚合 recall@5/recall@10/MRR/precision@5/coverage/permission_block_accuracy；无相关文档标注的纯权限样本以「实际拒绝==预期拒绝」计 coverage 且不拉低召回/MRR 指标（test_evaluate_retrieval.py::test_permission_only_samples_do_not_lower_retrieval_metrics 锁定该语义）。",
+      "evidence": [
+        {
+          "resource": "repo://scripts/evaluate_retrieval.py#L142-L202",
+          "version": "repo-lines-v1:sha256:980433b1446bedcde0bedc6d4f82f77715598d9199cf23e09665d0b86cae5543:eyJzZWxlY3RlZExpbmVDb3VudCI6NjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdiNzhlMzdlMGVlOGM2ZjQ2Y2ZmZjRmMDY5ZjcwY2ZjY2FjNjg3Y2UyY2ZiOTdlNDcxYzI4Mjk0NzlkMWQ3OGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjEyYmNiZDgwMTAxNWI5MTYyN2VkZWZmN2RjZThiZGRjMDBiYzBjOTBlMjhjMGM5MjVmMmExMWJlYWViNmEyNTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU5ZGMzZmQ3NmNlNzU2MjRmZmYwMDRlNGM3ZWQ5OTY2ZDgxNjgzNDUyM2RlOTRlZTQwZjA4NGJhNGIzOWRjODQifQ"
+        },
+        {
+          "resource": "repo://tests/test_evaluate_retrieval.py#L133-L164",
+          "version": "repo-lines-v1:sha256:4750593f0afa520a2a9f958738752e6fc52e9c5ad95f6867dbc830d7eb3809aa:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc0NTNlYTNlYTY3MjFiNDcxYjM5MjMxZTUyOWRiMWE1MDU0OTRhZTZjNWYzZDY0NTEyZWRiNWNkOGM4ZGZiYjkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJmNWE2YzRmZjc3YWUxMmNhNTdhMjZlNmZhMGFhYmQwNzY1YzQ3YzE0YjYwZDY0MGExYjQwNTljNTk3MWY2NGYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE2ODM0OTUwNzJkYjFmZTFjZmIzYjFmNGM5MThiODg3ODZjMzZiNmI3ZGMyMDhmZGQxNzA5ZjAyZWVkNzA5MTAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMxMTAwZWFmN2EwMjAxNzhlZTRkMzJiMTI2ZTQzMTFhNzA5NmJhOTdiNmM1ZmU2ZWEzOTdmZGY3NjY5YTI4YzEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_b13bef80c0ff47408ac6d8372cc2a6b7",
+      "statement": "检索评估准入阈值为 recall@5≥0.80、recall@10≥0.90、permission_block_accuracy=1.0，admission_passed 要求三者同时满足；main 检测到占位 chunk id（replace_me_/example_/sample_ 前缀）或未过门槛时以 SystemExit(1) 退出。",
+      "evidence": [
+        {
+          "resource": "repo://scripts/evaluate_retrieval.py#L205-L206",
+          "version": "repo-lines-v1:sha256:f90892385fdebc5ca145961aa06f80f5cb92b066071ebb52b971f7b32687ec9a:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjE2Njg1MjNjOTQ2NjQ3MzhiNDA5Y2QwMDZlYjVhMzcyZDExOWMwNmE2Yzk2OGUwZDBiZDA1YmQ3ZmM5ZDFmYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjlhYzI5OTMyMmY0OWUyNzFmMWM2NWJmZTY2Y2M1Y2E2OWNkOTI4YWRhMWJiMWIwY2Q5YzI1MDY0ZTllNzc2OCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGZiZDAwOTMxNGJjMjcwODQxNjczNGEwMmFlNWZmMzlhMWU0OGEwNTBiZTkxZjQzYjJmYWE5MjAwMmM2MmJmYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjg3OGViNDI5NzgwMWNlMWVjYjQ4YmY2YjFjOTdhNmY0NDllMjgzZjk4NDFhNTFlMmUyM2MyZDQ2MTI4Njk2MSJ9"
+        },
+        {
+          "resource": "repo://scripts/evaluate_retrieval.py#L224-L242",
+          "version": "repo-lines-v1:sha256:0e61207fb252fa09fb5eec8df888a2b4fdcbce6c89056c1f728451cdd8a707fc:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJmZDA2NzJiZTRkMTliNjQzMmY0NmQ0OGNmZDZkOWI2NGRlNjg0Yzc4ODEyN2M1YWRlMzU5MmVkY2Y3NjZmYzQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE3NmFlMzVmYTc5MTMzNTFhZDAwMmY0ZGU2MTNiZmYxZTMxN2E2ZGFjNTAyYzZhN2FkNzk2NmMyNzc1ODk3OGEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU5ZjFhMmU1ZTM3M2ZhYTE4Njc0MmIzMzI4OGU4ZWJmYTA4MDE1NWFjZjVhNWIzYTQ5Mzc2ZjJhZDFiZWEyN2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNkNDEzNDBjYzIzOWExNTljZTliNjAyMmU5ZjYzMjI4MzJlMmVhZDc2Y2FlOWU0NzU0ZDIxMGViOGZiNmQ1ZTgifQ"
+        },
+        {
+          "resource": "repo://scripts/evaluate_retrieval.py#L48-L52",
+          "version": "repo-lines-v1:sha256:c587c0c098edf6cd15b8147f98b3909c0324358cd26457b4fcf24f4b22f27b14:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTNhNGFiMjE5NDk4N2M0ZDIwMWUzMjIzNTEzYmFkOTc4ODdlMzRhNWQyNDYxNTEzNmM3ODY1OTJhNTIwMmE2ZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWYzNmE2YTRiNjc2ZWYyMzU2ZWM3ZGYxMWU1NmYzMDFlNzhhNjNjZmRhNGNhZGEwOTQ5MjBlZDE2NmI2NjFhMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDQwNzk0ZjBhYjY4OThiNjY4M2JiMTdjMzg1N2IzZjEwNWM1YTM0NTQ0NDBkZTliZTVlZDczY2EwMTkzMzIzYyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_60282d469dba4f88b0b7f381d642b025",
+      "statement": "scripts/evaluation_common.write_artifact 把 {commit_sha, dataset（仓库相对路径）, summary} 写入 artifacts/evaluation/<commit_sha>/<name>.json，current_commit_sha 在 git 不可用时回落 \"uncommitted\"；所有评估脚本共用此产物格式保证评估可复现。",
+      "evidence": [
+        {
+          "resource": "repo://scripts/evaluation_common.py#L18-L59",
+          "version": "repo-lines-v1:sha256:e2b43f59a3c97da2d91264ad527a7a4fd9043ad26620c0f6bef303da0c9ba4f7:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVkZDAwY2I5N2MyZGNiYmY1YTNlMzlkN2Q3ZGYxYjk1ZjFlMmQyNTI0ZDZmMDljYmVkMzBmY2ZhY2QzNjU4NmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyZDU5MDdmZDZhZDU4MmY3ZjZhMzBmZmViMDllNTg5ZTkxNDdkYTFiODQ5MGNiZjc3MDY4ZGMwZTQ3NzVmN2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNiMTg0NGZhZDI3Nzc4N2MzZjhkZjViMzQxZWNmNzIyM2Y1NTQ5Yzg0ZjI3MmUxOTdjYjE0MTI2ZjAyYzc3NjgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_5599d390dbd0479794afa10e3f182ace",
+      "statement": "scripts/check_permissions.py 不调用 LLM，用 HybridRetriever.retrieve + grade_and_filter 统计非 denied 结果数验证角色感知检索与 post-retrieval grading 的可见性：technical 可见 LangGraph FAQ（demo FAQ 的 allowed_roles 含 technical），operations 同一 FAQ 因 allowed_roles 只有 technical 被结果级过滤拒绝（计划级有 FAQ 源、可见 0），sales 查 report_search 无可见结果；任一检查失败以非零码退出。",
+      "evidence": [
+        {
+          "resource": "repo://data/raw/demo_knowledge_base/samples/faq/sample_project_technical_faq.html.meta.json#L1-L6",
+          "version": "repo-lines-v1:sha256:eb701713adb7793881114243e3919f251a861574597cf1f737eb7ef207a2b0f3:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTZmYjA4ZmRhMWFjYjk1N2I2MTE2YmQzNzgxMWExZmU0MWEwMTYxMWMwNjMxZWRiZjc4NmQ2ODg5YTI3YTU1YyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        },
+        {
+          "resource": "repo://scripts/check_permissions.py#L1-L5",
+          "version": "repo-lines-v1:sha256:fa5e1f9758b2d200500329c3eaf2add0570c078aee5cf552edc7220fe98c53b6:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGZlZmRhMTY5MWJiY2U4ODFkOGQ3NTM2MDJkZTU5ZjFlOTdhZWRhYTI4NWFjNTU4NmY2ZTNiMmUwOTgxMTA0ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTMwM2VjZGQ0YTRkMTBmMTljNzNmZDQyZmQxMjQzN2ZkMzM1NGE4MjY4MTYwNWRhNTI1NWE5N2EzOTA2OGRiYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTQ3NzMxMWQ3ZWUyYmZkODkxNTU3MmZkOWVlNzZkZmQzYmI0ZDFlOWMwZjY4Y2ZjOGVlZDkxZTFmODI0YjFjMCJ9"
+        },
+        {
+          "resource": "repo://scripts/check_permissions.py#L26-L54",
+          "version": "repo-lines-v1:sha256:204ff270648988e57166c502840a194c24d07d274db9ec44f9e1ed8037d01d81:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAwMGI1ZWIzOWY2MjZkZDI0MjFiYmVlMmRmYWRkMDU2YzU2OWU4ZjdlZWZjNTczYWNmMmFhYmM1YjEwZmNkZGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ4ZGJjYWNkZWU1YzY3YzkxNzg4Y2UwZTE3ZjhkNjg5YzRkMTAwZGEzYmY3MTNjMGUxY2Y0NDMwM2E1NmM2YzAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE5OGIwNjNkOWI0N2U2NTM3OTYyNTU3MmNjZTE5NzY2OWQ1NzY3ZTEyYzE4YmUwNzU2NTJiOGNkOTgxY2U4ZDUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNkNDEzNDBjYzIzOWExNTljZTliNjAyMmU5ZjYzMjI4MzJlMmVhZDc2Y2FlOWU0NzU0ZDIxMGViOGZiNmQ1ZTgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_bc379c7043a8454e9c4de00fd450a23d",
+      "statement": "src/evaluation/answer_judge.py 的 AnswerJudge 用配置 LLM（openai/ollama provider，temperature 默认 0.0）从准确性/引用相关性/合规性/完整性四维度各打 1-5 分并附理由；总体分为加权平均（准确性与合规性权重 2.0、引用相关性与完整性权重 1.0），passed = overall >= 3.0，LLM 返回的 JSON 用正则抽取并钳位到 1-5、解析失败记 0 分。",
+      "evidence": [
+        {
+          "resource": "repo://src/evaluation/answer_judge.py#L343-L355",
+          "version": "repo-lines-v1:sha256:555b2ec98a21c9f283d5f461489c82c29797c3175a67141df028ff285247614b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYyNThiZDIzYzVmYjJjZTM0ZGY3MmUyMDFkMWFkNmZlZGU0YWMyNzVkOGZlNTY3Y2EzNGE2ZDIyMDk3ZTk3MGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYwMDk2MjU4MWUxYzgzN2Q4NzVlMWQ5N2YwN2U5NjFjMjI1OTI0NjNhZThjYzFhYmNhOTgwNWI3OWRhMTIzNjYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU1YzRkZmVmNjFkNmU3YTc5Y2Q0NTc0ZDkwYjVlNDU3NDg5N2E2YWQ0N2NjNDgxYTgyYjdkOTMyMWRhMDIyZjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://src/evaluation/answer_judge.py#L36-L96",
+          "version": "repo-lines-v1:sha256:582c9566f7d7a7ff183e5647362713f471e0509035803f0fe4b0a0fc39b1fe4c:eyJzZWxlY3RlZExpbmVDb3VudCI6NjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYTc5ZTViZGFiMzEwYjdiMDBlZWM1NjQ3OThmMzZmN2MzYTVjYmJlYzJlYzkwMDRlZjAxMDU5MTU5YmYzOGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc0MTM2ZWFhM2RjNjg4ZGVmMjNlYzVjZDE1MDRjYTE0OTdjYjNlYjU2Njk3MGI1ODY2ODE2MDYwMTkwNzRjYWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY2YWYzOTU4MjFhNTY4NTJmNWE0ZGQwMzNjZDEzNTI5MDRlOTIzZTQzZmUwYTRlNTNmNjJhMWU2MDFlOTk5NTgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_d322dc289d844661aa2d637a21dc024f",
+      "statement": "scripts/evaluate_answers_e2e.py 的流程：加载标注数据集（问题+角色+预期关键词/安全预期）→ 逐条用 ROLE_TO_TOKEN 映射的 demo token 调 POST /v1/assistant/qa → AnswerJudge 批量评判 → 规则-based 检查（关键词命中率、PII 泄露、权限拒绝、合规标记、澄清触发、安全拦截、引用数量与错误统计）→ 生成 JSON 详情与 Markdown 报告。",
+      "evidence": [
+        {
+          "resource": "repo://scripts/evaluate_answers_e2e.py#L1-L15",
+          "version": "repo-lines-v1:sha256:87f6caa82778b457736dba56005287afd065e83f49b599cbc2d232be637a36a5:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA4ZmE4ZTJjMGRlZWQ3OTI3MjUxYjFjMTgwMzZhMmQ0Njg2OTIxMWZmOTIzYjM0OTAyZTMzM2E4YWU4MTU1MTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEzMDNlY2RkNGE0ZDEwZjE5YzczZmQ0MmZkMTI0MzdmZDMzNTRhODI2ODE2MDVkYTUyNTVhOTdhMzkwNjhkYmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU1YjZlODcwNmI0MzA0N2YyYTZkYjY3ZjEzMjYzODU5NTYwNGU2N2YzNjk2Njg3NmNlMDE1OGYwMDUzZTZiZDEifQ"
+        },
+        {
+          "resource": "repo://scripts/evaluate_answers_e2e.py#L37-L43",
+          "version": "repo-lines-v1:sha256:9b038428281ec5500436bcbf0eb1ed8b8679be34664fa45d89061b16054952d0:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODJlNTcwNDc5NWQ1MjJiMmQyZDAxZWQ0ODU2NmQzMWVlYjA1NTNkZmZlNTI0NmZhNDkyYjA5NzdkMWUxODVlMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2M2YTU5MDdjZjc0NmFjNzdjYjJkYWViNzMxZmRjZDk2MjRiMjhmMGVhYWUyOWY1OGQyMGIxMjUwZjhhZjMwMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTRlMTdlZWQxODhiNjA3MmY3OGI5ZDAzMzAzZDI3ZTVmMDU0Y2U2NjFmZGFhZDQwMzgxNzkzZDcyODM2MWNkMCJ9"
+        },
+        {
+          "resource": "repo://scripts/evaluate_answers_e2e.py#L97-L156",
+          "version": "repo-lines-v1:sha256:7a99f4cd1707191635e4473da1687f204dc02ce84f81138b39ead8d8a25025c1:eyJzZWxlY3RlZExpbmVDb3VudCI6NjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAzZDI4Zjk2YTIwZmQ5Y2YzODBmNjhjMGRlNGQzMDgzMmU3YmY4ZjhlNTVhYjg1YzkxOTQyYjYwYzNhYWZmY2QiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM0MTg0ZjFlYjVlNjlhMWU1MmIyMmY0ODQ1ZjkxYmU3M2RhNmFkZGFkNDZmNzViOTZmNzc4ZmU0NjI1ZjdiYjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImY4OTdmMDYyNThkYTQ1ZjUyNjJjZjk1OGJjNGNmYjQwZTFlYjZlZmU2ZWU5ZGM3ZDMzYTJhMmY0ODYyM2Y0MjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjViYjI3Y2E5OGEyNDgzYWE5ZTVmNzI4ZjVhZTAxYWY0OGEzYzdjNDkzNGY2MzYyMTVmMzI1MTRmYzkzMzUyZjIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_28a6eb1b8bee404ebba5a0be47743719",
+      "statement": "scripts/evaluate_ablation.py 对同一批问题跑 direct_tool/plain_rag/rerank_rag/agent 四条路径，比较 keyword_recall、拒答误判率（REFUSAL_MARKERS）、平均延迟与单次 LLM 调用数（_CountingLLM 包装真实 LLM 统计，含 bind_tools 后的 bound runnable）；简化路径与 agent 路径共用同一 HybridRetriever 执行层角色过滤、不旁路权限；llm/retriever_factory/agent_runner 可注入替身供测试（test_evaluate_ablation.py 全部用替身组件）。",
+      "evidence": [
+        {
+          "resource": "repo://scripts/evaluate_ablation.py#L1-L19",
+          "version": "repo-lines-v1:sha256:a718fb1664915b47d894cbbdccc0a009ffd4dc60ff6de6b285e3c8def16c54c4:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ5ZmQxNTBlODkxNmE5YzAxMGQzYWEwOTc1MmM1Y2JhMTlkMzlmYzYzNDRjOTRjZjgwYzNmNWQ2ZDRiY2Q1M2MiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEzMDNlY2RkNGE0ZDEwZjE5YzczZmQ0MmZkMTI0MzdmZDMzNTRhODI2ODE2MDVkYTUyNTVhOTdhMzkwNjhkYmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU1YjZlODcwNmI0MzA0N2YyYTZkYjY3ZjEzMjYzODU5NTYwNGU2N2YzNjk2Njg3NmNlMDE1OGYwMDUzZTZiZDEifQ"
+        },
+        {
+          "resource": "repo://scripts/evaluate_ablation.py#L235-L293",
+          "version": "repo-lines-v1:sha256:6ae95ea462002805ef61a1fa2f1ae1ff0862fbad61a45ac53dd45dd386d669ec:eyJzZWxlY3RlZExpbmVDb3VudCI6NTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE3NTM3ZTEwNTQ5MDRmYTFlNzA1OWJlMmRhMzdiMWUwMGNhMjYyOTRkMWNhYmZkNzQzZDc2YjI0NDI1ZWIyYWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjViOTI1MDAxZjQ5ODE1OGRhMWI4M2VmMmNmMmI4ZDA3NmQyMzVkZmQ2ZjYzZmE3NDViMDNmMjEzNDc3MjE5MDciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg5MWViYTEzYzBhNmMxZDYxNzgzYTQ5OGUxYzc0ZGM2NTI3Nzk5NzY1NTdmN2QxY2RhZTU5OTgxMzAyZDYwYmUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY4NzhlYjQyOTc4MDFjZTFlY2I0OGJmNmIxYzk3YTZmNDQ5ZTI4M2Y5ODQxYTUxZTJlMjNjMmQ0NjEyODY5NjEifQ"
+        },
+        {
+          "resource": "repo://scripts/evaluate_ablation.py#L53-L63",
+          "version": "repo-lines-v1:sha256:59fbd265c610b6b073198431535df7973108e439f30edbadcb8568b79df4f56a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ2NmNjN2JhNDZlMDk5N2Q5OGU1Mjc3YWI5ZDU3OWYzNzVjMGQ4ODdjYTk3NDBmYWI4MGY3YzUxNGU2YWI5ZmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg5NzMwYjQxMmIzODliZjhkOWEyMjc1YmQxYjhkZGQ5ZGRkZmRjNzBmZWI5NjllMjk5ZDY5MTI1ODkxODRlNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU2YmMxOWM5NjNjOGEwM2NjYWEyMDU3NDRhZjQ2MjQxMDcxMTIzM2IzMjRlYzYyNzdlNTQyYmQ4Mjg1OWQ1MDkifQ"
+        },
+        {
+          "resource": "repo://tests/test_evaluate_ablation.py#L1-L4",
+          "version": "repo-lines-v1:sha256:b97b3ad2474f55dc3f6e6d859ceca87b78d471e445054c2eba0db536e7449575:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjcwOWY1Y2JjNWI5ZDc5NWZhMmI0ZjA0Zjc5MzI2MzIyMTczODgyYzIwY2RkOWZmZTkwMWViMWRjMGFmOTgyOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTdiMjg5NDBmZDFkMGYxZmFjYjk1ZjJmZTUzYTMyZjk4ZTJhMGNkZDk5ZTBiYjFlMzNlNDdiNjNhZGYzOTZmNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_644bc8e016c24c9d9a9bd68ab4e5bf5e",
+      "statement": "附属评估脚本：evaluate_answers.py 用 ComprehensiveVerifier 算引用/数字/幻觉指标（citation_accuracy≥0.95、hallucination_rate≤0.05、expected_outcome_accuracy=1.0 准入）；evaluate_compliance.py 要求 block_accuracy==1.0 且 leakage_rate==0.0；evaluate_conversations.py 确定性执行会话隔离/软删除拒绝/request_id 幂等/审计完成/当前轮引用五组检查并要求全部通过；src/evaluation/retrieval_eval.py 是内置 5 条关键词命中式检索用例（Hit@K<60% 时非零退出）。",
+      "evidence": [
+        {
+          "resource": "repo://scripts/evaluate_answers.py#L41-L48",
+          "version": "repo-lines-v1:sha256:b68f6a88303f2f384ad54529bfa536fa9da06c5c1010fa2a3f466f31f8b96e54:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjE2Njg1MjNjOTQ2NjQ3MzhiNDA5Y2QwMDZlYjVhMzcyZDExOWMwNmE2Yzk2OGUwZDBiZDA1YmQ3ZmM5ZDFmYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzBjMWYxODhmMTQyZWQ3YTgyNDY4MGIyMDcxNzJjNTUxOWJjNjE0YTQ4ZmRhN2NmMTY3ZWRiOGRkZjc5OTU2YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGZiZDAwOTMxNGJjMjcwODQxNjczNGEwMmFlNWZmMzlhMWU0OGEwNTBiZTkxZjQzYjJmYWE5MjAwMmM2MmJmYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjg3OGViNDI5NzgwMWNlMWVjYjQ4YmY2YjFjOTdhNmY0NDllMjgzZjk4NDFhNTFlMmUyM2MyZDQ2MTI4Njk2MSJ9"
+        },
+        {
+          "resource": "repo://scripts/evaluate_compliance.py#L37-L38",
+          "version": "repo-lines-v1:sha256:5164100166a1eda315e94138b0f5e95c4e4215a7a2194075e39c20baba0d16a6:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjE2Njg1MjNjOTQ2NjQ3MzhiNDA5Y2QwMDZlYjVhMzcyZDExOWMwNmE2Yzk2OGUwZDBiZDA1YmQ3ZmM5ZDFmYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDUwMjZlNDJhZTRjMGNhYTIxNzU1OGY5NTA5NDg4MWFiODYyZWFkOTVkY2FiN2IzOTRkNzYxMWM0MGIwZTJiMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNGZiZDAwOTMxNGJjMjcwODQxNjczNGEwMmFlNWZmMzlhMWU0OGEwNTBiZTkxZjQzYjJmYWE5MjAwMmM2MmJmYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjg3OGViNDI5NzgwMWNlMWVjYjQ4YmY2YjFjOTdhNmY0NDllMjgzZjk4NDFhNTFlMmUyM2MyZDQ2MTI4Njk2MSJ9"
+        },
+        {
+          "resource": "repo://scripts/evaluate_conversations.py#L61-L117",
+          "version": "repo-lines-v1:sha256:21a931b5e1b068806737c0e68462f1aabdda031be12170a759e8d398ec7ace1c:eyJzZWxlY3RlZExpbmVDb3VudCI6NTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg1YzFiYzQ3NDE3MWRhZTk1YmZlMWYwMzQyNDU2Y2M3OWM5YmFhNjA1ZjlmZTcxZDMzM2Y2Zjk1ZGJlMTQxNjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZlYjAxZjcxZjJlM2Y0YjI4ZWI5Zjg1Mjk1NDQ1MzA2YWQxZjkxOTJkYjYxMjViNTc0MWY0YjJmZjUxMWJlMDQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ0OTMzYzFlMDc5MDFhMjZlYzVlMmUyZTY0Njc4NzY1N2UxM2EyMmNhZmNjYmYxMmM0ZTIyODEzMGE0NTRiZTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY4NzhlYjQyOTc4MDFjZTFlY2I0OGJmNmIxYzk3YTZmNDQ5ZTI4M2Y5ODQxYTUxZTJlMjNjMmQ0NjEyODY5NjEifQ"
+        },
+        {
+          "resource": "repo://src/evaluation/retrieval_eval.py#L167-L171",
+          "version": "repo-lines-v1:sha256:959cd272d2a9eef23877c165f02129d16f3eccc90d549c0c2f14abc31080ab69:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjA5NGQyZTliOGM0Y2EwZDk3MzAyZDEyMDQzMGIwNjYyODA3MTM1NWU4OTgzNzBkOWJiOWI2NmIwYjg3ZWNlNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMmZhMjA4NThhZjY0MjQ3YWE0N2YzMWQxZTAwNDRmNzEwNzU2YmQyNzRjZjUyZjA4OTdmODE1NTdjNTUyNWJmNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2UxZGJhNWZlOTE3M2U2OTBmYmJkNzdjNzE1Y2U2NzAwN2E1YmU1YjM1ZGQxNDc4YmFhNzRhMDM0ODNlNzEyOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiM2Q0MTM0MGNjMjM5YTE1OWNlOWI2MDIyZTlmNjMyMjgzMmUyZWFkNzZjYWU5ZTQ3NTRkMjEwZWI4ZmI2ZDVlOCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_6997facf9b274ce7b8131bf094aa6b59",
+      "statement": "内置评估集很小（evaluate_retrieval.sample.json 仅 5 条且可能仍含占位 chunk id，evaluate_answers.dataset.json 约 25 条且标注的是关键词命中而非人工打分），与 demo token/样例数据一样只证明流程与链路，不证明生产安全性、吞吐量或回答质量；检索准入阈值与事件分级阈值均为启发式起点，未经真实标注数据标定。",
+      "evidence": [
+        {
+          "resource": "repo://scripts/evaluate_retrieval.py#L224-L242",
+          "version": "repo-lines-v1:sha256:0e61207fb252fa09fb5eec8df888a2b4fdcbce6c89056c1f728451cdd8a707fc:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJmZDA2NzJiZTRkMTliNjQzMmY0NmQ0OGNmZDZkOWI2NGRlNjg0Yzc4ODEyN2M1YWRlMzU5MmVkY2Y3NjZmYzQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE3NmFlMzVmYTc5MTMzNTFhZDAwMmY0ZGU2MTNiZmYxZTMxN2E2ZGFjNTAyYzZhN2FkNzk2NmMyNzc1ODk3OGEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU5ZjFhMmU1ZTM3M2ZhYTE4Njc0MmIzMzI4OGU4ZWJmYTA4MDE1NWFjZjVhNWIzYTQ5Mzc2ZjJhZDFiZWEyN2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNkNDEzNDBjYzIzOWExNTljZTliNjAyMmU5ZjYzMjI4MzJlMmVhZDc2Y2FlOWU0NzU0ZDIxMGViOGZiNmQ1ZTgifQ"
+        },
+        {
+          "resource": "repo://scripts/evaluate_retrieval.sample.json#L1-L41",
+          "version": "repo-lines-v1:sha256:5dfc7c3281b77c6addf3d128cff5b249bc54a234a288ced243acf44c1e1cf749:eyJzZWxlY3RlZExpbmVDb3VudCI6NDEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk1ZDJiMTkzNDkzMTY5MTY2OWNjMzVhODc2MTk1MTgwMTUzMzYyMTNkZGEwYTYwZmUxYjA5ZjliOGUzZTk5M2QiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY5NDE2ZTA5Zjc4YmEzMTZjMDMyNTY4MjEzYjg1NWVlNzU2ZTQxNTY1ZDkxOGYwOTUxOWM4MWZkNjIwZjQwNjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.5.2",
+    "at": "2026-09-27T15:51:42.447Z"
+  }
+}

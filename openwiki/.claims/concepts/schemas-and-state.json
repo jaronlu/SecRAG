@@ -1,0 +1,266 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:1f79d8f5bb34d6e4c68d1f5e6cf276890733f1c5e0c4415d5dbef0c2230755fc",
+  "claims": [
+    {
+      "id": "claim_aacd3fe7be5c41b7bdf80978fdc697f7",
+      "statement": "src/schemas/constants.py 是全项目硬编码字符串字段名、State key 与枚举值的唯一权威来源；其文件头声明任何模块不得直接使用裸字符串作为 metadata key / State key / 枚举值，所有消费方（nodes、retrieval、api、utils、ingestion 及测试）都从 constants 导入。",
+      "evidence": [
+        {
+          "resource": "repo://src/schemas/constants.py#L1-L7",
+          "version": "repo-lines-v1:sha256:81bca532d23ed261f899577947b371831443e6a217fcf5e0d43d2d8c2670850c:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTMwM2VjZGQ0YTRkMTBmMTljNzNmZDQyZmQxMjQzN2ZkMzM1NGE4MjY4MTYwNWRhNTI1NWE5N2EzOTA2OGRiYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTMwM2VjZGQ0YTRkMTBmMTljNzNmZDQyZmQxMjQzN2ZkMzM1NGE4MjY4MTYwNWRhNTI1NWE5N2EzOTA2OGRiYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDI0YjA3YmE2YWUxZGE4MjRkZmFmNjhiZGJkY2Q3M2M4MmFjMzI3NDVhYzAzNDY3ZjU1NzhlMzMzNGEzYjIxNSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_225fea96bdf44d33b803a38f239bf4a2",
+      "statement": "AssistantState 的 TypedDict 键名必须与 constants.py 的 STATE_* 常量保持一致：Python 不允许用常量作 TypedDict 字面量键，state.py 以字段注释标注每个键对应的 STATE_* 常量作为补偿，新增/重命名键必须同步两处。",
+      "evidence": [
+        {
+          "resource": "repo://src/agents/state.py#L19-L25",
+          "version": "repo-lines-v1:sha256:d00986000774892a990151204744ab7fcf455e846f429aa5090a94c689f09a7f:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDBlYzhlMjRmOTIzN2VhYzk4MWNiNjA1NWZhOTY3MmIwMDQ4OGYzM2Q2NTY0OGIwMjZkZjMyNmVmMjViNWFkNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzkzOTFkMTEzODllOGUyMTYwYWFkYTY4YTBhMTNjZTcyYjNhMzIxYWVhZTM1MTM2ODM1ZjFjYmZmMDUwNWE1NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjk2NTkzNjM0ZjdhYjJkOTRmMzNkZDMwY2EyZDgxN2ZkNDFhOTgzYTI0OTBhZmVkYmQwYTBmZDBkZTNmMGJiNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTg5MzQzNjViNmY2YTI4NjhjNzliN2M3YzI5NTk0Y2UyYjlkNmNhMTg4NmQ2OTJhNWE0NGI2MjM1MjRmMTUyYyJ9"
+        },
+        {
+          "resource": "repo://src/schemas/constants.py#L68-L121",
+          "version": "repo-lines-v1:sha256:c8aadb1973aeab32077c392d49facf8608685da72fe56a9fe1e513b07a870090:eyJzZWxlY3RlZExpbmVDb3VudCI6NTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE3NDE4ZDIwZjFmODM4NWUzNTExZmU2YzNlYjcwYTA5ODAwYzFhZjBjZTEyMWRhMmM5MWI3NGE3NTZiMDFkNGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA2ODNiYzA0ZThkMmYwYTU4MmViYWJlNzk4NTcxMjE2Yzc0OWZhMjhlOGY4NGQyNGU4Yjc4YzU0Yzg2ZGQzMDkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhiNmNhNWU3NzAyNTFiNTQ4OWIwOGE3NDBhYTAzMWZjNzkxZTY4NzZmOGVjZmI5MjhmNDU5NjkxOGYwNjEyYmUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM4MWZkMTVlOWRlZTFiZTkzMzUyNWYxYzc4NGEzOTg2NzE3MDYyNzMwZTlmNzAwYmFiNTc0N2JiMmNjYTEyNmYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_4548f88de3eb4cdda455dadad5dfc8ea",
+      "statement": "chunk metadata 的 META_* 键由入库侧写入（doc_id/chunk_id、file/metadata/parse/chunk 哈希、permission_level/allowed_roles、retrieval_source、date_day 数值日期与版本字段），检索与审计侧读取；retrieval_source 是与 doc_type 绑定的逻辑检索源名（如 report_search），BM25 来源过滤必须用它精确匹配而非 metadata.source（文件路径/URL）。",
+      "evidence": [
+        {
+          "resource": "repo://src/ingestion/identity.py#L299-L330",
+          "version": "repo-lines-v1:sha256:806dad10505074d3f723e1d31456530c2c92aa627966d11ab6712b8e88fcc6f9:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFiMDhjMjI5ZTJmZDJkYzRlMTQ3N2EwOGY5YjM5NTc5Y2UyNzM2ODY1YWY0YmUwOTZkYzRlYTMyYjBiYjkzMzkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI2ZmU2MmFjOWFjMzhhOGI1ZDM1ZWZjZjc4YjBmYmNlYWQwOWI2ZTdlYWFlODI4MTA2ZjlkNTU2OTA1NmM0YWMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ2NDAzNmEzZTdkODVhNWU4NDQzYzcxOWI5YjI2MWY0ZjQ1ZWY5YmZkMWJmOTdmNmMxMzIxMzllNTQ2ZjJmYjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://src/retrieval/hybrid_retriever.py#L92-L102",
+          "version": "repo-lines-v1:sha256:c31a0146396cc9cdc9383a4e6b424297f75673b95a80f44f67af793c55d819e3:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4NDE2OTI3MjVhZjc0NTBlYWM5NjUwNTgyZmQ5ZWRlNzFmM2RiNmJlOWY1ZmVjY2MzY2QyNWMxMGI0NDRjMzUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFhZDZjOGVhYTg1M2RmYjcwNzIwNTFhNWY1OTYyOWJiNzZmMDJkMTMzMDQyZjY0MTQzNDNmYTAxOWFiOGU2ZDgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ3YTViMDJiMDhhZWFmNWE4ZTM0Mzk0OGY5ZWVkZTEyNmIzYzQyNDdhN2Y1NWFhYzFhOWQyMWQ0MWY0MmM3ODUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRlZjhhYTk0NTFmYmY1Njc5YjMzYmEwYTFkYTk3MjZjNWRhMWU1MGI4ZWViMDYwZmI5YjA0Y2ZjN2I3ZDI1YjgifQ"
+        },
+        {
+          "resource": "repo://src/schemas/constants.py#L15-L38",
+          "version": "repo-lines-v1:sha256:127cce2491683d6acdc91e9677f067f757053155ac04ec614f6c666563d0b663:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFjMGQ0YzdiZDliYTNmM2ZiZTBmY2IyMzI5NTA4OWYxZWY1ZTMwNGEwNmU4NTY0NjgzYWRlMjE5ZDNjMGFiYWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM0ZDRjZmYyZjFmMzJhZjc3MDVmMDA4OWRmZDczNTA2MjhhOTg3NmVhMTQ4OThlNGE5MjBjY2Q1YTAzYWZhMTUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjU3OGJkMjIxMmE5ZmYwYmYxYjBmMjVkMzNjY2ZhYWQxNDA4MTI3MmZiOGUyMjE4NTNhMzIyMjgxZjU4NzkzMTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE4MTAzZDQ4ZTIxZjFmOTdjNDVkY2NjZDQ0YWVkMDBjYWU2ZDU1NmEyZjA0OWNiMDE2MWFjYTI1OGI3Y2M2MjEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_d81c9ed2e9d94d1d89875460def3f74d",
+      "statement": "检索分数语义分离（issues.md 一.5）：RR_SCORE（score）在向量相似度、BM25 原始分与 rerank 分阶段含义不同，原始量纲分别保存到 metadata.vector_score/bm25_score/rrf_score；rrf_fuse 把融合分写入 rrf_score 并返回融合排序，grade_and_filter 的 _comparable_retrieval_scores 对未融合结果按 cosine 排名折算成 RRF 等值分 1/(RRF_K+rank+1)，与 rrf_fuse 共用 RRF_K=60，保证混合候选池同量纲可比。",
+      "evidence": [
+        {
+          "resource": "repo://src/agents/nodes.py#L748-L768",
+          "version": "repo-lines-v1:sha256:368106f8bbef41154c60b26da3de15d36352fd9ba9622676c0b08a2bd089cf97:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxOTRhOGMxMDYyODBlZDY4NjU2NjI5MWQ4OTA5MTdiMjc4MzQ4NDMxMThlZmMwNDY5YzQwODcxODgxMmFlOTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNmYjc0ZDNmYzc3MmI2NmViYWQ3YjBkNjVhYjlkN2MzZWYzOGYyMDkzYzIzYzAyOGIwOWVhMzdiODZkZDE2YTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVhMmQwYWVhZjVmMWUwM2FjYTA5YWI4NzY3YjZjNGI2YTQzYzQ2N2IwNGVkZDhhYWY3YmQzZjkyYzExNDc5OTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc0NDg3MDkzNzYwMmI0OWMzYTk3NGY3OWRlZDhkYWI0ODZmNDExN2FkNDg2MDAwMzgwNDAwYjI5ZDY4MTkwMDcifQ"
+        },
+        {
+          "resource": "repo://src/retrieval/bm25_retriever.py#L211-L267",
+          "version": "repo-lines-v1:sha256:34e935dff427ab1c167de13f6b5c4d2d90e130c5347246f3535b98422729cbde:eyJzZWxlY3RlZExpbmVDb3VudCI6NTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRkMzRiYjNlNTYzMmY0ZThmYWExYmUwMTA4Y2FjMjc1ODRjZjJkNWJlOTRmYTRmNWQ5YzE3ZGQ4MzEzODJjMzQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcwZTRmYjRkNDIzZWMzZTYwYTFkMDNkYjA4OGU1N2U4YjM1MjIxZDkxMzg0OTM2YTg4ZmQ5Mzg5NzllZDlkOTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImY4YTE5YzQ5NGE0NDJkNGUyMzJhMzJkNGE0NzZmNjE1YjVlMDhkZjZiODkzMjhmNmJiNWI1ZjBkZDc1NjU2MjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://src/schemas/constants.py#L50-L55",
+          "version": "repo-lines-v1:sha256:7066ab015aa620ac808be26b8747c40be5ed6e09c53c0b6abf8f5ab993814dbf:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOGQ0YjVkNmM4YTAxOTZjOTAyMTk3OTI0NTgxMjdjOTZjOGY5NWY3YmI3YmE4MjY2NTNlYmU4Yzk4OTVkOTU4NCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTMyZDI0MDZkMWU3MjBjMDAzNDNlMmVhMDA4ZDliZDBkODg0ZGJkZTUzMzcxN2UwZTMxMjU5OTI4NWVlMGNkNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWYzZjUyNGFkNTY4YzdkN2UwY2Q3ZDY3MTFlNTMyMTQ2ZWUxNGYxOGM4N2ZjNjI5YzFmYWFkMmI3ZDQ4YTJiZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNmQ0OThmNGEwMDBjZjllMmRkNzEyNzJiYWI2NTc0MDdhNGIzM2Y0N2I2NjM5NzMyMjU5ZjEyOTNlZjM0ZTFiNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_f6b27bba581c4b16b62c2a249d6b3d0c",
+      "statement": "AssistantState 是 LangGraph Agent 图的共享内存：节点不互相直接调用，而是读取同一份状态并返回要合并的字段增量；messages 用 add_messages reducer 合并，其余字段由节点显式累加或替换（如 retrieve 把本轮结果累加到已有结果）。初始状态由 API 层 build_assistant_initial_state 一次性构造（身份、角色数据权限、原始查询、空集合与请求级截止时间）。",
+      "evidence": [
+        {
+          "resource": "repo://src/agents/nodes.py#L687-L714",
+          "version": "repo-lines-v1:sha256:df09d890c09a01eeaf49d245e649096bab0b3c6a4309b078363c39f89a9df85f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBhNzRlMDFkMmQxNDJjOWExNjk0ZGU5MGFkYmIwMjUyYmRkNThjYTRmNTgyZTg2ZmE0MTdjMWNkMzMwYmMyZjgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZkZTAxZGRhM2YwZjY5NDUxMTBkOTA3NmY5ODg3OTQ2ODY1ODU3ZmMwYTViNmM5Y2I5OWY2YTJjNTU4Y2UxNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU0NmFkNWRmODRiZDI3MzZiNjM4ZWJkMGFlZDJkYWIwODY2YmYxZTljODYzODgwZDI5ZDQyNmY2ZDkzNWRhMjQifQ"
+        },
+        {
+          "resource": "repo://src/agents/state.py#L24-L94",
+          "version": "repo-lines-v1:sha256:e12d8aa496a07a67da3c7138302ed0acae7dc3471549bcb518c4294567e485a7:eyJzZWxlY3RlZExpbmVDb3VudCI6NzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJkNDhhN2M3Y2ZjODM2NjAxNmMzNmE2YWQ5NGRiNWYwOTczNGNmMjZjNjMxMTEyMWY1NGVhYjliMzhlMjZjYzciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM3M2UxZWYxNjE0NDIyYmYwYWE4YWJmNmVlMDQwZTY3NjBlOThhZjkxZmYzZjBkNmE3Y2NkMDY2ZDYxMjI4MzYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJjZTA1MWEyZDdmMzQwZTFiNDAzYThjY2Q1OTdiNGFhMmEwZDFiYTRhNjFlMDQ4ZWUwZmQzZDYxZTAwMzZmZjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://src/api/auth.py#L106-L164",
+          "version": "repo-lines-v1:sha256:6820748b4b7b8e6e49b7ddaca5ccb10e8f09d24884c709295fbd2dd5b3b32b1f:eyJzZWxlY3RlZExpbmVDb3VudCI6NTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3NDI3YWI4NzZlMTZlMTc3N2Y3YWJjZjk2OGRjMWM1NzhjYzRmYjA0MjM2NGYzZjE2ZDk3MTY2ZDcxMDg1MWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0NzVlOTRhOTA0YWM0OWIzMTU0ZDQ2NzJhNjZlODYyOWI4NmRhYzc0ZTNlMjkzN2JlNjkyN2FlM2RhMTFjNTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRjNmY4NDU3ZmUwYjMxZjMyZDEyZjA0OWM1ZDgzOTc0ZWFiYTQ3ODdjZTgzMWNhODJmMzhjMDlkOTUwZjg0OGYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_4b09bb859c594635a3db4a1954af5bef",
+      "statement": "STATE_TERMINAL（terminal）标记对外业务终态：compose、clarify、permission_denied_response 置 True，而 ReAct 尝试产出的中间 final_answer（finalize_reason）不带该标记；SSE 传输层按 terminal + final_answer 识别终态事件而不按节点名推断，新增终态路径按契约声明即自动生效。",
+      "evidence": [
+        {
+          "resource": "repo://src/agents/nodes.py#L1290-L1309",
+          "version": "repo-lines-v1:sha256:f45284d785b51dc7397f7130debe582faac7fa129d5ac130c4dea31dd6ccba69:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU4MTEwY2EwNmNiMWY1MmIwOGE0ZTQ2MzU4NzdlM2RjOWI1ZTFjZDM5ZDgwYzAwNzkzNGRmYTA1ZDYzNTY4ZmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFjMDlkOTU3MzQwNDNhMDA5MzUwYmIzNTdmNjcyYWIwYjc1MzUwMTZiYWRmOWJkMDUwNDUwNTg4ZDg2NTBmMWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU0NmFkNWRmODRiZDI3MzZiNjM4ZWJkMGFlZDJkYWIwODY2YmYxZTljODYzODgwZDI5ZDQyNmY2ZDkzNWRhMjQifQ"
+        },
+        {
+          "resource": "repo://src/api/main.py#L737-L740",
+          "version": "repo-lines-v1:sha256:9fa134ee44dc5bf5e16415ea6abfbdaae1fd53b1e99192e3ea25698b7995b28d:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZmM2MDRhOWY1NmY5ZDI1NTFiY2U5NWU1NzY4YzI1N2MxYzBhMTNiODA5NWMxZTg1ZWE3YjE2MWQ3N2EwMzk3NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDljNWZlNWNkZDQyNmZkMTFjZWEzMWYzYjRjNGMyM2MzZWU0OThkNjUwMzI5NzJiZGJlMTk5ZjQ4MmI2ZDhmNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzJiYjlkNjE1YzJmZmI2ZGQ0N2UxNTVmODM4N2VkYzU4NDMxMWYxMDMxNTZjMDRkZDBiYTU2NDA4MDE0YzhjOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTBiZjdmMWYzY2NiYjVkYTU2M2Q5MzUxZWU4N2NhZTI0MTc4NDIwYjlkYjU0ZjZjN2JjZmQ0ZmViNWEwODU2MiJ9"
+        },
+        {
+          "resource": "repo://src/schemas/constants.py#L117-L117",
+          "version": "repo-lines-v1:sha256:51d3fe98a7a393b654c9ad832832eef55325a02ddddf8eadc0a2295cad2d6dfe:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTFkM2ZlOThhN2EzOTNiNjU0YzlhZDgzMjgzMmVlZjU1MzI1YTAyZGRkZGY4ZWFkYzBhMjI5NWNhZDJkNmRmZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTFkM2ZlOThhN2EzOTNiNjU0YzlhZDgzMjgzMmVlZjU1MzI1YTAyZGRkZGY4ZWFkYzBhMjI5NWNhZDJkNmRmZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjk0OTQ5OTY1YzQ0MzFjMWFhMTU5OTlmZjQwMjUwNTY2NjM4MGQwMThkMTg5MTYyYTA4ZGZkOWQ2Njg3ZDFiZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTdlMzA3N2I0M2EyYzA2Yzk2NDcyMWRlNzM1OTY1YmJlZmM3YTJhOTc3NzE1MmI0M2RkYjVkNGIyMzFiYTY5YyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_a1249edaaee74c729658bfab71358225",
+      "statement": "请求级截止时间 STATE_REQUEST_DEADLINE 由认证入口写入（time.monotonic + api_request_timeout_seconds），模型调用与工具执行点在真正执行前检查并尽快短路；工具执行边界 authorize_reason_tool_call 依次检查角色授权、请求截止、熔断器（TOOL_CIRCUIT_BREAKER_SECONDS=60s 冷却期）与单工具超时（TOOL_TIMEOUT_SECONDS=10s），超时或异常均触发熔断并返回 status=error 的 ToolMessage。",
+      "evidence": [
+        {
+          "resource": "repo://src/agents/nodes.py#L1028-L1118",
+          "version": "repo-lines-v1:sha256:05e13cb03d5791c92857b726d40f2fe3bf142c94ef3ce67f3f306c7fabc65647:eyJzZWxlY3RlZExpbmVDb3VudCI6OTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM5YzRmNzZjNzdiZTRiODBmNDk4MGFlYzlhYTgzYzVjOTMzNTRjZDJlZWNkZmY0OGIxN2FlZjU4NDRkNTljZjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg1MTlmNDk2YmViMDE3Y2UyNjg0YzJkMGI2ZmQ1YWVlZDIxYzU4YjEzZTExZWM0YTVhNmZlODlkY2QzNjkxNDciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRhZmUwM2Q0MjY4YWM4MzA0ODAxOTg3YTI3ZGNiMTc5YjFiYjA1NWMzMzYxNzBiZDFlNWQ0Y2RkMDBjNjMxYWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVhMzViZDNkOWQ1NDEzOGRlMzFjZTk4YjBmODdjMDEzODk3ZGUzMDczNjA1ODkyYzM0ZWQ3NGUwYjBjNWY5YTgifQ"
+        },
+        {
+          "resource": "repo://src/agents/nodes.py#L178-L182",
+          "version": "repo-lines-v1:sha256:d71e555273da2412dfb36798d4eafada7270ac059cfe7b30931d16120c2c9d0d:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMGM2MWRjM2I1NmIxMTZmNTMzYTZiMzE3YzA2MGU5MzZlMDU2NmEwYWFhNjlhMWUyODMzOTU3ZTA5OGViMGRhMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWU0OGU3ZTY0OTIyZjlkMjZiMzllMzZmNGRkMTExYWIzZWFhOGQ4ZDMzZDhiYWU0OTYzZmI4ZmQ2NTg3Mzk4ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTg4MTlmZjE1ZjQ1Nzc5M2E0NjVhZDY0NDk3NjYyOTViNzdjYzdlMDA3N2FjZmM4ZjkyMjAwODUzZTIyOGE2MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzA2ZDhmNDkwZGU1YzlmZWFhNzc2ZDUwNjkzYjEwMmI4ZWQ5ZGRjNGQ5ZGQ5MmJlYjgzNTRjYTRjOWE2ZjI3YSJ9"
+        },
+        {
+          "resource": "repo://src/api/auth.py#L150-L152",
+          "version": "repo-lines-v1:sha256:e8d235af3fe3d912269a8c72f5e0a74c2f383a4abdb4dee6b2ae0492684d82c4:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTkyOWQ5MTM2NzcyYjY4OTEyYTUwZmUyMmU3Y2NjNDkyYThjMGY3Y2ZkOWI2MWI3ZWY2ZTE1YTg4ZTJkMTkyYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDkxYzljNzFmMjI0NWY3YTlhNGUxNWExMjk4ZmMwZGQ5ZmE5OTNiYmEzZWNhMjM5OTM0N2IwMzcwODRjYTRiZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTVkYmQyOTEyZGYwZDAxOTgzNzZlMmViYWMwY2U4ZGRiMjdhYTZlNmUzMDk0OTIwNzNiN2JlOWQyZmYyZGMyMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGUwNmVmNTRmNzM4Mjk0NjUyYzkxOTQzZjg0MWQ2ZDNiNjNlNDliOWQxMGM0M2JmZTg4YjQ1YjQ3NzNhYTJmNyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_187cfa85288f4b0faa93ea80700a9481",
+      "statement": "图路由阈值集中定义于 constants.py 并被消费：should_retry_retrieval 用 DEFAULT_MAX_HOPS=3 限制多跳补检、用 CONFIDENCE_HIGH_MIN_RESULTS=3 判断结果是否不足；should_reason_again 用 MAX_REASON_ATTEMPTS=2 限制验证失败重推；route_reason_model 用 MAX_TOOL_ITERATIONS=3 限制单次 ReAct 尝试的工具循环，超出走 tool_limit_response；API 层把 AGENT_RECURSION_LIMIT=50 传入 LangGraph recursion_limit。",
+      "evidence": [
+        {
+          "resource": "repo://src/agents/graph.py#L191-L216",
+          "version": "repo-lines-v1:sha256:9681e4681bb40e95c0589b6e3257577893802cf2f1bef6933872dd69f666771b:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc1NDlkMjgxY2RlYmMzYWQ2OTdlNTI3NzdiNDdjMDhhMGIwZjlmNjZiNGMxNDMwMDYwNmQ5YjMxODUxZWI1MDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVkMjNhMDFiMzUwNDQ4MGI5ZGQxOGNlZjg5MGE1N2NkMDc2YTQ2ODNiNDgyMzEyY2YwOWNhMjEwMmJmZDQzZTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZkZTAxZGRhM2YwZjY5NDUxMTBkOTA3NmY5ODg3OTQ2ODY1ODU3ZmMwYTViNmM5Y2I5OWY2YTJjNTU4Y2UxNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjIzZTNjZmY1MzY4OWY1NThjOTdlNzA3N2IwNmVjNjlmYzU2MjliMzgxZjNmOGZkODA1MjNmNWQ4YmU1Yzc0MWEifQ"
+        },
+        {
+          "resource": "repo://src/agents/nodes.py#L1143-L1152",
+          "version": "repo-lines-v1:sha256:d88669f5710b3137b578ae789cd1db5b228283dd7b833056e2ef82c299286001:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlkMGMwMzMwNzQ2YmEwNWMzZTYxMjQxYjY5MDQ4NjNmOGFlMTI4YTU5OTAzYzA1ODk0MmZiMTdhZWZlNTc2NjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJlMTEzZjMyOTljZGU0NjAzNzU4NjEyMTQ0YzJhNDcwMTk5MTA5YWUzNTY4Mzk3MmZlNzhlMzkyYzYyZGJkZjgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRmYmQwMDkzMTRiYzI3MDg0MTY3MzRhMDJhZTVmZjM5YTFlNDhhMDUwYmU5MWY0M2IyZmFhOTIwMDJjNjJiZmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI4N2IzZWM4ZTg3MTM4Y2RmMTg4OTMwNDY4NWU1ODcyZjM0ZDJiZGU3NmMzMjRiYTZlY2YwMDFkODU2ZjI0YzcifQ"
+        },
+        {
+          "resource": "repo://src/api/main.py#L526-L530",
+          "version": "repo-lines-v1:sha256:8f42b1a234bc1a26363b16cc1a37155734726d822de9a1c593e0552a62d4da0d:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmEwZDhkZTI0YTU5OTk5YzAzMTFhZWQ3OWYyYWZjY2I1MTJmYjFhZTk4NDVmZmE3ZjRlOTRiY2M4YWM3NzNkNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTZiMDQ0OTE0Njk3MjJlODM2M2E5NGU0MDQ0NTM4ZTAxM2EyYTIxN2UzNmIxZTU2OGJhNjBhY2I3YjRjOGYyZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOThkYjMzMDJkNzFlMzRlNWUyNDRhMjA1ODc1MjJhY2FkYjAyMzM2Njc2Y2UxNzE0ZjkzMDgzNDQ4NmRjYjU4YiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTllOTMwNmQwMDEzYzIyY2ZmYmRiNzQzNDEyMzRmMDExYzNmZjc4MDhlN2NmMWM1ZTI4NTEwYjUwZDVjMzIxMCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_2b77ac48ada041fdb5b967ae506963a2",
+      "statement": "grade_and_filter 先按单量纲排序做阈值过滤（RETRIEVAL_MIN_SCORE=0.6 只适用于未融合结果的原始 score，RRF 融合结果不过该阈值）、按 source+chunk_id（或内容）去重，候选池限 GRADE_TOP_K×2 以控制 rerank 开销，再尝试 BGE 语义重排并保留前 GRADE_TOP_K=10 条；reranker 未配置时显式降级为原始 score 排序，并在 STATE_RERANKER_STATUS 标记 unavailable/error，compose 据此参与置信度判定。",
+      "evidence": [
+        {
+          "resource": "repo://src/agents/nodes.py#L722-L745",
+          "version": "repo-lines-v1:sha256:73c9ba79f102aa820f5a97794087086ecace5e72a24ba231557688041703e4b0:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFkZDY5NGEzM2VkNzE4YzIwMTQ3OGM4NWU3MGZjMzQwMjU4NGQxNDI3NGI5ZDZhMTQ0OGNlMTVmODUxZGQ0MDUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBmOTdiZDQ4ZjQ1MDc1MjIzMTFjMGUzN2M3NjU5NWU5MzI3Mjg1ZmZkOWE5NmI4ZTY1NWVkZmQxNzdiZDU4N2UiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZkZTAxZGRhM2YwZjY5NDUxMTBkOTA3NmY5ODg3OTQ2ODY1ODU3ZmMwYTViNmM5Y2I5OWY2YTJjNTU4Y2UxNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRjNDY1ZDAzYzQ2ZGI0NmMyODJlZmE1ZTViMmJmYTQyNDNhYTZiOGE5OTAxMWY1NWUwZmMyZmEzNWI0ZWIxODQifQ"
+        },
+        {
+          "resource": "repo://src/agents/nodes.py#L771-L832",
+          "version": "repo-lines-v1:sha256:7ea61a83cf8f2d184d0eca400d9ad46ef546a91b93f3b824c418831a6d4f5c94:eyJzZWxlY3RlZExpbmVDb3VudCI6NjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBkNTZhODc2N2E1NTFiYmQyNWU3OGVlMzQ2NjBkZWVhMmQzZWMwYjczYzZmM2ZhZjljMDExYjcxMjhmMjZiYjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM3MWQwNjhkYmQwOWZkNDM2NzQxOWJkYjM3ZWMwNTNlMjFhNjhjODQ5NDA0NzNmNGE5NTdkMmIwZGI0NmE0YWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU0NmFkNWRmODRiZDI3MzZiNjM4ZWJkMGFlZDJkYWIwODY2YmYxZTljODYzODgwZDI5ZDQyNmY2ZDkzNWRhMjQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_e28dfd4cda9e4e2a9f2765168185b564",
+      "statement": "权限感知检索按计划级与结果级双重过滤：HybridRetriever 先按 ROLE_ALLOWED_SOURCES 过滤计划（越权 source 转为 denied=True 的显式拒绝步骤而非静默跳过），取回 top_k × PERMISSION_OVERFETCH_FACTOR=3 候选，再按 permission_level 与 allowed_roles 过滤后截断到 top_k，避免高分候选全部越权时误判为全部越权；缺少 permission_level 的 metadata 视为 public，非公开 chunk 缺少 allowed_roles 时默认拒绝。",
+      "evidence": [
+        {
+          "resource": "repo://src/retrieval/hybrid_retriever.py#L170-L220",
+          "version": "repo-lines-v1:sha256:438afd8a2035ddd2db8bab1441611e1060e7987af3fc0e40363d090fe2f312d0:eyJzZWxlY3RlZExpbmVDb3VudCI6NTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFmNjNjYzU2ZmYxMzA0NTg2NGViOGEyZjI0ZDI0ZmZkMTMzNzMzYjA3MGE3YzkzZDk2MzgyZjA0NTgyZWZkODIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgxNmY2NTFhMzczMTBhMGM5ZDQwZTZhNzQwZDgzYzM1MzFkZDU3NzIxMzI4OWJhNmNlZWYwNTVhNzEyNmJmMmEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjU1NWUzNTNkZGVmNTFhMDIzNmE1YWM5Y2YzMDhhMTgwOWEzOTY1NTFmOTM3MmQ4NjNmNzJiODkzZWRkN2U1NzMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM4ODRmNDU2YzQ0ZGFiZjUyZDJhOWU3NTM5NjI3NTk3NzU5ZGJlNTM1Y2UxMjc4OWIzMTY3YTc5YzVkMTdiNTAifQ"
+        },
+        {
+          "resource": "repo://src/retrieval/hybrid_retriever.py#L59-L118",
+          "version": "repo-lines-v1:sha256:fce69a8ddefb2f3cba4f43198335d798668fb25f80737e9626ed865efe7c645d:eyJzZWxlY3RlZExpbmVDb3VudCI6NjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIzMzUxYWUyNmU5NTA3NzVjYjZlOTg4ZWQyOGI1NjUyZWNiNzE4MzdjY2JmYjYwZDBkOTI1NmE0YWRkMmUwYjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjViZTI3OWNhOTNjZDYzYzU3ZTEwMjMyNzEyYjEwZTgxNjdlNjVhMWQ3NWJjYjZlMmJlZDcxNmNiNzM2MDM0NjYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJjMDE4YjZkNTIzNzA3NjVkZDM3ZmFlYTZjMjkyNDJmN2ZhYmU5NWVmZDNlN2JlNWU5NGE4NjQzY2Q0ODczMjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI5ZWVhYjMxNjQ4YWVmNTQxNmQ4NjAzZDY1MGI0YzVkMGExZmExNWVjM2NmZmVmODU4Zjc0YzAxZDFkZmRlODIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_cc24cee2b18d4e6384ec37d8d5a0e942",
+      "statement": "枚举值域集中在 constants.py：doc_type 七值 + ALL_VALID_DOC_TYPES、UserRole 五角色、Confidence（high/medium/low）、permission_level（public/internal/confidential）、query_type 六值（QueryType）、retrieval_source 五源 + DOC_TYPE_RETRIEVAL_SOURCES 映射；入库清单校验在写入前强制 allowed_roles 属于角色值域、permission_level 合法、retrieval_source 与 doc_type 匹配，非公开文档必须声明 allowed_roles。",
+      "evidence": [
+        {
+          "resource": "repo://src/ingestion/identity.py#L76-L119",
+          "version": "repo-lines-v1:sha256:bc5eed46ee1976a91f8905511b678ca44a8a2667a4f54ec9f6d0f36efa3c43c5:eyJzZWxlY3RlZExpbmVDb3VudCI6NDQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdiYmVjOWRkODk0M2RiOTIxYWMwYTJlMWJmNWQwMjZjOTY1YzZkNjE5ZGJkMTc4MjliMzc3NjQ0NWIyNTk5MjAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQwOGE4ODM4YTg3MzJiMTlhMDhhMzNmYTRlOWVhNDA0ZTdlNTY5NmVlMDk5NWMzNjczZDA5NmQzMTczYWYxZmEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImY5ZWE2N2ZjODU2NjUyMGE0OTUyMTIxZmMwNTI1YWY2N2Q2OGFhZDQzY2ZkNDUwNmZkNThhOTQyZGFhYWE1OTYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjkxZmJhYjUxYzczN2ZmYTIwNzdjZmMzYmFjYjM2ZGFmODg5MmRjYzU5MWNhMWZmZGUxMWRlMTVmMDMyNDM0Y2MifQ"
+        },
+        {
+          "resource": "repo://src/schemas/constants.py#L156-L251",
+          "version": "repo-lines-v1:sha256:664530cf732344ba7184e5539850f1a8810eb1099bc0a8b167f8804ee485a78c:eyJzZWxlY3RlZExpbmVDb3VudCI6OTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIxMzgwNmRmNzcxMDg4OGI5YmI3MjM3ZDM1MmI3ZDFjNDVhMDNkYmMyYjU4ZjA5Njk0NzIwN2E3OGQ4OWI1NTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY5NDE2ZTA5Zjc4YmEzMTZjMDMyNTY4MjEzYjg1NWVlNzU2ZTQxNTY1ZDkxOGYwOTUxOWM4MWZkNjIwZjQwNjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVjMWZlMTM4ZDU1MDUzNTcyYjU1MTVhOTA2ODRmZGVmNzc4NzdhMDc0ZjJiODdmYmM0Zjk1YmU1NTc2MzI3YzMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFjZDMzNzM4Y2MzYTI2YWYxMzQ1MTlhNmM5MTA4ODcxNGEyYTU2ODJhZmExMDZkYzBhYjRiZjliOGY1NTc0NzUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_84f0d470bce7414bb256cabc926398ff",
+      "statement": "ROLE_ALLOWED_SOURCES 与 ROLE_DATA_PERMISSIONS 定义角色到检索源/数据权限的映射：advisor/sales/operations 为 public+internal（advisor/sales 可用 product/regulation/report/SQL，operations 无 SQL），compliance/technical 额外含 confidential 权限；认证入口 build_assistant_initial_state 据此把 data_permissions 写入初始状态，检索层据此过滤计划与结果。",
+      "evidence": [
+        {
+          "resource": "repo://src/api/auth.py#L115-L124",
+          "version": "repo-lines-v1:sha256:d14d7fb46e934029cd99777a623652821cdc623e0e0854bd410b7d060c02fcc4:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYwMjFjMDRmNWIyYThhMGNiMDU4ZTQ3MTI0ODUzMzFlMzFmNzM3M2UxNjI4ZjEzOGRmZmViZmFhODg2OTg5MjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQyNWU1MWQ4YTk3ZjA1M2ZhZjZkYWQ0YjcwNjRkYmRiYzBmNjBiMjZhYjdjZDI4MjQyODFhMDBlMGNiZTk4ZTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRhNzAyMjUxZWNjMDE5ZTkxYjFkODYxODNjZjAyNThiZmY0Mzg0ZjE1NmE0ZWJjMzU5YzljZDBkMjJiZmNhYjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ2MmM3N2ZkYmYwYjZlZmM5ZjQ4ZjIxYjI0YjZiYzE2NTQ3YjZhNmQ2OWUzZmI4YTQyM2U0MTNlNTgxYTFmNGEifQ"
+        },
+        {
+          "resource": "repo://src/schemas/constants.py#L294-L316",
+          "version": "repo-lines-v1:sha256:3c5fb559078d2cf32129f4a7474e1d90b496457aada860c215c03be58fc2e093:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE3NDE4ZDIwZjFmODM4NWUzNTExZmU2YzNlYjcwYTA5ODAwYzFhZjBjZTEyMWRhMmM5MWI3NGE3NTZiMDFkNGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRhMDA5NDhkNDYyMTlhZmQ4M2U3ODQ1NzdhN2Y0YzJjOTljN2NjZjc3OGIzZmE0NjAxOGY2MmIwOWNmMzQyMTYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFjZDE4NzMyZDE3Y2M5NDNjZDZjMjEwY2JiNjg4ZTUzNWMzNzFlMTcwNWU1N2NhNjEwNDFhZmYwMTA2MGE5NDIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_a53f2a5839774dce9a0ab98f0ecc4f9e",
+      "statement": "AUDIT_* 常量定义 audit_trail 的五组键（query/retrieval/reasoning/response 子对象及 request_id/timestamp/_started_perf_counter 顶层键）；AuditEntry dataclass 以 SCHEMA-REFERENCE §3.5 为权威，AuditLogger.log 从 AssistantState 组装（retrieval.sources 去重提取、reasoning.iterations/duration_ms 由 intermediate_steps 中 step=reason 的记录聚合），SQLiteAuditStore 落盘 payload_json 与查询列；审计写失败不阻断回答，改为标记对话 outbox 失败、追加本地 outbox 并在 trail 返回 audit_write_failed 降级标记。",
+      "evidence": [
+        {
+          "resource": "repo://src/agents/nodes.py#L1392-L1427",
+          "version": "repo-lines-v1:sha256:ee9f0349106bfce9ffd92b87dfd5a58b1dd89d1be5232649aa7603360472d8cf:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBmODU0ZDJjYjU0MDEzOGFhMTRkYmYyMDI1NzZjMzQ5MGIzZmQ5MzRhODY2ZTQ5NDU5ZmM1NzlmM2RjZjE1YzciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3YjViM2E4ZGY2YWQ1YjRmYTZiZmFkZWZhYzdkMGM3MDg4ODJlODhhYWY2NDFlMWJmNWVjYmVhMDk3MWI5MDgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI0YTc3MWQ2YjY4NjNkZjcyNmQ5ZGQwOWZmY2M0Njk2OGRiODBiZjhjOGM4YjJjNjAyOTQzOWQwMzY4YzQxZmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU0NmFkNWRmODRiZDI3MzZiNjM4ZWJkMGFlZDJkYWIwODY2YmYxZTljODYzODgwZDI5ZDQyNmY2ZDkzNWRhMjQifQ"
+        },
+        {
+          "resource": "repo://src/schemas/constants.py#L123-L153",
+          "version": "repo-lines-v1:sha256:3e5653fe237f2f09130c9e4f7c6112bb12666a2f7937069059395e82d4b81351:eyJzZWxlY3RlZExpbmVDb3VudCI6MzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFlZThmZjg0YzAzNTE1ZWI0Nzg0NTRkNzUwNzFmOTAyNmMyZmFhNmU2ZjAxYWZmNzdiZWIwOThmN2E0YzY4YWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjViODYwYWI0OTYwYzY3N2IxZGRlMGZhYjg1ODBmNjBkNDQyMDk0NWIwYzlmOTgwNWE5NTkzOGE5NTU2YWI5YjkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ0ZjllZDE4Zjg1NDhiMzlkMjVmMGQ2MTlmZWUzZmY2MjU0N2ZkNmFkOTY0YWJiNzZkNjhkZWQxNzMxOWUwYjgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJiY2M1NDY4YmQzNDllYjFmY2E2NTY3OWQ2OTcyNjVmZTFiYWY3YzY4YTFkNjFhNmVmMzZiYTZiOTdmN2U1OTYifQ"
+        },
+        {
+          "resource": "repo://src/utils/audit.py#L91-L146",
+          "version": "repo-lines-v1:sha256:0b75328c4cad77f3200596357d6aa19c12dc204d9f01040444ba822d6b0acc53:eyJzZWxlY3RlZExpbmVDb3VudCI6NTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk3ZmI3MzQ3NWQxMmE4MDIwNGQ5ZGQ3OTY3YWU5ZjE1Yzk1ZjgwNjRhOGI1ZThjZWRmNzUzMTg2NTUyYTVlNzkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkyMTVmNjE5MWVhOTNhMmQ1YWExY2QyNWRmYjI4MDQ5NTRkZWNhOWI5OTc1MjU2MDZhZjU2MGE2ZTliMjFjMzYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM0ZmJkNmI0NTY1NzhhOTIxODg3MWMxYzBkZTVmMTc0MjJlYmVmZjU2MTgzZjE3NjgzMzhhNTlhMjA2OTFkNzgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_495afe97dc9a4af4bba56aa208fc015c",
+      "statement": "核心数据流：planner 产出 RetrievalPlanStep 存入 STATE_RETRIEVAL_PLAN → HybridRetriever 执行并返回 RetrievalResult（越权带 denied/reason）累加到 STATE_RETRIEVAL_RESULTS → extract_citations 只从非 denied 结果生成 CitationDict（内部为 Citation dataclass 的 asdict 序列化）→ compose 组装 final_answer/citations/confidence/risk_disclosure → persist_conversation_turn 写入会话消息/turn 与审计 outbox → audit_log 把完整 AuditTrail 写入审计库；API 响应（AssistantQAResponse）只含 thread_id/turn_id/answer/citations/confidence/compliance，不外露审计数据。",
+      "evidence": [
+        {
+          "resource": "repo://src/agents/graph.py#L346-L400",
+          "version": "repo-lines-v1:sha256:260f9be03e44189f3ce26742077094d695f572c0b00b02acbfbf507a67f43e7b:eyJzZWxlY3RlZExpbmVDb3VudCI6NTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ0Y2E1M2UwOTViZGM5MjE4MDM0NGQ1ZTU0Y2MyODlhNGVlOWIzMjY0NGQ3MzMzYWRiZTc2Y2U4OWM4NDMzNDEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIwMWQ4NGFkM2MyODNlYWY3NDYyMTkzYWYzZDM2NmZkYzE4N2I4ZmZlNjg0Nzg4ZmU1YzBlOGUyNjUyNzA3NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImY3MmNhZDg1YTQ0NzZjNjdlODMzZDc5Mjg1NDM0MjI3MTJhZGE3OGE1NzhiZjFmYzdjNjA4NTgxZWQ3OTMwNmEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQxMjcwZmM4NGRmMDkwNTIzNTJiOTAyOGVjNjdlMTRiM2QyZTE3MWEwYjY1MmExYTU2ODVkMmEyNmUzMzQ0ZWQifQ"
+        },
+        {
+          "resource": "repo://src/schemas/request_response.py#L29-L35",
+          "version": "repo-lines-v1:sha256:27b33200e22bf0c27715db611addfc8d3da2a924e71743dbe27c822c5e70cde4:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTg4NjNjNzBjOWQ1ZDU5OWEwNWZmYTUxZjc2Nzk2MWE3YjlmMjk4ZmFkNGJhYzkxNzgwZGMwZmRkYjQ2MjljYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiY2Q2NGNhMzViNDIyOWFkMjU5MmY3YmEyMjNiNzNjNTcxZGUxMDc0MjExZjcyNTU1MzQ2M2Q3ZDFiMGE5NWFhYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMGNmODQ4NTI4NzhkOWIyZjdiZGIxYzczMDE2MjM3NTRmMDY5MDljMjA0MmEwNjk0ZGQ5MGJiMzQ1ZWQyMTlhNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZWM0MzAyNWUxYmY0OTE2OGQ4ZjY1NmRkNzMyOWE4MWUyM2M1NmM1N2JmMWZiNzgxZTI1NmY2OGE3ZjVmMWI2MSJ9"
+        },
+        {
+          "resource": "repo://src/utils/conversation.py#L282-L397",
+          "version": "repo-lines-v1:sha256:0db09baef4cc6946e64eeb6a140fc240a5eac915110ea2d5e5d4ea172a5f5d80:eyJzZWxlY3RlZExpbmVDb3VudCI6MTE2LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiIwNmY1MGVjM2IzYzZiNDk2NWVkNGJhNDQ0MWZlOTY4ZDBiYzkwYzgwZWI3ZmFiOTM3NjJiZmEwNDY4NmNjY2MzIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiI1NTAzMmU5NjRkMDkzMjM1MWU1ZDE4NTI2OTI4MWIxNzFhM2EwOWIwOGIyODZlNjYxZWE0NzAzMjNjODJlYjRkIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJhNjliNWVhMjk0ZDgxZDE2MWNhNmE2Mzc1N2QzN2QzNmUzZTQ4ZjU5MTljOTk3ZjZmZjAzYTM5YzliMWJlYzgzIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiIzN2VlZDFlYmU5NTY2OTM0OWI5N2MxMGYzMTlkZWZjZTNmMGUxMjc3NjIxMWEyYzY1MjYzMzM1MDRlNjM0YmY0In0"
+        }
+      ]
+    },
+    {
+      "id": "claim_977c9c32f2454bfaa8e755733d64fceb",
+      "statement": "SQLiteConversationStore 按 user_id 隔离线程：线程角色或 client_id 变化时抛 ConversationContextMismatchError；insert_turn 以 request_id 幂等（重复 request_id 直接返回不重复写入），并在同一事务写入用户/助手消息、conversation_turns 摘要与 audit_outbox 事件（事件类型 conversation_turn_persisted）。",
+      "evidence": [
+        {
+          "resource": "repo://src/utils/conversation.py#L282-L397",
+          "version": "repo-lines-v1:sha256:0db09baef4cc6946e64eeb6a140fc240a5eac915110ea2d5e5d4ea172a5f5d80:eyJzZWxlY3RlZExpbmVDb3VudCI6MTE2LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiIwNmY1MGVjM2IzYzZiNDk2NWVkNGJhNDQ0MWZlOTY4ZDBiYzkwYzgwZWI3ZmFiOTM3NjJiZmEwNDY4NmNjY2MzIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiI1NTAzMmU5NjRkMDkzMjM1MWU1ZDE4NTI2OTI4MWIxNzFhM2EwOWIwOGIyODZlNjYxZWE0NzAzMjNjODJlYjRkIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJhNjliNWVhMjk0ZDgxZDE2MWNhNmE2Mzc1N2QzN2QzNmUzZTQ4ZjU5MTljOTk3ZjZmZjAzYTM5YzliMWJlYzgzIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiIzN2VlZDFlYmU5NTY2OTM0OWI5N2MxMGYzMTlkZWZjZTNmMGUxMjc3NjIxMWEyYzY1MjYzMzM1MDRlNjM0YmY0In0"
+        },
+        {
+          "resource": "repo://src/utils/conversation.py#L86-L105",
+          "version": "repo-lines-v1:sha256:82930c44e5deee20bc5363132a26a0466af3c2af1f69460c4361423df148817c:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZkYzhhODI1MWRiNjZhZTZkYzU0MDhhZjY5OTIwMGI3ZWFkYTJmNzMyZTYyZjc0NGMzMTI0N2ZmYzRhNzcyYmMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEyMDg5MjY1MDZmNTRjNDE0ODFkNmQ2MWM5OTMzZTc0OWU3OWE2Nzg0N2EyZmI1ZDFhYzkzNmRmNGJjZTI2OWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIyMmJkMDM1MDk5MDc2YTljMTRmOTEzODNmMGMxOGIyNDY2Y2M5ZTRmZmIwMGJiMjE2OTQxNmRiMTM2OTU0M2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVlZmQyZDQ2MGFkMjFmZjdkYzcwNzY0Mzk0Mjg0NWE0NTY3N2VlZGE4NmM4YTg0YTU2ZWQwNzIwNmViYmViZjgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_5a523978491a4830b8b36bc65942aed9",
+      "statement": "聚焦测试：tests/test_agents.py 的 TestGradeAndFilter 覆盖阈值过滤、GRADE_TOP_K 截断、跨跳去重与 filtered_chunks 计数；tests/test_tool_deadline.py 覆盖 TOOL_TIMEOUT_SECONDS 超时上限与请求截止时间短路；tests/test_api_main.py 覆盖 AGENT_RECURSION_LIMIT 传入与响应不暴露 audit_trail。",
+      "evidence": [
+        {
+          "resource": "repo://tests/test_agents.py#L185-L237",
+          "version": "repo-lines-v1:sha256:fe3b26fdcb63d2b584d44f88fce860ab6383a9f18a709ca4605f25ab208f5fac:eyJzZWxlY3RlZExpbmVDb3VudCI6NTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE4NGI3MjgyZGQxMTNhNjU5MTAzNTQzMWExNGJlODU4ZmNmOTBiOTk0MWYzNDNiYmJkYTZlZWE2NzBiNzFhNjciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM1MDdjN2NlYmNmMDJkMGUwNzJjZDcxNzI1YTUyMDA0ZDFlMGJjMzg2M2MwMDMwODA1N2I1ODA1MTU1ZjA0ZTciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZkZTAxZGRhM2YwZjY5NDUxMTBkOTA3NmY5ODg3OTQ2ODY1ODU3ZmMwYTViNmM5Y2I5OWY2YTJjNTU4Y2UxNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA3NzI4NDc4NzI2NzJmMjZjNTdhYjczNDUzNjlhMWE5MzJhOTY0YTkxNmNhMDIxZDg2MGJmOWM0NzRlNjM0ZWUifQ"
+        },
+        {
+          "resource": "repo://tests/test_api_main.py#L128-L152",
+          "version": "repo-lines-v1:sha256:5309318fbf1c31d39d268def075873e460d66a16fae413692d5ce6a5c831aa21:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQyYmE3N2NiMTBkYzM2MDg0MjlkYjdiNTRlZTNkMjZiOWJmNjk1MWE1ZDM5ZmQwODJkMzc5ZGY2NTdkOWJmODMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJkOTk0MmRlYjdkYmFiYzExNGIxYzQ4ZDAyZGE0NjM4NmU5YWNhNTE1YTUyZmI3YjNjNDEyZGM2Mjc5MjFiMDgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUzNWZkNzEyZWYzNDYyMTBlMjk1NzY2NGMzZmM2NWE4ZjI0YTRmYWU5MmEwMDYwNjAxZTI0MDM3YmNmYjJhYTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI1Y2QxMjhiNDk0ZTMxNWUzYjBlN2JhYzkwYWQzNGQ4OTM4NWUwZTM3ZGEzN2VhYzYyZTcwOTk3NmEzNTE4ZGIifQ"
+        },
+        {
+          "resource": "repo://tests/test_tool_deadline.py#L31-L63",
+          "version": "repo-lines-v1:sha256:c9277f408cd9cc11de47f6fa76a5636d04ced15e76ee869a2a4a3a78ae95867b:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImViZThiM2EwOGY1MjhkYjA1OTMxMjg4ZTYwOTlhNzZhNjE2NDQxZjljMTgzMmVkNzc5Zjg4ODY3ZTM3YzE5MDciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQwY2UzNmE5YWRjM2JkNzU4NjM4ZDEzNzI2OGFhOWU5MDA3NzFlZjBhZDFhYWE1NWI2NzI3ZDcwZDFjMmFlMmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk3YTQ4ZGZlNDk1NDE3MDA5ODYwYmRmZjM4MDlhNWY3NDBjZGM4MTNmOTk0OTNkY2I0MjVlMGYyYWY0MzBhYjUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.5.2",
+    "at": "2026-09-27T10:44:22.630Z"
+  }
+}

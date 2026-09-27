@@ -1,0 +1,448 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:948fdbbfd11e226b542740c6380baf0420b5118fb048aa73f2ad818bfd3111d9",
+  "claims": [
+    {
+      "id": "claim_7bb63b9f0ef8462cb8805b955d0d6c5d",
+      "statement": "观测职责边界：Langfuse 只接收 Agent/LLM 链路元数据（节点耗时、token、模型调用、request_id/thread_id）；权限/引用/合规审计仍在本地 SQLite（src/utils/audit.py），QPS/延迟/错误率/缓存指标仍在 Prometheus（src/utils/metrics.py），Langfuse 不重复建设。",
+      "evidence": [
+        {
+          "resource": "repo://README.md#L138-L143",
+          "version": "repo-lines-v1:sha256:a3e52b791bf166ece4b4ea0fa38a68324672cb60ebd47a33172bda15f13fa59b:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjY2ZDQxYzBlOTE1MTgzZTY4MzAyMWRkNDRkN2NkMGM0YWI5YzM2YzczMTdjZTNmZWYyMTJiZTM3ZjY5N2E5NyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNmExYTdkNTkzNmNkMTBkMzQxZjdhMzU4MzA2MDgzNDg0YWM1OGVmYzE3NDQyNjBjMTk1ZTkyM2M0NWFmZGFiYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjkyZmRmMmFmMjM5MTQ2NjVmNmJkYTVlOWUxMjc1ZmQ2YjMxMWQyYWVhMmZhNDYxYWI5YzFlMDM1OTdjYzI2ZSJ9"
+        },
+        {
+          "resource": "repo://src/config.py#L90-L99",
+          "version": "repo-lines-v1:sha256:034c865d22ef989c1c4636162ce6d42a6b35e5ad3b3077d209c6aa50a47bb064:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM5YjIyMDgwODA1YTc4OGY1NWQwODA5ZTdjNGExMWQ4OWQxZjg5YjAxMTBjNzQ5YmVmM2I0ZTU0ZWIwYzU5MjAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMwYmY2NTY5MWEzMDI5NWQyN2UwMmQyYjUyNmIwMjgzZTlkMjcyMWFlZTY5ZGRhYmQ2MzE0MmMzYzg0MDk3ZTUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMzOTczYzdiZGFiMzJjY2JkNjYwYzU3NDUyOWI4ZWM3YTcyZjY3MjVlMGI4MDljMzZlYTkyOTdjNDQxZjQxNWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU5ZjYyNWY5OGY1MjIzNDIzNDU0Y2M0ZjgxNWZkMjFiYjA2MmU2OGUzOTEzZjBhMDAzMjcwNGU0OWYxMjMwNjcifQ"
+        },
+        {
+          "resource": "repo://src/utils/langfuse_adapter.py#L1-L59",
+          "version": "repo-lines-v1:sha256:06118462994d2adf0191c9950264f0c741453c3f51e02c9376753268173fbfc5:eyJzZWxlY3RlZExpbmVDb3VudCI6NTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVmZDEzZjlmMjBhNWZkOWNmNGEwYjljMDFmYzAyMDgzNzk0MTI2MmI2ZjlhNDgyODY0ZGVlNjQ0Yzk1ZThiMTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEzMDNlY2RkNGE0ZDEwZjE5YzczZmQ0MmZkMTI0MzdmZDMzNTRhODI2ODE2MDVkYTUyNTVhOTdhMzkwNjhkYmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU1YjZlODcwNmI0MzA0N2YyYTZkYjY3ZjEzMjYzODU5NTYwNGU2N2YzNjk2Njg3NmNlMDE1OGYwMDUzZTZiZDEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_c3f7611154f041caacdc4e9973106ca4",
+      "statement": "AuditLogger.log 从 AssistantState 组装 AuditEntry（原始/改写查询、意图、实体、PII 标记、检索来源去重、chunk 数、工具调用、执行路径、验证/合规结果、引用、置信度、总耗时），audit_log 图节点委托给 AuditLogger 并调用 SQLiteAuditStore.insert 落盘 data/audit.db 的 audit_entries 表（request_id 主键，timestamp/user_role/compliance 索引），随后把序列化 audit_trail 写回 state。",
+      "evidence": [
+        {
+          "resource": "repo://src/agents/nodes.py#L1392-L1427",
+          "version": "repo-lines-v1:sha256:ee9f0349106bfce9ffd92b87dfd5a58b1dd89d1be5232649aa7603360472d8cf:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBmODU0ZDJjYjU0MDEzOGFhMTRkYmYyMDI1NzZjMzQ5MGIzZmQ5MzRhODY2ZTQ5NDU5ZmM1NzlmM2RjZjE1YzciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3YjViM2E4ZGY2YWQ1YjRmYTZiZmFkZWZhYzdkMGM3MDg4ODJlODhhYWY2NDFlMWJmNWVjYmVhMDk3MWI5MDgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI0YTc3MWQ2YjY4NjNkZjcyNmQ5ZGQwOWZmY2M0Njk2OGRiODBiZjhjOGM4YjJjNjAyOTQzOWQwMzY4YzQxZmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU0NmFkNWRmODRiZDI3MzZiNjM4ZWJkMGFlZDJkYWIwODY2YmYxZTljODYzODgwZDI5ZDQyNmY2ZDkzNWRhMjQifQ"
+        },
+        {
+          "resource": "repo://src/utils/audit.py#L208-L243",
+          "version": "repo-lines-v1:sha256:803524efcc632db75138de73e2a5e6d4da4b770f2e9e42a79c4883c443954b20:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImExYzkwZjI0MTI1N2IyZTJkMWYzYjgxNTllNTY2ZmM1MGM5ZDI3NTE2NmIxMDVjZjVkNWY3YmM0NjNkY2VjMjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU5ZDY0NzdkMjI2OWFhZTI4MzQwMTE3MWQ4ZGU2MWU2MDMzMTdlYjRiYmU1MmUxYjcwNTUwZTA4Nzg5ZjViZTAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ5ZmY4M2Y1YTc1MmZlY2RiNjM0YTA0MDRjZjM3YmU5YzNhYzRkMmI0MDA2OWZmZDQ3NWNiOTNjZmZiODc3NzQifQ"
+        },
+        {
+          "resource": "repo://src/utils/audit.py#L91-L146",
+          "version": "repo-lines-v1:sha256:0b75328c4cad77f3200596357d6aa19c12dc204d9f01040444ba822d6b0acc53:eyJzZWxlY3RlZExpbmVDb3VudCI6NTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk3ZmI3MzQ3NWQxMmE4MDIwNGQ5ZGQ3OTY3YWU5ZjE1Yzk1ZjgwNjRhOGI1ZThjZWRmNzUzMTg2NTUyYTVlNzkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkyMTVmNjE5MWVhOTNhMmQ1YWExY2QyNWRmYjI4MDQ5NTRkZWNhOWI5OTc1MjU2MDZhZjU2MGE2ZTliMjFjMzYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM0ZmJkNmI0NTY1NzhhOTIxODg3MWMxYzBkZTVmMTc0MjJlYmVmZjU2MTgzZjE3NjgzMzhhNTlhMjA2OTFkNzgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_18afe30d31034ec8b0e17f5362f5c49c",
+      "statement": "审计写失败不阻断回答（P0-5）：audit_log 节点把对应 request_id 的对话 outbox 标记失败、把审计条目追加到本地 data/audit_outbox.jsonl（记录含 error/entry/failed_at 供后台重试），并返回带 audit_write_failed=True 与 audit_write_error 的降级 audit_trail；outbox 自身写失败只记日志不抛出。",
+      "evidence": [
+        {
+          "resource": "repo://src/agents/nodes.py#L1377-L1425",
+          "version": "repo-lines-v1:sha256:b959263a2cabf07da16d9c1a13a8ab4ab82848849f3bd77c7fd4514553ea8c77:eyJzZWxlY3RlZExpbmVDb3VudCI6NDksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImViY2U2OTliYWYyNWVmNjFkZTBkYWJhZjQ3ODVkMzIxMTAzYTc3NzU1OTk2M2M5YjViNzEwMmRlNGM2NmI2N2QiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRhYTYyNWY1ZTQzYjFmYjczZTBjNWMzYmI0NmVjY2FlN2JjNDgzNTczOWM5OGIxMjNmOWM1NDEzMzQ1YTVjMGQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZkZTAxZGRhM2YwZjY5NDUxMTBkOTA3NmY5ODg3OTQ2ODY1ODU3ZmMwYTViNmM5Y2I5OWY2YTJjNTU4Y2UxNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBkYTEwNWMyMzkzZTlhNmY0MjcyNjljODJhYTNjOTVhZThlY2ZkZDAyMmM4NmM3NDZmMzJkMzJkMDlhZjI0YzgifQ"
+        },
+        {
+          "resource": "repo://src/utils/conversation.py#L399-L431",
+          "version": "repo-lines-v1:sha256:43b3255b531b746a93628a8a6c03a163f8ea6532bcbf6fb9095b4ecd8d73b7e4:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ0NDlhZjhiZjY2ZjgxMTIxMDcyZjdhMzU3NjA4ZThmYzg2ZTAwMTE5NmE0NTFhOWRmODFkZjQ4MmQ1NTMwNDUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQzZDk5YTBkZjE3MTMwZWJkYjJhMTM5OTZjZTI2YTNhNTVjM2MxODc0ZGYzNTJhZThkMWRmZDNkZDllYWVhZTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImEzMzM5MzE1YzM1ZTMxMDJhYTMwZjFjOTE3ZTI4Y2UyOGNjNTQ3OGRkYWRkODdiYjE4MjgwMGIyMjQ3ZTdlY2IiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU3OWU4ZGFmNTRmYzAxYzFjNDRkNGVhZDVjYjY0NjYyZTZlMWM0ODQyOTM5ZmMxN2EzZTUwODY1NDIwMTg5OTYifQ"
+        },
+        {
+          "resource": "repo://tests/e2e/test_e2e_audit_cache.py#L95-L121",
+          "version": "repo-lines-v1:sha256:4ec6562a5250874745807c54441cdd07e700d373bce34009a5699753bf1ea10f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlkOWEzOTQxN2ZlNTIyZDViNDlhZmRlYTNlNzQ4YWQ5NmY2YThiNWQzMDliN2FlMmRiNmVlYzA0MzMyMjg5YjgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdjMDE3NzM0MTY3MWFhYmRhZWY2MDg4YjUwOTEwYzU1OGE1YjEwMTY1NzFmZmQ3MDhjODZiNGQzZTFhOGUyN2IiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNiMGJjNTJmZTNjMTJhZDJiOGQwZWQ4MjRlNDZmNWVkODBiMjcwMTZiMDRjMWUzZGI2MGIwZmJiOWU0MjQ1ZGYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_25fac13364574a7a9b531313d79aca7b",
+      "statement": "对话持久化与审计 outbox 同事务：persist_conversation_turn（SQLiteConversationStore.insert_turn）写入可见消息/回合的同时插入 audit_outbox 表 pending 事件（event_type=conversation_turn_persisted），audit_log 节点成功后调用 mark_outbox_processed 标记 processed，失败时 mark_outbox_failed。",
+      "evidence": [
+        {
+          "resource": "repo://src/utils/conversation.py#L282-L431",
+          "version": "repo-lines-v1:sha256:4bb0327011574ef510004084f9159046db4a2682d1239f5d94adc645c8abfd25:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUwLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiIwNmY1MGVjM2IzYzZiNDk2NWVkNGJhNDQ0MWZlOTY4ZDBiYzkwYzgwZWI3ZmFiOTM3NjJiZmEwNDY4NmNjY2MzIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiJkM2Q5OWEwZGYxNzEzMGViZGIyYTEzOTk2Y2UyNmEzYTU1YzNjMTg3NGRmMzUyYWU4ZDFkZmQzZGQ5ZWFlYWU2IiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJhNjliNWVhMjk0ZDgxZDE2MWNhNmE2Mzc1N2QzN2QzNmUzZTQ4ZjU5MTljOTk3ZjZmZjAzYTM5YzliMWJlYzgzIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJlNzllOGRhZjU0ZmMwMWMxYzQ0ZDRlYWQ1Y2I2NDY2MmU2ZTFjNDg0MjkzOWZjMTdhM2U1MDg2NTQyMDE4OTk2In0"
+        },
+        {
+          "resource": "repo://src/utils/conversation.py#L472-L489",
+          "version": "repo-lines-v1:sha256:cd601d7d1b1ea06281c41fed30aa6cbd927f6462f22d2f9e9eb333b0f9c1c5e7:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUyZjA5NWZiZTc2MWFjZDA2OTIxYjc1ZDQzMGY4YTZjNDA3NjY3YjZlZjA3NDc0N2JlYjUzNjkwYTA5N2QwMTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ1NzJkYzUxZTBlMWVlMjQ3Yzk4ZWZiNmZhYzMyZGUwZjA4YmQyMmNlNzBiNjhiNTlmNGQ4OGE2MjM2ODNlMGYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQzZWY1ZDA3MWJhZGM3OWQ5MmVmODFlMzgxMWI1YmRkY2Y1MGVmYjAwNzNjNjEwOTA1Njk2Y2RiNWNmYzQ0NmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjoyLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE0NzVlODBjOWUxYTRhNzEzYTJjMmZkMThmNzFiYTdlZGQyOTMzMGM0YjBiNDNlM2NjZmFmM2JmMTBlZDQyYmMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_c44fdff69b594a17a346269c300b2d5f",
+      "statement": "语义缓存命中跳过整张图（audit_log 节点不运行），API 层 _persist_cache_hit_audit_event 补写一条持久化审计事件：execution_path=[\"semantic_cache_hit\"]、verification/compliance 取命中快照、total_chunks=0；写入失败复用同一 outbox 机制（_write_audit_outbox）落本地。",
+      "evidence": [
+        {
+          "resource": "repo://src/api/main.py#L405-L449",
+          "version": "repo-lines-v1:sha256:5ed6e2a3b9237746eb934bdaa56e50c20c479696c3bd0f38f99cd50575713f6b:eyJzZWxlY3RlZExpbmVDb3VudCI6NDUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkwM2YxZWI4MGM1NzFiZGFiOTQ4NjQ3NmM2YmQ1YWYwYWJkMjU0NGJmMGRjZDI2ZmMzNGQwNDZhYzllY2QzNDAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM3YTY5MzU4N2IzMDI0ZjhlMjFjMzcyMmZlYzY2NTdhNTZiYjlhM2IwMWRhZjQ3NzgxOTNlZTdhZjY5MWIxYzUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUwYjIxYmY4OTVmYWUyZDczOTIwZDkzMTc4Y2ZkNTg0MWNkZjhmOTUyNDUxNmM4YTU2NTg0MzZhNGFjNDhmM2IiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE3ZDM4NjFiNTE2ZWE4M2FiYmNiODYxMTBkYmZjYjAzZTBiYTc1NjA5MTAzOTliYTkwOGNjMTI4MTVjNGVhMzgifQ"
+        },
+        {
+          "resource": "repo://src/api/main.py#L537-L560",
+          "version": "repo-lines-v1:sha256:3e72f8a7ac82e39552df72348fcd8b947b36c55cc65c0032eb47d5750aaed849:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg0MjY2OTQ2MjQwZWM1OGIwYmIwN2YxZDU3MzhhZmYwZDM1OGNlNDRjMTNkZjdmOGRlM2RmODFjYWE3MGQwNmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEwZDk5NmE3YTM3NWJiOWM4MTIzZDhlMmFjY2M3NmQ4NjMyMjdhOWFkNTAzYzQxN2M4NzdjOGNlZjc3YjA3NGUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE3OGViMjE5MTFlMTgxMzg2ZWVhNDZmM2E0YWZiNzQ1NmFmOGQxMjE1MjQ5Zjk4MDZhN2IzNjBjNGMwZmI5ZDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ0ZGY4MTIzYjA3MGZjMDA3ZDRmYjM0YjIzM2RmM2UzZTVkMDQ4MTZlYWEwYWFmOGMxNmYyY2FmMmFhNTI1YzUifQ"
+        },
+        {
+          "resource": "repo://tests/e2e/test_e2e_audit_cache.py#L225-L252",
+          "version": "repo-lines-v1:sha256:5da7c0cf1228a5bd7b0009ce7ed9cb06b4f2dc3045f17b742a1edb084f732028:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM5MDNiNjgyNTI4YTgyNzI5MTU5NzMyM2FmNDkwMjBjYTcyMDY5OGY0OGFlMGY3MTE3ZTU0MDY5ZTAzOWQxYjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZkZTAxZGRhM2YwZjY5NDUxMTBkOTA3NmY5ODg3OTQ2ODY1ODU3ZmMwYTViNmM5Y2I5OWY2YTJjNTU4Y2UxNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNjNzliOGJhYTFiZmM1NDY0ZjFiNWQ1MTk3OGY3NmI2ZTc5Y2Q2N2I0ZjYzODJlNjdjNDJkMDk5ZjI5YTk3YzUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_4470028cd66f4f36b483948b6c0fbb84",
+      "statement": "request_id 贯穿 Langfuse 与 SQLite 审计：API 入口显式生成后传入初始 state，Langfuse 根 trace 与审计共用同一 id；trace metadata 只含 request_id/thread_id，验收测试断言上送 payload 不出现 user_id/department/role 且 metadata 键集合不超过白名单。",
+      "evidence": [
+        {
+          "resource": "repo://src/api/main.py#L507-L512",
+          "version": "repo-lines-v1:sha256:f7802bf4d6376edee023e8a684a14c36998a327f995b41a64ec175eeb581dab3:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTI2NzRlZmVkNGM1YjVhN2JlYzI3NzBmYzdjYTlmNmZkZmFhZjU2Zjc4N2NhNzUyNmY0ZDgzY2E1N2RkNzVkNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTlkMWI2M2IzMzE2NDQ4NzZjY2VjZTg0YzYxODJmYjFiZWMxMmUwMDc3ZTQ3ODMwMjFlOGY1NDU0NmQ4ZGM4ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDc2NjE4MTM5YjUzMzhkMDQ4YTc4YmUzM2Q1YzlkMjczYjY5NzkzOGQ5OWI4OTE5ZGU5ZmQ5M2Y0ZmEyZmJhNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWYwN2NhYjRmMWRiNjVmZGI0MGRmNmExZWM5YzQzY2ZhNzRhZGNhNWNhYjU5ZjY2NThiYzAyZTU1M2Y0ZjUzNSJ9"
+        },
+        {
+          "resource": "repo://src/api/main.py#L690-L696",
+          "version": "repo-lines-v1:sha256:95232a5f8b198d44614083602b54a9d13f40a1bed4bf987bae7118fce65aa1b2:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTJiZWI5Yzg5YzljZmRkODZmOTQwYzYxZmU0ZWQ1ZTQ2NzE3YzRjNzA3YzNjMDY5YTIwODY3YjU2ZGE4MmNlNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTM2NWFkYmZjNmRiMThiNjJhNDA5ODI5NjViNTBlNTU4NDAyZDBiMTJhMTlmODRkMDY5ZmZlMmJlMTZiYmY4ZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjk4YTk0MmE4ZGMxNzhmNjE4ZDM3ZGUwYTcxOWNhMDNlOGJiMDFhNDhmOTI2Y2E0Yjk4MWI2ZmY1NDBiMGVhNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmUyYzllOTIxZWI4ZWZmNTg1MjRiOGY5Yjc2NmRiNzlkMjUwYTI4ZThjNTJhNzNjOGIxZmM4YzI0YzkxMTkxMSJ9"
+        },
+        {
+          "resource": "repo://tests/test_langfuse_acceptance.py#L468-L501",
+          "version": "repo-lines-v1:sha256:b4dcc4f30766400ca9aa23fb1b0a066d5dfc2cb4c7237240696f7fe5ff05de66:eyJzZWxlY3RlZExpbmVDb3VudCI6MzQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJkOTk0MmRlYjdkYmFiYzExNGIxYzQ4ZDAyZGE0NjM4NmU5YWNhNTE1YTUyZmI3YjNjNDEyZGM2Mjc5MjFiMDgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM3MmVjMDZjNTdjNjU2YTQ1OGNlZGYwMDZjMjM4ZDVjMjE5MjVhOTBkZTY1OThiMWI0NzA4ZjlkNzQwN2UzNDEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFjZTJlMjhjZTE3MDI2MGYxNDgwMmNjZDQxYTNkZGZkZmY2NGY2M2ZiMWJjZWZkNDkxNmQ4YWU4YWMzZTUyMjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBkZGZlZWQ5MzEwZjUyNGQxOGI5MzU0MTNjMjg5ZmJkZjg4NDdmMTg1M2NlMzNmYzE1YzY2OTgzMmY0MWNmZmIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_ecd8a38bccec4714af84f0d63ff4604f",
+      "statement": "MetricsRegistry 是进程内线程安全的内存聚合器（get_metrics() 单例），/metrics 输出标准 Prometheus 文本格式；指标清单含 secrag_queries_total（role/status）、secrag_query_duration_seconds（role，桶 0.1–60s 支持百分位）、secrag_cache_hits/misses_total、secrag_retrieval_chunks_total（source）、secrag_verification_passed/failed_total、secrag_compliance_blocked_total、secrag_active_requests（Gauge）、secrag_langfuse_dropped_total 与 secrag_langfuse_export_errors_total（按 reason）。",
+      "evidence": [
+        {
+          "resource": "repo://src/api/main.py#L136-L146",
+          "version": "repo-lines-v1:sha256:b5d5704ffdcd9981bb234a00c240337c4e505bc648e6973361ff555149186498:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVkYjJiMzRkOThkZjZlYmYxYTQ2MjQxYTcwYTEzZDFhOTcyZDJhNDkxNjc0MDNhMzM5YmNkMjJhZWY2YWZlZmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwYzFmMTg4ZjE0MmVkN2E4MjQ2ODBiMjA3MTcyYzU1MTliYzYxNGE0OGZkYTdjZjE2N2VkYjhkZGY3OTk1NmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE5MzE2MmM4MjA1NTU4ODVmYWJlZWJhNjFiZTUyZTcyNjUzYjNkYmIyM2UyMjZmNjc3ZTE1YTQyODUwN2QwNDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImFiOTFmNDU4Yzk3YmExM2JhODJkMDM4YmQ3Y2E1ZTA3NWQyMWFmMDhkM2E5NWY0ZTU4OGI4YWI1NGZmNjFiMzUifQ"
+        },
+        {
+          "resource": "repo://src/utils/metrics.py#L214-L291",
+          "version": "repo-lines-v1:sha256:17535428893c008e15d730d12afa507205facd3bdf683dbca4f9c74a25aa4a8e:eyJzZWxlY3RlZExpbmVDb3VudCI6NzgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU3MzA0ODcyMjBmNzlhZGNlMjJkZDgxZTJlNjY0M2ZlOWYxMTNhNDZkM2UwNjZlMTU4ZjBmYjc3MzFlN2RjNjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM4MWY3MGI3MzVkNjk3MWQwMjNhZjRmNzljZjcxMGNmOWE0NzBkZDMwODMwYzM2NjBlZmE5YzU5YmNiOTM3MzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZkZTAxZGRhM2YwZjY5NDUxMTBkOTA3NmY5ODg3OTQ2ODY1ODU3ZmMwYTViNmM5Y2I5OWY2YTJjNTU4Y2UxNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY0NTkwOGU5NDk4ZDQ4YThmMmMwZjc1Njc4NmExMTNmNjk5ZTQ4MTA0OWJhNjg4NWM1Y2RiYjUxZDU3M2ZkY2MifQ"
+        },
+        {
+          "resource": "repo://src/utils/metrics.py#L351-L386",
+          "version": "repo-lines-v1:sha256:3137de918fca3b4c377896011711e54de55597b17e95acecca30b1a88121c07e:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI2NTk2MjgyN2U4N2I5NDRmMjFjYTU1M2E1Mjc5YzQ3NGZkYmVkODgxNjE0Y2Q1NmI4ZjAzNzhhNzYxMjhhNGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA2MmJkNjBkZDFlYzI4MzIzN2YzZDM2Mzc5OTMxZmZjMzUxNjE3NjA2OGYxZDVjN2MzZGMxZGMyNTBjNTcyMjkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE4OTVhNGJkNmFlNzUzNmZlYTBlZDM1ZWUzNTRlNzdhZjc0ZWFjNjIwZjk4ZTk2NzJhOWE5MjdmMTQ2ZmNlMGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY0NDhjNzg0NTMyNDdhODllODVmZjczZWIzMzAxMDJiOGIyNTc1NzllZjdhN2U1NmJlNzlhZWMzYTY5NjFiMWUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_780cbd911c70434abe03fe6f60d35522",
+      "statement": "MetricsRegistry.get_summary() 返回 uptime_seconds、total/success_queries、success_rate、active_requests、cache_hits/misses、cache_hit_rate、latency_p50/p95/p99_seconds、verification_passed/failed、compliance_blocked，由 /health 的 metrics 字段承载；/health 检查 ChromaDB 连通性，chroma.status 为 error 时整体仍返回 200，避免负载均衡器摘除节点。",
+      "evidence": [
+        {
+          "resource": "repo://src/api/main.py#L108-L133",
+          "version": "repo-lines-v1:sha256:1330854dccad48fd62b1b4e13415fc253a0addb56107badb5c55f132419c944b:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE5ZGNjZmQ2NmU3MmQ2YTVkMGNlNDc1YzVlNDg0M2RmNGQwYWI0ZTMwNGU0YmVlYmRjMzk2OTUzNjY2MGRmODgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE0MGU2ZDMxNGZlM2MyNzUzNDQ4M2MzYTcwNDBjZmE3NzU2YmFkMWZlNTgwYTM1ODJlZmNiZTNjOWE2NDY3YWMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ1MThjNTkwNzU4NDg3M2JkNWViZGIyN2UwZmExZDlkZWE0N2RkOTdlZDM3ODEyOWJhZjA0OGJhZTIxZjE0NjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg2ZjA5NGVjYWRmNzQxZDgzMTIxZDNjYzY1YjAwZTM2MDcwNmUxOWVlODZiYTcxOTZlYzM5NDBhMDNiZTk4ODYifQ"
+        },
+        {
+          "resource": "repo://src/utils/metrics.py#L315-L349",
+          "version": "repo-lines-v1:sha256:bcb5ffba476b363ea795c7d5dd3c4fe9a49e171c868cac9c6927de1b6489245a:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZhNjk5OWYyNWQ4NmE1OWNiZTkzNWQyZTAzODhiN2Q5NTU2MTcyMDFjYTQ3YzQ1NzNhMWZlZWMyYzU5ODQ0NWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU2YjA0NDkxNDY5NzIyZTgzNjNhOTRlNDA0NDUzOGUwMTNhMmEyMTdlMzZiMWU1NjhiYTYwYWNiN2I0YzhmMmUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI5NzU1ZGY2MTM4ZWMwZGQ5N2ZmZTRkOTA1N2RjNzlmNjI5ZTJjM2JmMGJjMTg1ZDVjMmIyNTMyYThjZTlhZWIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ3OWQ2M2FkOTdmODI5ZDI3M2U2ZmJjNWM4OGEzOGVmOGZhOGE2MWI0MThlMmU5ZTRjZDA5NzVkMGM1NGQ1NWYifQ"
+        },
+        {
+          "resource": "repo://tests/test_api_routes.py#L35-L45",
+          "version": "repo-lines-v1:sha256:900470bfca2efbc3f6d213e0f7580cda35162bb039f06baac691714de6ea69fd:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJmNmEyNjJlYTI2NWQyMjA5MmYwYWU4NWRhNDhmN2VkMWY5NTI5NzJlMWM4MDIzZTg5NjgzMzU3YWI4OGI1YzUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhmMDhhYjUxMzE3MTEyMDZiMjIyNTAwYmIzNTIyZDAzYjM5NzkyZjYyZTcwZmNjY2ViZDk3MjE1NzEzZWNkOWIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYwNzk5Yjg4MGQyZjBlMjhjYWM0Zjk2ZTg5NGIxMWYwNGY2ODFmNjdkYjk1ZDUwMGJkNzQ1Y2JkNDBmMzc0ODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZmMjNkNmFlNTZiZTg2YmI0ODhkYTRhNTVkZThkYzA5NDhlY2I0Mzc3OTA4NmI0ZmZjOWIzMzQzNmZjMTY0MTgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_9f27853eb97e4dce9bf2bb8ea06b8bd1",
+      "statement": "Langfuse 启用条件：LANGFUSE_ENABLED=true 且 public/secret key 齐全且 LANGFUSE_HOST 通过 is_valid_langfuse_host（仅接受 http/https 绝对地址，刻意放行 localhost/内网以支持自托管）；未启用时整体 no-op、所有方法安全可调、业务零感知；LANGFUSE_ENABLED=true 但缺 host/key 时 Settings 校验直接启动报错。",
+      "evidence": [
+        {
+          "resource": "repo://src/config.py#L107-L125",
+          "version": "repo-lines-v1:sha256:58cabd962dc8bb166fce7e4b1c95d3429ec7989b2cd5137237694f036353a9a8:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlZjFjZGQwZjU3NDMzY2U1MDc3OTA3MjJlMmY1MWQ5NzM1NmNiZmZhN2IyNGRkN2NhMTM0NDgzMmQ0ZTUyNDgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEyYWIwOTBiY2QxNjIwZmE2MmVhZWUxNTdhNzRmY2E2MzVhYTI5ZTEyY2JmZmQ2MThiNTc5MmQ4N2JjMDNhM2YiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIwMWZkNjI1M2U1M2QzYWExMzUyMzQ5MDIyZWMwZjRlNWMxYTZhM2Q5YzdiZjQ3MGQyMTA4NjcxMDhkMjRjOTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg3YzBjZGMxZWMyZDM4ZGRkM2Y4YTU5MzliZDhiZGEzZmQxYmY4Mjc3Zjc3NmFiZjEyZjk5ZTFiZGY2MTUwMDMifQ"
+        },
+        {
+          "resource": "repo://src/utils/langfuse_adapter.py#L152-L162",
+          "version": "repo-lines-v1:sha256:38c7cd5fcf5caf89856c107f973a09da320591a101dd40f190dc059bc734e183:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI0ZjdlNTgyZWFlYmM2NDYxY2U5YzJiZGRjNTViNWQwNzAzZGYyNDcwMzBiOWE3NGFjNjY4YWY5NTcwZjVkZGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJhNzU1NmEyNTRmZjMzOTA5ZGFhMTA1OGQ3MGJiMWQwZTVhNGJmODZmNWM1YmFkZDJmMTAwNzc1MmYwMGQ5NTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdhMGU5ODgwZjZlYTFlNjIyNzUxMDIxNzM1ZjE2ZDExNTEzN2U1MmE0MGVkMDFjYWFhNjJkNjUyNzQ1YjMyZjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFkODBkYzQ3MTI0NGRlNmE5Yjg2YjdlNTFkMzM2YjFhZGZkNDQzOGRhZTRmMWZmMTk5OTcyOWQwNTM3NjI3MjcifQ"
+        },
+        {
+          "resource": "repo://src/utils/langfuse_adapter.py#L385-L433",
+          "version": "repo-lines-v1:sha256:d5592ce3de947a7ec9dee8f20a1d0fc905f8ffba4b85f0d3aed0a44233b3ffd2:eyJzZWxlY3RlZExpbmVDb3VudCI6NDksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlmZDdhMDdhODNkZDE5OTZmYjUxNjg0YjQyYWVjYWY0ZTkwZmI3OGJhNzIzMGU1NDJlZDdiZDAxZDQyMzAxYmUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjliYmE0MGRkOTNjMjM5ODg3NGI4MDczZTg3NDI4NzFhMjkwYmY0OGY3Yjk4NDNlYjg5NTM1MGI4ZTY0MGIxNzYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRlZDY2YjVkZGI5OWU2Njc1OTNiY2QyNmFjYWQ4YzFkNmE0NmI4MDJjY2JiOTc1MmM1MjBjYzQyNTRlYzE5OTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjlhZGM0Mzk1YzdmM2FhYzRmNzc4M2VkNGIzMzg5ZjVlNjhmZTVjNTBlNjcyOGIwZjNkNTM5ZWY1ZWJmNmVlNWEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_9d3d4d3ad00f44fc8ca940132c88913c",
+      "statement": "Langfuse metadata 第一层防线：LangfuseTraceMetadata 是固定标量白名单（request_id、thread_id、node_name、model_name、duration_ms、token 三件套、retry_count、retrieval_count、cache_hit、verification_status、compliance_status、status、error_type），filter_metadata 是 metadata 唯一入口，未登记键与非标量值一律丢弃——新增字段必须显式改白名单。",
+      "evidence": [
+        {
+          "resource": "repo://src/utils/langfuse_adapter.py#L515-L535",
+          "version": "repo-lines-v1:sha256:ba4693a5f289927a084ed7daebc3f7c4b400485f71c5b16b14972711e08f8cb3:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdkZDhlZWM0NzRhOThiMTNmZGYwMGQ1YjlhODRhNTljMzFhMzhjYTg1YWZhMGEyZTdiYTRjOTJmMWIxZjg2MDMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgxNmY2NTFhMzczMTBhMGM5ZDQwZTZhNzQwZDgzYzM1MzFkZDU3NzIxMzI4OWJhNmNlZWYwNTVhNzEyNmJmMmEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRlNDk0NDliZmYyZDlkMWUwNzg4ZWYyN2YzOGI0MTI1YmJkNDI5NTY0NDg5YzYxMDQwY2VhN2I3NzA4YzYwZDYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRlNTkxODBlZGUzNmFkOTkwNDlmOTUzYTBlZGJlYzQwMTJlMTc2Yzk5N2JmMTBjMDY5ZWQ1YmI5NjBiNjM5NTAifQ"
+        },
+        {
+          "resource": "repo://src/utils/langfuse_adapter.py#L82-L104",
+          "version": "repo-lines-v1:sha256:082d605a088cd00373c612d47bba64aadc5b0d904dea3b145a7e430230ed9809:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MzBhMjI5NmMyZTU5ZDljOTE4N2FhZTgxM2RiY2FhZGM1ZWU2OTBhOWYxNzRmNTNhNDgwMzAzMjg2ZDFlMWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3MDg4Y2NlZDExZTVjNjA5YzBmY2UwMDJmMDRmYzhlNzZlMDRkNzUzYTc5ZTg2MjI0ZjFiMWIzNWZhNzYwY2YiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhlMzVjNWQyMmRjMDJlMjdjNWNlNDUzM2U3YjBmNzIwOGUyM2Q3MzE3ZTI4ZThiOWM0NTE3YTFmYzM2YTg3MDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUwM2FiNTI1ODQ4YmZiMzA4NWZmOWM0ZGVlYzRlMDNiOWY2MWMzOTFkYTQ5YWQ5NmE5NGRkZDFlODMyNDcxMDAifQ"
+        },
+        {
+          "resource": "repo://tests/test_langfuse_acceptance.py#L267-L298",
+          "version": "repo-lines-v1:sha256:35de448dc5af4fdba567dd127f2d04e9ada62130a482b7f4be688e634a37b876:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdhODNlY2EwZTllZmZiYTViY2I0ODNiNjYyNTIxMjU5ZmYyNWRjMGE2MWFkMzdmOGNmZjYwYjQzMDMwYjg3ZjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZjNzVlMGEyMGRhNjc4YTc5NWQ0YjFjNjdiOGQ4MDJjMzk0Yzk2ODM1NGI5ZDU3NDZkYzEyM2UzMzc0N2M1NDIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg3MjQyMTFjMmNiZjYyZWFiNjQ2NjFiNGUyMjFiYmM0YmU4NDcxZWRjNDhkYzE2ODJkYjhiMmY4ZDE3MmZhNTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVlYzJmYTViMDI3M2Q2M2QwMTMzNTFjODA5NzI3ODhmOTM3ODVkNWFhOGM2YjRkZDJlOWFlYjdhZDQ4ZTVlNWMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_2fbaa5c0655f470cb34bdbe1d32ec53f",
+      "statement": "Langfuse 导出层第二层防线：_mask_otel_spans（mask_otel_spans 回调）在 export 阶段兜底——默认删除全部内容属性（langfuse.trace/observation input/output、langfuse.observation.status_message、gen_ai.* 消息/工具键与 gen_ai.prompt./completion./request. 前缀）；仅 LANGFUSE_CAPTURE_CONTENT=true 且 APP_ENV=development 时才保留，且每条字符串先经 redact_pii 脱敏；属性不可读时抛异常由 SDK 丢弃整个导出批次（fail-closed，宁可丢数据不放行未脱敏原文）。",
+      "evidence": [
+        {
+          "resource": "repo://src/utils/langfuse_adapter.py#L106-L133",
+          "version": "repo-lines-v1:sha256:85c900f601474c9d7db61df22fed9bc6398a4bb6885a0a0cb2108472b8300ae8:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJkOGQ4YzRkYWNhYTg2YTlkYmVhZmEyM2IzMGE3ZTBmMWI0OWQ2YzE3NzI2Y2Q4OWI2YTAyN2JmZmYxMjQ0MzYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY2M2I0MTFmMTRkMTZkNGM2YjJlMDZjNzdiZWM1NzBmOTljYWM3ZTM5YzgwOTRjZjBlZTE5YmI4NTZmZmVmYmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNkN2JmY2JmMjQwMTBjYWU5ZjNiZmVlZGY5NDUzNDgwNThmYTVjYTJiMDYxYmU0YzZiNWZhODI2OTg1ODRjYWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImEzM2Q1ZDRlYzRlYWM3NWI2OGUzMGMzYTAwNzA1YWQwZjk5N2EyNGI3YWQwNmUzZmM0ZmQxMjgxZDQzMTRjNGMifQ"
+        },
+        {
+          "resource": "repo://src/utils/langfuse_adapter.py#L571-L615",
+          "version": "repo-lines-v1:sha256:ee3840741f2e678e8aaa861fcd1a643f9a45170de3e93495140b66ef48cacea7:eyJzZWxlY3RlZExpbmVDb3VudCI6NDUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxYWJjZDBjYzY5MTNkNGY1MWViMjFlNGY1YWZjMmU5MGY4NmQzNmE0NTBiYjQyY2IwNWM2ZjNlMGQ3MDZmOGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhM2M3YzM0NGFiNDI2NDNiNmY1ZDBiZDNkNjIyOTY2NmM4NWZiYzQ3MzBlNDVmYjA3NGZhNzA2MWMxYTI4ODAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk4YzAxNmNiYTc0YTU0ZjM4ZjYwMDFiOGFkODVjYWU0ZDk0NDE4M2I3N2MyMmRhOWMyYmEzNzA1MWVkZmI0ZjgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE4MzA2ZDAyZmQyYTAxYjc4YTAyOGNiZjNkYmFkNGExNTNjMmIzOTllYjNjMDY3ZTQ5NDVkMDEyNzJmMWQ2YWEifQ"
+        },
+        {
+          "resource": "repo://tests/test_langfuse_acceptance.py#L301-L343",
+          "version": "repo-lines-v1:sha256:d4bf1d161e795652adbb522b34b601cc3ef59c2ad1000e347abab51fa5daf087:eyJzZWxlY3RlZExpbmVDb3VudCI6NDMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjliYjA4NDI4ZDZhNjQzZGQ1YzUyODI5ZWJlMmRiMmEzMGNjYzVlNWIwNzg2M2Y4MWMxYTBlNmEzYjhmZDZlMjkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNiN2EwMTk2NzllZDRhMjFlMGRlOGUzN2VjZTVmOTc0NWU4NWY4YTkxNmNkZmNhODVmZDNhYmFiMTIzODViMzgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZmYjg2NTk3MGUxYzM4NTVmZjBjNzc5M2Q0Y2IyZTI4ZTQ4OGI5OGMyYmI2NTJlNzNmNTJlM2M3ZTRhOTRkNWQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJjZGUzZGVjMTczOGFiMDhjYjA5NWM2Njk4OTAwYWNiMWE2MDk3ZDMzNDVlZjU5MWM1YTI4NzQ0Y2IyMjQ0MDQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_636add4cd6ad4206a3f7a04348657720",
+      "statement": "Langfuse 媒体预上传在构造 client 前无条件关闭（LANGFUSE_MEDIA_UPLOAD_ENABLED=false）：锁定版 SDK 导出管线先做媒体预上传、后执行 mask，base64 data-URI/内联媒体会先离开进程，关闭后才满足'内容默认不离开进程'红线。",
+      "evidence": [
+        {
+          "resource": "repo://src/utils/langfuse_adapter.py#L136-L149",
+          "version": "repo-lines-v1:sha256:50a2f7d3aea84cbf6a1603a2bcf6acd6eaf9ac6ea08fee0d0d67773d221ebde8:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE1NDAxOWVmYjk5NGViNWM5YWMyNmUyMGY3ZjczMGIzMDk4NzQ2NDM0NjFiOGU5MzJkYWRjODFiOGE1NGY3MmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU0ODM2YjBjZjIwOWVjNzRjZDQxZWYyYWQzNzI5MzM3NjdjNzIwNjRlOWIwNDY1ZWE1YjkzYWM0MjliYTgzZWEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRhMTEzYzM4NzA0NmVlYmQwNjk4YzQ4YmRmMWQyZjlhMmQ5YWIxZjZmMmI2MmQyOGQzOGMwNmFkNWE3ZjdhOTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU1MTUwYzM3M2FlYTNmZGNmZTU1NjUyYjM1OGYxYmFmZDI4MmJhZmQ4NDM4MzI5YjEzY2M2MjdkYTQ3NjAwZjgifQ"
+        },
+        {
+          "resource": "repo://src/utils/langfuse_adapter.py#L447-L451",
+          "version": "repo-lines-v1:sha256:721ba06761371a844447957605a9de0ff8856090d1fd85bb205b110157180cb8:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTE5OWIxYWQxMzA2YWQwOGQ4NTBkYmM0ZDkxOWI0ZjQxZjFkNjdmNWIxYzUwMTc1MTFlZTQ5YjJlYjJjMzc0MiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDJhYzcyNDM3YmJjNTFiNzU5NGM3MmE1YThhY2QwZjhhNDZkZjAzOTViNzg2YmFlY2Y0ZjJkNzNkNDAxMDA3YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMGFjNzg1MTE0ZWUwZDdhOTI0NDMxMzBhYzUyNjc5MmE5NWVlMmQ4ZjRlMzE3OTUxMjRhZjk1MWNiYzUzZTYxOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTQ1ZWRkMDZlY2UxMDY5MTZiMGU4NTRiNWU5ZGYwMThiMDZjNDA3OTRmMjIzNTEzOWU3YjU2MmRmOWZjNGMwNyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_05b9388395c8466d9ad42fc18ad11956",
+      "statement": "Langfuse fail-open：未配置/初始化失败/超时/鉴权失败/写入异常时业务链路照常完成，错误只写本地日志（secrag.langfuse warning）并累计 secrag_langfuse_export_errors_total（timeout/auth/exception 尽力分类），绝不抛进业务路径；OTLP exporter 批处理线程内部消化的失败由 _OtelExportFailureLogHandler 日志钩子（挂在 opentelemetry.exporter.otlp.proto.http.trace_exporter logger 上）转入同一计数与告警。",
+      "evidence": [
+        {
+          "resource": "repo://src/utils/langfuse_adapter.py#L30-L46",
+          "version": "repo-lines-v1:sha256:67bca9465f6b258e6ba8e0850d33cbd198fb6bcdb5420cda23f9487b4229aeae:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZiNmJmMmRhN2U3N2RjYjM4NzJhNjJmNjE0YjQ0YTcxNWViZDU0MDljOTg1ODEyYjI4NGRiODhkNDY0NzZhNWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEzYjA2YTlkZTZmNWJhZGFlNmFmNjY2M2EyMjBjYTMzOGZkMjMwNWQ4MWZjOTc4MDBiYzAzNWMzYTBjY2IwZmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjlkMWQ5NjQyYWMwNjg1ZDRiMTFhNTM5NzMzYTQxYWNkNDgzZWYyYWY1ZmI3MjQwNmYxMmNlMTMxZmI3YTg5M2IiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjkzODViODhiMmFmMTlmZDE5YWIyMzFiMzBlMjBiMDJhYzViMjYzODdjOTFkZWFmNTc0ZGUzMDUzNzVkODcxNjcifQ"
+        },
+        {
+          "resource": "repo://src/utils/langfuse_adapter.py#L336-L374",
+          "version": "repo-lines-v1:sha256:6ac03a2d89d63d36aa13758879283db91d4899a28741174f9f2d0ddf0fdb71a7:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgxMGY1ZWUxM2M0Y2E3ODFkNDdiOTJkNTQ4ZGIxNGM0ZmYxYmIzZTExNGQ1ODBiYzIyZWZhZWJhMjkwMjE1ZjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNhNTc4MjJlOGEwMTlhODA4NWVmZmFiMmEzMjM1NjFlNzgyMmJiNzVlNTcyOTBkYzZmMmVkMWM5MGZkYTdmNGMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIzZGYyYWNmMDZlOGMzZjAzYzcxMzVjNmU4YWM1YTljYTU0MzJhYmUwNmE3NGFjYTBmZGQ5YTUzYTAwOGY5ODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY0ZDkwZTZlZDAzYjYzM2I1YWY5OWUyMjM1NmY2ZmZkZDJkNDBmNjc2YjA4ZmVmODU2ZDI2YmFkODQyMjkwNzkifQ"
+        },
+        {
+          "resource": "repo://src/utils/langfuse_adapter.py#L483-L511",
+          "version": "repo-lines-v1:sha256:6d67c68c73af2d5306f0c0db5d8e30fd001bc50c519df487403678d68acc20b2:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxYWJjZDBjYzY5MTNkNGY1MWViMjFlNGY1YWZjMmU5MGY4NmQzNmE0NTBiYjQyY2IwNWM2ZjNlMGQ3MDZmOGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY5YmZiNWQ0NGVhMmIyZDQ5N2VjMTlkNzM0OTc2ZTJhYzBlZjJiYjg2ZWM5NjZkNDRmNTA4MTM1ZmJmNDBhYmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImExNWQ2YmIwZTRjYTJhZjRhN2FhNmRlYjQ3Y2VhOGQwODEzZWE1MzExMmQyYjJkODEyMmJjMDFhMjIzZDQwZjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRlNDk0NDliZmYyZDlkMWUwNzg4ZWYyN2YzOGI0MTI1YmJkNDI5NTY0NDg5YzYxMDQwY2VhN2I3NzA4YzYwZDYifQ"
+        },
+        {
+          "resource": "repo://tests/test_langfuse_acceptance.py#L360-L437",
+          "version": "repo-lines-v1:sha256:946259a692f2395cf13b90fee124793deaa9fd1595fbbdf8253bc38e97b9489a:eyJzZWxlY3RlZExpbmVDb3VudCI6NzgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFmMzQ1ODNhNTk4NzY3YmY1NmFlZmViNjVlMjAzM2ExNjUxY2M0YzhkN2U2ZjBhZjNlNWNmZDMyOTNmOTMzYjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjMxNmU3M2NlMDYxNjMxMTkwNzA1YWYzMGM2ZjI4Y2NmY2ViZTgyNTZmNGU1MTQwZDI4OGNiNDk5YjY0ZTliOTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUyYmNmY2EyNDUyMWI5ODgxMmRiYmRlZjA3OWIxNDQyNjhhYTBkMDg4YWI2OWVlOTc5NjVlM2Q4NzQ0NTcxMDAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_c99edf1e943b44c9a6cff30bce5e0477",
+      "statement": "Langfuse 采样语义：LANGFUSE_SAMPLE_RATE 在 adapter 请求边界做头部采样（SDK 采样固定 1.0，决策集中在 adapter）；建档时已知错误不参与采样一律保留，被采样掉的请求执行中失败时 finish(status=\"error\") 补建仅含白名单 metadata 的错误 trace（agent.request.error），保证每个错误请求都有 trace；采样丢弃计 secrag_langfuse_dropped_total{reason=\"sampled_out\"}，不算失败不告警。",
+      "evidence": [
+        {
+          "resource": "repo://src/utils/langfuse_adapter.py#L37-L46",
+          "version": "repo-lines-v1:sha256:d62b4ae2970c2b37085d0068611bbb08aba83ec8f871de9d21034d0766b36e02:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVjZjgzZDA0NjhhMGE4N2FlYzMyYjdhOWYzMTA3Njg0NDhmYTk2NjNhMTQ3OTI3ZTA4MTg2Y2Q4MWM3Yzg2YWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEzYjA2YTlkZTZmNWJhZGFlNmFmNjY2M2EyMjBjYTMzOGZkMjMwNWQ4MWZjOTc4MDBiYzAzNWMzYTBjY2IwZmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdjN2Q5MmE5NzFlMTk4ZTliNTE2NDRmNTgyZWFiOTJkZDk0Y2IyMmVjMTdmMmZkYzUzZDQ4NjgzNmYwZWE0NjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjkzODViODhiMmFmMTlmZDE5YWIyMzFiMzBlMjBiMDJhYzViMjYzODdjOTFkZWFmNTc0ZGUzMDUzNzVkODcxNjcifQ"
+        },
+        {
+          "resource": "repo://src/utils/langfuse_adapter.py#L539-L547",
+          "version": "repo-lines-v1:sha256:eeeb4faaad90d757254b5bdcc776d68eed1170f37bd2a990e544232c93b55cba:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDgwNjk5NTRhOTdjMDg0YTk2ZjU5YWYzZWIwYTQ4ODY0ZWY5NTUyMTllNmNkZmU2YmZjODM0MjUyMTM4MDU3NSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDA5MWMxZjA2MDUyZjMxZGI5NWU5NDQ4OTIzMTNlMjE5NTQwMWJmMmYzMWQ4MTkzNWU1MWJlMjc2MmMzY2ZjNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZGU1OTE4MGVkZTM2YWQ5OTA0OWY5NTNhMGVkYmVjNDAxMmUxNzZjOTk3YmYxMGMwNjllZDViYjk2MGI2Mzk1MCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZWVmYjFlMGRkNWViMjk1ZGQ2ZWUwYTYxMmUzMDdkYTVjNWFkYTM3MmQyZWI2ZTgzNjdkYzBkNWQ0NzIxODdkYSJ9"
+        },
+        {
+          "resource": "repo://src/utils/langfuse_adapter.py#L689-L719",
+          "version": "repo-lines-v1:sha256:d158c47ec74a55025c73d4bc4dff84f24ca6b83ab6e1829a27337a7970d59b57:eyJzZWxlY3RlZExpbmVDb3VudCI6MzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNjOWU4MTM0ZTUzYWE2YmU2NmFkMjc5NWM5MzM0MjBjNjY3Y2QwODA4NjUxOThjNjYyODgxZTVjMjA4ZjM1ODUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk5MWRiZWM4ODU5MjljMTczZjdkNGZkMGE0YWQ5ZTk5OGUwNTE1NzU4ZGUyYTgyZjZkM2Q1OWE3NGZjYmEwMjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNjZmUxMzc4N2M3NDJmMjU0MmQwZWEzYzM5MGEzM2MwMGEzMjQzNWRiZmUzNWJlMTNmZDZiYzI0YTdmZjBhOGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJmY2Y2MzcxOTk2YTNlYzcxZmUwZmM3YzQwNTY2MTFhODgzNmM2NTJkNDYyMDdlNTU5NzdmZmJiYWRjNjQ1YzcifQ"
+        },
+        {
+          "resource": "repo://tests/test_langfuse_acceptance.py#L540-L551",
+          "version": "repo-lines-v1:sha256:3b7192beb380f922648c64d1676143b82516394da9b910b37d1a434f073ce54f:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEzNzEyNTg4ZWJjYmZiZjMzNmNlMTM5MTY4MWY1ZTVmZmY2Mzk2Y2IxMTBmYjNhY2M2MzVhMDNkMDE1NDMyYjAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMWQ2NWI4ZmRiZTUyZTQzMGFhYWFlYzQyMzlkNDAzOTZkMmZjOGMyOTlkZWE1MmQyNmNjMTk4OGZhMDk0NTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU3YzRiNWZjNmViY2ViNTE2NjFkMWUzNmE0YjAzM2IwY2NlMzc3MWU4MDE4MWRhYWFkMzk4MjFiNDUzMGRhY2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_ffb7abd6c8c54ae5be88bd68c9a5af9a",
+      "statement": "trace 注册表只导出登记的 trace：_should_export_span 按 span context trace_id 查 _trace_registry（容量上限 4096，LRU 淘汰），未登记/杂散 span 一律不出进程（fail-closed）。",
+      "evidence": [
+        {
+          "resource": "repo://src/utils/langfuse_adapter.py#L127-L129",
+          "version": "repo-lines-v1:sha256:2e544dbb1ca636f83343d7ab593214d45f0a784d6f13554b677fbfee1b8dca32:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNWJmOWM5ZGFmOTMyMGMyMWJmYzNiNmQxN2E0MjEzZGNhZDU5NDdkZGMxMzA0OGM0MWUzZWJjOTk1ZTNiMGQ0NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNGViOGFiMWQ5NDIxZjhiYTY4MGNlMjE3NzMyMzZjYTg2MjllNTFiMDIyYTJlYTc2YTY1YWJkZjdmYjIyMDhlOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDAyMjM4NzIwZmQzZjBiODE5MzZmY2E2MzFiZDgyZDYwZDZmNzk3MDYyNGFjYjczYWM3NTkwNTdjZmFjYjJkMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWNmYmU3ZThlNWNjNzNmNDhmMDU2ZmEwYmQ5ZDY0MjY2NGUzYWNmNDU4ZGRkMWJkNzFmNGJhZDJjMDgzNDBmYiJ9"
+        },
+        {
+          "resource": "repo://src/utils/langfuse_adapter.py#L551-L567",
+          "version": "repo-lines-v1:sha256:d65661ff51c751b9e6999c5bddc84293ace15ecc1683e7044e252f148e3804b9:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxY2IzY2JhYzRkNzZkMGRiYmYwMTE4NGRiMzg1MGQ0MDkzNTI5NDYyOWZiNTllOTY2ODA5NWQyN2Q2MmIxYTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFhMTg4M2Y1ODIwYWU2NjdkZTM3OTgyM2Q1NmQyM2I3ZjNjZmRhYzdjNGQxMmFjN2E2NjA4NmM2NGY4Yjc0ZTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVlZmIxZTBkZDVlYjI5NWRkNmVlMGE2MTJlMzA3ZGE1YzVhZGEzNzJkMmViNmU4MzY3ZGMwZDVkNDcyMTg3ZGEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk4YzAxNmNiYTc0YTU0ZjM4ZjYwMDFiOGFkODVjYWU0ZDk0NDE4M2I3N2MyMmRhOWMyYmEzNzA1MWVkZmI0ZjgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_c65afae6f91e4633abec7455ed83b576",
+      "statement": "Langfuse 传播机制：API 入口 start_request_trace 建根 trace（agent.request）并经 set_current_trace 挂到 contextvar，请求 finally 里 reset_current_trace + trace.finish；_traced_node 包装器给外层图节点建 span（metadata 只放标量），ReAct 子图内 call_reason_model 手动建 span（模型名/token/尝试序号），工具 span 在 authorize_reason_tool_call 创建（权限校验失败的调用不产生 span）；回调经 RunnableConfig.callbacks 传入 LangGraph 覆盖节点内 LLM 与工具调用，未采样/未启用时 handler 为 None。",
+      "evidence": [
+        {
+          "resource": "repo://src/agents/graph.py#L88-L183",
+          "version": "repo-lines-v1:sha256:f4a145ce49a8e851f8bfed5caa258bb139b4b16b491344a4e39f9bcb0c8e5efd:eyJzZWxlY3RlZExpbmVDb3VudCI6OTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ0NzIxYzIxOTk3YmYwN2Y0ZWI4M2MwYWFiNjY5ZDE4Y2JkOTUyNjEyNmM2MzJjZDQzOGJhYzAxZmUyMDgyNGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ0YmFiZTFlNDlmNzAwMzAwODcwZGUxMzdkODIyNjgxNzUzZjU3MGRmNGI3NzllYzk0ZDg2M2EyMjMwMmRiYzgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRlNzU3NWMzYjc3NzZjZjJmOWMyYmZiY2E0NGYyMTQ4MTNhNzgyN2VhYTljMzg0NTRjNzAzYjY4OWE3NDQzODYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU0NmFkNWRmODRiZDI3MzZiNjM4ZWJkMGFlZDJkYWIwODY2YmYxZTljODYzODgwZDI5ZDQyNmY2ZDkzNWRhMjQifQ"
+        },
+        {
+          "resource": "repo://src/agents/nodes.py#L981-L1025",
+          "version": "repo-lines-v1:sha256:146105438849c85ed940c8696da9cf1664c4342707fd98e07d344519a9deb174:eyJzZWxlY3RlZExpbmVDb3VudCI6NDUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY2YWU0MzZjYjc1YTk5MzlmNGI2MzQwMzZmOTM3YTBkZTA0NWI5NTZjNzcyZmY0ZGI0ZjRlODM1NGZiN2QwZmUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNkN2ZhNDlkYjU3ODdiYTVkYTU0YTNmNThmMGM3MjFmNTEzNDUzN2FjYjdlODc4ZjdlNWVmNTYwODBkZDNkNWEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRmYmQwMDkzMTRiYzI3MDg0MTY3MzRhMDJhZTVmZjM5YTFlNDhhMDUwYmU5MWY0M2IyZmFhOTIwMDJjNjJiZmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhiZjE4OWY0MGFiNTIxNDU1NmU1M2FjYjRjOWEyMTQ5ZTdhMTc4YWI4NjUzNjc1ZWVjZjJjOGQyMWI3MWQ3ZTcifQ"
+        },
+        {
+          "resource": "repo://src/utils/langfuse_adapter.py#L731-L764",
+          "version": "repo-lines-v1:sha256:a18302cd540a6ef691937fd67c2c1189e0123c670699cd1411866c2a15f560b2:eyJzZWxlY3RlZExpbmVDb3VudCI6MzQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU2ZTA3ZjVlZDBjZDI0YmM5YzJmZWNhYWRiOWQ3NTVhYjY0NjJiMjE3YzhhZGQ0Nzg3MTU2ZTU4ZjRlMGMxNzgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI4YjgyMGY2NjdmNDg1NWIwMzE4YTBiYTg1MWU1MDBmYjViMTAyM2RjMDllNGUyYjJlMmY5NDdlZTE4ZTBlYTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjMyYTU4NGEzMWY5NWMwYThkM2M0MDhhOTNkMzZlYmRlNjJlODRkMjFmM2Q0ZGRiZTBlMzNlZWJkNTBiYzlmM2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY0YTkzNWVlMGFiY2U0ZGZhODk2MTIyMzdiMzViMDdlOTYyMTIwM2YwODEyMzljOGUzNzFiZTE1ZjQ0MGI2MDkifQ"
+        },
+        {
+          "resource": "repo://tests/test_langfuse_wiring.py#L411-L493",
+          "version": "repo-lines-v1:sha256:3299e29a259be40ac007d18bd2ada2e2bb945e6dc5a8ceae933e33882a1459b7:eyJzZWxlY3RlZExpbmVDb3VudCI6ODMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVhNDdiODBkMzZiNWZiYzVmNWZlY2QyNGNjYzQzMDkxMWMzNDUzZmNkZWEwOTQxNWU2YjQ2MWI3ODA0OWQxOGEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU3YTI1MWQ0OTU5MDYxNGVmYWIwNzg4NTVkNTM5MzQ3ZDU3NTRmZmZjMWNmMzFmZDA0NTkyNjVjZmNjMGVmOGUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYzMzhhODcyNjJjODVhNmQ2YTcwZDJiMjExY2ZiYzg3NTk5MTNiNjg0NzAxMjIzYTlkYmUxMjE3Zjk4MjZmMWIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU1YmMwZGQ2NzY0OWVjYmYyYTAwY2Q2ODBkZWNkMTVjNmI0ZTRiMzBlOTUxNjc1MDE3MjVhYTNiNDEzYzA1YmUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_1599799a47334c7e9eb5d63595fc52f4",
+      "statement": "语义缓存运维语义：semantic_cache_enabled 默认 false（未绑定会话上下文与知识库版本、命中路径绕过会话保存/审计，重新启用需满足 issues.md 一.1）；按 cache_entries.role 角色隔离；API 层仅缓存答案非空且长度>10、compliance.passed 与 verification.passed 均为 True 的成功终态，store 时把 compliance/verification 终态快照随条目落库（旧库自动补列），命中时原样返回；TTL 默认 24h；命中率按真实 lookup 请求口径统计，禁用态与空查询短路不计数。",
+      "evidence": [
+        {
+          "resource": "repo://src/api/main.py#L604-L624",
+          "version": "repo-lines-v1:sha256:bdbfbeed07fd329b1b547db60d53cd8702b7734b8b01f146e0a27a8fa3cb9bf2:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQwMTRmZjliYjNjNmExZDMyZDliMWQwNDE3YzQ4ZmM2NjBmMzhkMmU1MWJjZDg4OWMyOGQ3ZTdhNGY3Yjc4NTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU1MDMyZTk2NGQwOTMyMzUxZTVkMTg1MjY5MjgxYjE3MWEzYTA5YjA4YjI4NmU2NjFlYTQ3MDMyM2M4MmViNGQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjgxNTlhZDZiM2MwMGMyMzlmMWIwODU3YWU2OTNjZmQ0ZTQzM2ZiNTcwYmNkM2VmMWY0ZDk2YmU5OWQyNGU0NzIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVjYWY0NGVjZTBmZTk3N2MwMTA1MGZlM2FkODM1NTg5ZjU4NDVlNTZmY2Q1M2Y0ZTNmZDEzMmIxZDVhZjIwOTIifQ"
+        },
+        {
+          "resource": "repo://src/utils/semantic_cache.py#L160-L226",
+          "version": "repo-lines-v1:sha256:da00f5123fc186001a9c621f55b4241cb436fefdd4f42e3b530d3dfbe01b7ee4:eyJzZWxlY3RlZExpbmVDb3VudCI6NjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNhMThhZTMwNmYwMTQ3ZDhiY2E1ZjdiZDdlYjIwMWIzNmM5ZjI4MGVkZTI1ZWQxYWViNjEzNWRlMWQxNTFmZjkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVlN2M5NTdiY2I0NGZiNjczYzk4YjAwNTBhNzVkMzgwODJkYjgxZDkxOGRlMzEzYTNmMDdjMTIzNTMwNmQ3ZWMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjlhZjEyOTNkOWUzZTYzNTk2MDhiZjZjODQyY2FmY2QxZWM0YmZjNzY5N2Q3MzZkMzcxZmYxM2UxY2FjODk3ZWIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI3NmI4NjlhYTBkNGJiYjdhM2RkNWZhMWViNzJjM2IwNGQzZGY3N2MzMjViY2I2ZDJkYTMyMGVjODkxMmVlZmQifQ"
+        },
+        {
+          "resource": "repo://src/utils/semantic_cache.py#L282-L322",
+          "version": "repo-lines-v1:sha256:d2ab5f30803e5a47415cec493c0e93464f58f96d04c6ae9ee4ecc3b61664f0c4:eyJzZWxlY3RlZExpbmVDb3VudCI6NDEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzMGIzNjYxYzE2NGZjYzcwMWQzYzlkZjUxY2YwYTU5OGNlNGJkNGYyNWJkMmFiYjhkM2EzM2FhMzk1MzQ0OTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU2YjA0NDkxNDY5NzIyZTgzNjNhOTRlNDA0NDUzOGUwMTNhMmEyMTdlMzZiMWU1NjhiYTYwYWNiN2I0YzhmMmUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjMzNjNiNzFkMGM4MjhjNTNiMjdmNmMzNzYwNTlkYjcyNTBlZDJjMjI3YWNlOTQ3ZTk3ZmYxOTBiOWMzMjkwNDUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZiMWM5YzZkNTk3NjM3MWI2MTNmMzkyOGQ3ZjEwMzk1M2JmYzkzNzYyMDFmODU5NWU2NWExOWNhMDdlZTNiNWQifQ"
+        },
+        {
+          "resource": "repo://src/utils/semantic_cache.py#L41-L46",
+          "version": "repo-lines-v1:sha256:33196d8bff35044f8583d711bf8f9051a5ee9f9c3672e572ed0c60a9c689db7e:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMThkZDIyMGE1NDUyODExZDk0NDllYWU1ZmYyM2FmZDc2MDNlNjU4OWU0ZWEyNTU0MTg2OWYxYWE2ODViODRmMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjhhMzdmYzg1Y2UwOWM2Yzg5MjRhMzJlY2QxYmYwNmY0ZTQ5OWFiMDZmMTRlMzE0ZjU2NmE5OGJhNDcwMzExNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDFkMWIwYjE2OGJhMmQ1YjE0NTg2MTdlYmUyMzcyNjc2NjNkYmVlYjE3ZjZjOWM0YmMxYzk2NGUwZDhjZDI3YiJ9"
+        },
+        {
+          "resource": "repo://tests/e2e/test_e2e_audit_cache.py#L294-L340",
+          "version": "repo-lines-v1:sha256:165217fb0d5104ac3c98405d3885a86d4644a9cef2209da55422d54d14cb89fc:eyJzZWxlY3RlZExpbmVDb3VudCI6NDcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBiOTI2Y2M0ZTJiZjIyMTM0Nzg2ZjYzNDQyMzhkZjE3YzVhZWY0YTNiMzBiZDUxNzI4MDE1YjI1YjliNjY2NGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMyNWUyY2VmZDYzOGQ5MDk1MWM3NmU2NzYwN2I1MzE5MjljZWExODc4MDY0NTY2ODU1OTY4Y2RmNDk4YjRiMjYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE3NTFmNGExOWNmN2YzZDNkMDVmZjRmOTk1ZDNlZGQxODNhNDRhYmViYzQxOWE5YWMxYjIwMTIwZDllNmJlZWYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://tests/test_semantic_cache.py#L34-L131",
+          "version": "repo-lines-v1:sha256:3dd5724ffc9e7302d3700035e155f108db10f311e4ab8bcdae4cba1e2bd40d28:eyJzZWxlY3RlZExpbmVDb3VudCI6OTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM2ODhkMWY5YThhNGY1MTkxN2UxNGQ3MGJhMjQwNjJkMzQxMmRjODNmNWY1ODA2MDI3MTBhNzc1MTFiM2NlOTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE1M2E2NTk5ZGIyZTNkMjUxNWY4OTgxNDBlNmFmMzg2NDI1NTc5OWUxNWVhYmYyMTZmNmQwYjVjNjNiMTZlYmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImM3MWYxMjJiYzQyYTQ3NTU5MDUwZDZkNTg0N2M5ZTkyNzM0YzU1Y2UwMGUwMjgzZGVkYzVhMmNmNWEzNTRiMDQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_f97e32b2e05c49dabb52c7d971f2bb75",
+      "statement": "缓存命中响应统一终态出口：命中与普通路径都经 _qa_response_from_outcome 返回同一 AssistantQAResponse 字段集；命中相似度/hit_count 等内部字段只进审计与指标，不进响应体（TC-032 断言响应体无 cached/cache_similarity 键）。",
+      "evidence": [
+        {
+          "resource": "repo://src/api/main.py#L452-L465",
+          "version": "repo-lines-v1:sha256:0000e4bd10146233ac1899b1bff6ee832b545c4525b3faccd3bfb9e72af07684:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNiOWQyZTgxNWI5OGY4NTg2ZjQ4YWZlMGNkOTYyZjU1MTY3MjZlNjYwOGMwNmJjY2MyOGRlNDhhNGE1NDYzMWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwYzFmMTg4ZjE0MmVkN2E4MjQ2ODBiMjA3MTcyYzU1MTliYzYxNGE0OGZkYTdjZjE2N2VkYjhkZGY3OTk1NmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ1NjM0ZDI5ZThhNGM1MTA2ZjUzMThlNWI0NDdjZmFhMzQyODkyZDU4YmYyYzMzMjY4NmQ1ZGNlMjBkNzhmYTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBkZDA3NzZhNzBhMzNlYWY5Y2UwNGY3Yjg5MjA5YjM3N2MzMjAxZGVmMDMwZDE3NGRiYjE3ZjcyMTcwZTY0YjAifQ"
+        },
+        {
+          "resource": "repo://src/api/main.py#L537-L560",
+          "version": "repo-lines-v1:sha256:3e72f8a7ac82e39552df72348fcd8b947b36c55cc65c0032eb47d5750aaed849:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg0MjY2OTQ2MjQwZWM1OGIwYmIwN2YxZDU3MzhhZmYwZDM1OGNlNDRjMTNkZjdmOGRlM2RmODFjYWE3MGQwNmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEwZDk5NmE3YTM3NWJiOWM4MTIzZDhlMmFjY2M3NmQ4NjMyMjdhOWFkNTAzYzQxN2M4NzdjOGNlZjc3YjA3NGUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE3OGViMjE5MTFlMTgxMzg2ZWVhNDZmM2E0YWZiNzQ1NmFmOGQxMjE1MjQ5Zjk4MDZhN2IzNjBjNGMwZmI5ZDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ0ZGY4MTIzYjA3MGZjMDA3ZDRmYjM0YjIzM2RmM2UzZTVkMDQ4MTZlYWEwYWFmOGMxNmYyY2FmMmFhNTI1YzUifQ"
+        },
+        {
+          "resource": "repo://tests/e2e/test_e2e_audit_cache.py#L225-L252",
+          "version": "repo-lines-v1:sha256:5da7c0cf1228a5bd7b0009ce7ed9cb06b4f2dc3045f17b742a1edb084f732028:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM5MDNiNjgyNTI4YTgyNzI5MTU5NzMyM2FmNDkwMjBjYTcyMDY5OGY0OGFlMGY3MTE3ZTU0MDY5ZTAzOWQxYjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZkZTAxZGRhM2YwZjY5NDUxMTBkOTA3NmY5ODg3OTQ2ODY1ODU3ZmMwYTViNmM5Y2I5OWY2YTJjNTU4Y2UxNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNjNzliOGJhYTFiZmM1NDY0ZjFiNWQ1MTk3OGY3NmI2ZTc5Y2Q2N2I0ZjYzODJlNjdjNDJkMDk5ZjI5YTk3YzUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_8803d3d5c0064ef5ba5b5d89f77006f7",
+      "statement": "语义缓存 admin 端点：GET /v1/admin/cache/stats（admin/technical）返回 get_stats()（条目数/命中率/阈值/TTL/enabled）；POST /v1/admin/cache/clear（admin/technical）按 clear_expired_only 清理过期或 clear_all 全清（同时归零命中计数）；缓存查询含 embedding 计算与全表扫描，QA 入口经 asyncio.to_thread 执行避免阻塞事件循环。",
+      "evidence": [
+        {
+          "resource": "repo://src/api/main.py#L163-L192",
+          "version": "repo-lines-v1:sha256:e07c580629118c3721daa8db6cb1b174aad3560c924a15136e6e41c3e83279cc:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg2YmQ0MGQxZjQ1YzdmNTYwYjc2NWI1ZTUxMmYxYmJlNDFkZjc5ZTUwNDQ5ZTFmZmJjMDA3NDAzZjE3MTdlYzUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI3MmY5NjY0ZTZlYTZjOWE4YWY5ZDQ4YzE4YzViYjE4NmQ3NjIyNDEzNjBmZTBlYTRiOGI4YzIzOWIzYWU5ZTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFkNGY1MDk4YTQwNTk4YWEwYWUzY2M5MGYyYTEyZTZiNWI0ZDRhMjU2YjdiMjEwOGZlNTM5MzRlNDgzNTJjN2YiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA5ZDcwNmFjM2E2NGQ2NTgzZGU5NGEwNDUxYTg1MjRmZTc0NDlkMjc4NmYzMzg0ODFlZmI4MmUzZDdiZGY3NTkifQ"
+        },
+        {
+          "resource": "repo://src/api/main.py#L537-L541",
+          "version": "repo-lines-v1:sha256:8ded02355f95b137db5c3008982701c76488818553ea9fd1c8fc061685e8e526:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODQyNjY5NDYyNDBlYzU4YjBiYjA3ZjFkNTczOGFmZjBkMzU4Y2U0NGMxM2RmN2Y4ZGUzZGY4MWNhYTcwZDA2ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODM5MGFiZTRkMDI3MzFkZGIxZmFkZDJmMDA1OTFjNDIzMGY5OWQyOWQ4NTAwOWY4M2Y3ZjExMTI2NjI5ZmRmMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTc4ZWIyMTkxMWUxODEzODZlZWE0NmYzYTRhZmI3NDU2YWY4ZDEyMTUyNDlmOTgwNmE3YjM2MGM0YzBmYjlkMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNmEwODBmMGNmNGI1YTAwNjkxMDA0MzAyYWEzOWUzMjE4MjRkY2MzNjNiNWEyYTRjODE3OTcxNjkzYjVlMDc0NCJ9"
+        },
+        {
+          "resource": "repo://src/utils/semantic_cache.py#L324-L348",
+          "version": "repo-lines-v1:sha256:7cc55acb484d959b0fc53456ea69c3e49653d5dadf201b34247eb15570f8450a:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY2MGNlZGI1YWIxOWViM2FkZTJlODhiYWRhMDlmZjBiMjU0NGI5YjdmN2JiNDFjOTE2NTA4MWIwYjg5YzFhMjAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNhYjUyNDUyMWM5Y2VkZGViOTJhMGZlZDZjODVkZjYwNWFiMTcwM2I4YWFhZTk2NmQwNGFmN2MyNDY1MzUzYzciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJmN2MxOWQwYmYzMzcyNTczNjk3YzAxODMyMTUwNzdjODE0NGRjMjYyNDQxYTQ3ZGI3YzZmZWYxMTIzMjQ0NWIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZkNTJiYTg5NTgzZmFiYTRlZWNiMWQ3MDYwMDk0YzI3OGI5NmUxOTk0Yjc4YjgzOTU5NTc0NGIyNGZlN2M4YTEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_6de49b052b6940baaa61a43106c2e790",
+      "statement": "进程内滑动窗口限流：check_rate_limit 默认每分钟 30 次、窗口 60 秒，key 由 get_rate_limit_key 生成（优先 user_id，回退 client_ip，再回退 anonymous）；非流式 QA 超限返回 HTTP 429 带 Retry-After: 60 头且指标记 rate_limited；窗口与计数在进程内存中，多 worker/多实例各自独立，生产应替换为 Redis 分布式限流。",
+      "evidence": [
+        {
+          "resource": "repo://src/api/main.py#L484-L493",
+          "version": "repo-lines-v1:sha256:4f20b9b50f28a61b684c5d748df7cc6b22887a80720cd1951672cb906824705c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc5MjJiZmQ4NmVmYjVlYWY1YzUwODBkNmM2NmFlNWVhMmVhZjY4MTU5YjJlNWM3Y2NkODIyYzFmMzViMTZiNDUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMxY2NiN2RlMzYwYzU4MTQ4YjZjOTZhYjI5OWNjZWE0OTk3MDI4ZTVkZDY0YjI5NjRjODUxYTAyMzk2YzI1NzgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBiOTBhMWZiNWIzOWU1YTQ3NDljZWM1YjEzMjRmMDNhZjgzZGUwNTFhZjQ5YzU5ZjVlOTFhNjBlYmJlOGI0MjIifQ"
+        },
+        {
+          "resource": "repo://src/utils/rate_limit.py#L1-L45",
+          "version": "repo-lines-v1:sha256:d5a1c3c7d8725ba1ca48060515d96399aa35306d26a4a98bbdbb8286e006ab42:eyJzZWxlY3RlZExpbmVDb3VudCI6NDUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVkZGQ4ODU3MTlhZDYwODczNmZkMjMxMTU0Njk3ZjdkM2NlMzM1ZDcwZWUwMmE3ZTNiNWNjZWNkNTNjMjA3Y2EiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBkMDE3NTU5ZjM5YmJlMzJjOTRmNGEwZWYyMGZmNmJmNmZiNjAzOTQ2ZmVmNzFhNDVmZmU2N2I4NjcyYzNiMjEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://tests/test_api_routes.py#L130-L136",
+          "version": "repo-lines-v1:sha256:d9847a8525dc26d9c06848eb7f31b9f3896fa1b32c5e3ba99a2ec7660e314d79:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2MyZGMyM2YwNTg0YmU4MmFjMDU2MDkwNjNiZjBkYzJiMDNhOWFmNDhlY2I3MGQ4YTQ5M2QxNTQzMTc2MmI3MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmM2NzY1Zjg4MDEyNzM1NWVmMWVjYWU0MmFjMDIzOWJmMjFjNGVhMWI1ZjlkNzg5MzgwM2U2NmJkMzE5ZWQ0NSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDNhMjI1MDRhZTEzNmM0YTI1MzZkMjcwNDdmOWU0ODJlMzVjMjJmZWRkMTI5MjhjOWNkMmU2ODI4MjQ4YWU2YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDQ0M2ViYTU3Y2M0MzllMzAxNjRhZjEyYjc1YWI2NGUwNjZhOTAyZTE4NDE1NDU5YjAyODdlMTFmNTA4MDIxZiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_68588ecb18f84a7b9f002fc68d4b18d0",
+      "statement": "流式 QA 端点（/v1/assistant/qa/stream）限流超限时以 SSE error 事件承载 429：返回 event: error + {\"type\":\"error\",\"detail\":\"请求过于频繁\"}，HTTP 状态仍为 429。",
+      "evidence": [
+        {
+          "resource": "repo://src/api/main.py#L663-L674",
+          "version": "repo-lines-v1:sha256:7963d6f72226441b1bcd2f59a92efd094b2ec205711cd68346582aef6427ff04:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjczMDg5MTkyM2U3MjM1YTA0MzkyNjc3NGJhZGMwOTJjMjYxZDFlNGNhMTY0MDhmMzlkNmJlMTQzOTNmNDk5YTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIyNGE3MzQwODdlYTc1MTNiOWQ5M2ZmZmY4OWMzYjU2YmJjMzUyNzAwNTc4MmJhMjVlYmM3OGZhNjA4YTNiZGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZkMGRjN2RlOTRiYjEyMTc1YzE1YWE4ZTgzNmI4ZWY0ZWYwNzhkZjQyZTY0MzZmYjNmMzZjODQ0Mjk4OTYzMmEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_91db9a27aa0e4471983076c8d2d8c9f5",
+      "statement": "docker-compose 单容器部署：secrag_data volume 挂载 /data 持久化 ChromaDB（/data/chroma）、SQLite 审计/会话库（/data/audit.db、/data/conversations.db）与 HF 模型缓存（HF_HOME/TRANSFORMERS_CACHE=/data/hf_cache）；容器内环境变量覆盖 .env 路径；Langfuse 观测配置显式透传（ENABLED/HOST/PUBLIC_KEY/SECRET_KEY/SAMPLE_RATE/CAPTURE_CONTENT，默认关闭）；healthcheck 用 curl -f http://localhost:8000/health（30s 间隔、90s 启动宽限、3 次重试）；端口 ${APP_PORT:-8000}:8000。",
+      "evidence": [
+        {
+          "resource": "repo://Dockerfile#L30-L71",
+          "version": "repo-lines-v1:sha256:d97c5038f2d456fccbac5e1b8c50fcf0f5e7fbcdacab10a972b4304a49e0964b:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxM2IxZGMwMGZiY2Q0NzU2YjVhYjU2NjJjZDM1NDdjYjk1NjczYjhiNTQ1NzgxYzc1YTQ3ZDkxNzJjZGM5NGEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ5MDNkZjk0YTVjNmZiMTk2YWZiZDYyZjMzMmQ1MDE1NmZiMGJiZTU1M2M2ZTNiMGVmM2ZmOGIzMmU5MGY4MDMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjgyOTQ4MThiOGUxNzJkYjQ2MzM5M2MzNmU5ZDA2MWM5YTkyZTkzOTEwOWUxMmIzMjZhMTM0NDM2ZWE4OWJjN2EiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
+        {
+          "resource": "repo://docker-compose.yml#L19-L58",
+          "version": "repo-lines-v1:sha256:a1017db63c9bdab6e6ed9dd0339d3db16018338f113a8b7a7b228d93878d188d:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhNzNmY2NkYzk5ZWE4MzU5NjdjN2RlZTdlZmJlZDFmM2NhODcyNjBkOTI5MzE4NTBmZGQ2NmRhOGNiMTJmMWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ5OGUxN2FiOTBhMDA5NWVlY2JhMzZlZTUwMmUwYWJiYWM3MWMyMjk2NDM2Yjg1ZjJlZmViNWIxYWIyMzA0OWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFlN2ExYWM1OTdkZWQ3MzgwNTFiNTM1OWJiMDUxNmI3NGYxYzMwMDBhY2E3ZmU4OGJiYmQ0MTY5YjlmNWUwNzUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_4382b77d04c44066a0e53bd09115e7df",
+      "statement": "start.sh 本地启动入口：默认 127.0.0.1:8001（HOST/PORT 可覆盖），日志 tee 到 /tmp/secrag-<port>.log，端口被占时默认 kill 现有进程（KILL_EXISTING=0 关闭），BUILD_FRONTEND=auto|always|never 控制 React 前端构建，最终 uv run uvicorn src.api.main:app。",
+      "evidence": [
+        {
+          "resource": "repo://start.sh#L1-L61",
+          "version": "repo-lines-v1:sha256:ae891d7ba734f332d804c75834e05c8728b7d35c14309a3a884df8f03c99da66:eyJzZWxlY3RlZExpbmVDb3VudCI6NjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFkOTVmYzA0YTgwYzk1MmY0OWNlNDE4ODYyN2M1M2IwZmJlOGM0NDA0MWI5NTJkNTkyYWNkMWRlOTk4NjE0NjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg4NzBhNjVkNGU0NTZhMWE0YmUwZDRlZDcyODQ2YjM4YTNkMTVjMjg4NThkYmM1M2Q5YzJlZTRkMjQ1MGM2OWMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_e20aac46f8984d40a215ffdd543b02c6",
+      "statement": "单机部署已知边界：LangGraph checkpointer 用 InMemorySaver（内存），服务重启后不恢复图执行状态；会话/审计/语义缓存均本地 SQLite；后台入库（create_ingestion_run 的 BackgroundTasks）基于单机进程，不支持多实例任务调度。",
+      "evidence": [
+        {
+          "resource": "repo://README.md#L294-L295",
+          "version": "repo-lines-v1:sha256:85fe5e72b709fd76300a5039d175587e7359ee13db197eae4031cc88fcbcd883:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDcyMTdhZDM1NzZkNmM0NzZjMWMxNzZlY2ZlY2QyMmE3ZjA0Y2M3ODQ1MTFjOTkyYmViMjU3ZGE1Nzg3Y2VmNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZTdmNGEzZGM1Y2I5Y2U4ZmVhMDE3MGZkMTI0NGI4OTJiYTkzZjdmNjVmM2EwY2I1NTQzNzg1NjZhNDI1NTYwNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWUwYzI4Y2YxMDMzZGQwYzMxOTY1ZTZkZDUyNDliZjJkMzQ4OTBjNTEwMjU0ZmE3MjJhNjI5MTcyZTc4ODkzOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjFjNDE0Y2U4MTBmNDU4YThlMGVkYzZmYjUwOTg4ZWFkNmMyNmZmYjQ4YzcwMzY2NGFkNzBmYTA4OWVjYTM5MCJ9"
+        },
+        {
+          "resource": "repo://src/agents/graph.py#L410-L416",
+          "version": "repo-lines-v1:sha256:a342db2ac81488fc44036c7f5d25282837646f605f017b3eafd2860e21772a07:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZmQ5MGEwYWNlYTk5OTQ0ZWJhMWI1NTRlNDVjNzYwMzgxYWRjN2RjNTQyYTJkZWJhMDU5YTA1MzVhNmJkM2E3NyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGQyMzExNzNiZTNhMjI1NWQ2NDE0MzU3ZmJlYjg4ZGY3ZjMxOGMyYzcwZTgyOGI4OTVjMTcxMWJmMWMyZWVlMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmRlMDFkZGEzZjBmNjk0NTExMGQ5MDc2Zjk4ODc5NDY4NjU4NTdmYzBhNWI2YzljYjk5ZjZhMmM1NThjZTE2NCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjAsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSJ9"
+        },
+        {
+          "resource": "repo://src/api/ingestion.py#L126-L147",
+          "version": "repo-lines-v1:sha256:fef54078875df1a3519bd7edb32e4b6117360e05438da3ab3711caa24490d7d3:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ1MzI2OTVmZjkxMTMzNTM5M2YyZWMyMjNmYWE0OWMwZTFjNTJjNDU2YzQ3MmU0ZWE0MzkzYmRkMTNmZDgxOTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwYzFmMTg4ZjE0MmVkN2E4MjQ2ODBiMjA3MTcyYzU1MTliYzYxNGE0OGZkYTdjZjE2N2VkYjhkZGY3OTk1NmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRlODYxYWVlY2I4NzlkYmZiZWQzNzcxOWUxOGVkMWQ4ZjY2NmQxZmNkMmExYWMzZmU1YTQ4OGQ5NjdhZmFjNDMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_a4038f02eba44063927af55d70ea4652",
+      "statement": "节点 span 错误语义：_traced_node 在节点抛异常时以 error 状态收尾 span 并原样重抛；重排器 error 降级视为显式执行失败，span 状态为",
+      "evidence": [
+        {
+          "resource": "repo://src/agents/graph.py#L132-L183",
+          "version": "repo-lines-v1:sha256:9654414154e8cff9495b0ebe7dca32ff11d81c4ee9e4fd658ebe9884b1d8c30b:eyJzZWxlY3RlZExpbmVDb3VudCI6NTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3NDk2ODFmYzBlMzJkNjhkMjE3MWUyMWNlYmQxMjM2NmJhNGIwYjU3NTYyZTc1NTEyOTA0ZTE0NmZhNTQ1OGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ0YmFiZTFlNDlmNzAwMzAwODcwZGUxMzdkODIyNjgxNzUzZjU3MGRmNGI3NzllYzk0ZDg2M2EyMjMwMmRiYzgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkxZmJhYjUxYzczN2ZmYTIwNzdjZmMzYmFjYjM2ZGFmODg5MmRjYzU5MWNhMWZmZGUxMWRlMTVmMDMyNDM0Y2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU0NmFkNWRmODRiZDI3MzZiNjM4ZWJkMGFlZDJkYWIwODY2YmYxZTljODYzODgwZDI5ZDQyNmY2ZDkzNWRhMjQifQ"
+        },
+        {
+          "resource": "repo://tests/test_langfuse_wiring.py#L471-L493",
+          "version": "repo-lines-v1:sha256:b1d5d445c206ad4664279f822ac88434a2687b55a7ebc47a02c636e0e58294b5:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUyMjRjZTIyMGYzMmMyNDczMjM2NjQ1ZDc3YWUzNDhmYjI5MGJhYjg3NWI1MTg3M2IzMDIwMWE4M2QyMGRhYWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU3YTI1MWQ0OTU5MDYxNGVmYWIwNzg4NTVkNTM5MzQ3ZDU3NTRmZmZjMWNmMzFmZDA0NTkyNjVjZmNjMGVmOGUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcxODFhY2Y2MWYyMGIyYWJmNTIxYjljMjI3ZGQ2ZDdlYmYwMmQ5M2I3NTM0OWNiYjU0Mjk3MTQ3Y2U3MTJkOGMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU1YmMwZGQ2NzY0OWVjYmYyYTAwY2Q2ODBkZWNkMTVjNmI0ZTRiMzBlOTUxNjc1MDE3MjVhYTNiNDEzYzA1YmUifQ"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.5.2",
+    "at": "2026-09-27T15:51:42.447Z"
+  }
+}
