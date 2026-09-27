@@ -91,3 +91,16 @@ scripts/
 ## Rules
 
 - 每完成一项独立修改，在合适的检查点运行相关检查，确认是否出现 warning 或 error；对本次修改引入的问题先诊断并处理，再继续后续修改。无法运行检查或遇到无关的既有问题时，如实说明原因和未验证范围。
+
+<!-- OPENWIKI:START -->
+
+## OpenWiki
+
+This repository has a generated `openwiki/` evidence index. It is optional just-in-time context, not required startup reading.
+
+- Treat source code and tests as authoritative. A brief's unknowns and review items are verification gaps, not automatic requirements.
+- Prefer the narrowest quiet validation that proves the changed behavior. Preserve complete failure output.
+
+The scheduled OpenWiki GitHub Actions workflow refreshes the repository wiki. Do not hand-edit generated OpenWiki pages unless explicitly asked; prefer updating source code/docs and letting OpenWiki regenerate.
+
+<!-- OPENWIKI:END -->

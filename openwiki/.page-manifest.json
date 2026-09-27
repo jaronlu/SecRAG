@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "pages": {
+    "/openwiki/architecture/state-and-safety.md": {
+      "pageVersion": "sha256:24518c8d273853a76019bcc5b1350065a7b2d6a560c506aa1dc5353d786cdee3",
+      "completedBy": "codex",
+      "completedRunId": "b9ef6326-6e9d-4785-8d0c-157fed135205",
+      "gitHead": "780ef9ba692a28e956545456fc8d89d601fc48e4",
+      "sourceFingerprint": "sha256:522afa93da11a3bbd1593d8762a431350514be48b2a93715ed2e55e2eed7b5f3"
+    },
+    "/openwiki/quickstart.md": {
+      "gitHead": "2604ed84d248093b77080a910117cbc4cad44584",
+      "sourceFingerprint": "sha256:e309e833ea7b9c65343bbcab1b5e0fa47acbaaf7f268497c50f050ae7c3ef068",
+      "pageVersion": "sha256:ea8305e1822b64f286fb8e64aaaf9ab6adcaea12188b6a3b55482dfb41ddf89c",
+      "completedBy": "codex",
+      "completedRunId": "ed8a4fe3-6277-40c9-a696-83e206e40208"
+    },
+    "/openwiki/tutorials/knowledge-ingestion.md": {
+      "gitHead": "2604ed84d248093b77080a910117cbc4cad44584",
+      "sourceFingerprint": "sha256:e309e833ea7b9c65343bbcab1b5e0fa47acbaaf7f268497c50f050ae7c3ef068",
+      "pageVersion": "sha256:7e627c2d3477943dd0ee80cbf26a67328e0375b0703957aa165dda1890279f50",
+      "completedBy": "codex",
+      "completedRunId": "ed8a4fe3-6277-40c9-a696-83e206e40208"
+    },
+    "/openwiki/tutorials/request-execution.md": {
+      "pageVersion": "sha256:41a0e90458ae64422c9334569533f6ee7232055afcb6575fb4d116a7bb99a361",
+      "completedBy": "codex",
+      "completedRunId": "b9ef6326-6e9d-4785-8d0c-157fed135205",
+      "gitHead": "780ef9ba692a28e956545456fc8d89d601fc48e4",
+      "sourceFingerprint": "sha256:522afa93da11a3bbd1593d8762a431350514be48b2a93715ed2e55e2eed7b5f3"
+    }
+  }
+}

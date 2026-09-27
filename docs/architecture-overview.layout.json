@@ -1,0 +1,266 @@
+{
+  "canvas": {
+    "height": 980.0,
+    "width": 1400.0
+  },
+  "composition": {
+    "limits": {
+      "max_bends_per_edge": 12,
+      "max_bridged_crossings": 8,
+      "max_route_stretch": 5.0,
+      "max_total_bends": 100,
+      "min_container_gutter": 0.0,
+      "min_label_clearance": 2.0,
+      "min_node_gap": 0.0,
+      "min_segment_length": 0.0,
+      "profile": "standard"
+    },
+    "metrics": {
+      "bridged_crossings": 0,
+      "max_route_stretch": 1.0,
+      "minimum_container_gutter": 0.0,
+      "minimum_node_gap": 10.0,
+      "shortest_segment": 10.0,
+      "total_bends": 0
+    },
+    "ok": true,
+    "profile": "standard",
+    "score": 100,
+    "violations": []
+  },
+  "edges": [
+    {
+      "bends": 0,
+      "bridges": [],
+      "crossings": [],
+      "id": "auth-to-qa",
+      "length": 70.0,
+      "route": [
+        [
+          330.0,
+          192.0
+        ],
+        [
+          400.0,
+          192.0
+        ]
+      ],
+      "route_stretch": 1.0,
+      "source": "auth",
+      "source_port": [
+        330.0,
+        192.0
+      ],
+      "target": "qa",
+      "target_port": [
+        400.0,
+        192.0
+      ],
+      "waypoints": []
+    },
+    {
+      "bends": 0,
+      "bridges": [],
+      "crossings": [],
+      "id": "qa-to-understand",
+      "length": 171.0,
+      "route": [
+        [
+          530.0,
+          224.0
+        ],
+        [
+          530.0,
+          395.0
+        ]
+      ],
+      "route_stretch": 1.0,
+      "source": "qa",
+      "source_port": [
+        530.0,
+        224.0
+      ],
+      "target": "understand",
+      "target_port": [
+        530.0,
+        395.0
+      ],
+      "waypoints": []
+    },
+    {
+      "bends": 0,
+      "bridges": [],
+      "crossings": [],
+      "id": "understand-to-planner",
+      "length": 20.0,
+      "route": [
+        [
+          640.0,
+          427.0
+        ],
+        [
+          660.0,
+          427.0
+        ]
+      ],
+      "route_stretch": 1.0,
+      "source": "understand",
+      "source_port": [
+        640.0,
+        427.0
+      ],
+      "target": "planner",
+      "target_port": [
+        660.0,
+        427.0
+      ],
+      "waypoints": []
+    },
+    {
+      "bends": 0,
+      "bridges": [],
+      "crossings": [],
+      "id": "planner-to-retrieve",
+      "length": 20.0,
+      "route": [
+        [
+          880.0,
+          427.0
+        ],
+        [
+          900.0,
+          427.0
+        ]
+      ],
+      "route_stretch": 1.0,
+      "source": "planner",
+      "source_port": [
+        880.0,
+        427.0
+      ],
+      "target": "retrieve",
+      "target_port": [
+        900.0,
+        427.0
+      ],
+      "waypoints": []
+    },
+    {
+      "bends": 0,
+      "bridges": [],
+      "crossings": [],
+      "id": "retrieve-to-react",
+      "length": 96.0,
+      "route": [
+        [
+          1010.0,
+          459.0
+        ],
+        [
+          1010.0,
+          555.0
+        ]
+      ],
+      "route_stretch": 1.0,
+      "source": "retrieve",
+      "source_port": [
+        1010.0,
+        459.0
+      ],
+      "target": "react-agent",
+      "target_port": [
+        1010.0,
+        555.0
+      ],
+      "waypoints": []
+    },
+    {
+      "bends": 0,
+      "bridges": [],
+      "crossings": [],
+      "id": "react-to-output",
+      "length": 10.0,
+      "route": [
+        [
+          1110.0,
+          587.0
+        ],
+        [
+          1120.0,
+          587.0
+        ]
+      ],
+      "route_stretch": 1.0,
+      "source": "react-agent",
+      "source_port": [
+        1110.0,
+        587.0
+      ],
+      "target": "output-node",
+      "target_port": [
+        1120.0,
+        587.0
+      ],
+      "waypoints": []
+    }
+  ],
+  "input_schema": "v1",
+  "issues": [],
+  "mode": "architecture",
+  "ok": true,
+  "palette": {
+    "below_target": [],
+    "minimum_target": 4.5,
+    "ratios": {
+      "section_sub_fill": 4.76,
+      "text_muted": 4.76,
+      "text_primary": 17.74,
+      "text_secondary": 4.83
+    },
+    "scope": "default opaque canvas text tokens; not a full rendered accessibility audit",
+    "unsupported_tokens": []
+  },
+  "placements": {
+    "legend": {
+      "actual": [
+        60.0,
+        930.0
+      ],
+      "bounds": [
+        50.0,
+        916.0,
+        782.8,
+        962.0
+      ],
+      "moved": false,
+      "requested": [
+        60.0,
+        930.0
+      ]
+    }
+  },
+  "schema_version": 1,
+  "semantics": {
+    "details": {},
+    "ok": true,
+    "profile": "generic",
+    "style": 1,
+    "visual_theme": "Flat Icon"
+  },
+  "style": {
+    "id": 1,
+    "name": "Flat Icon"
+  },
+  "summary": {
+    "bridged_crossings": 0,
+    "edges": 6,
+    "nodes": 13
+  },
+  "text_metrics": "heuristic-v1",
+  "typography": {
+    "complete_text": true,
+    "hint": null,
+    "metrics": "heuristic widths; inspect the actual rendered font",
+    "truncated": []
+  }
+}

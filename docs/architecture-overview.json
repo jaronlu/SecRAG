@@ -1,0 +1,298 @@
+{
+  "schema_version": 1,
+  "mode": "architecture",
+  "template_type": "architecture",
+  "style": 1,
+  "quality_profile": "standard",
+  "text_policy": "strict",
+  "width": 1400,
+  "height": 980,
+  "title": "SecRAG 整体架构",
+  "subtitle": "面向机构投研场景的安全型 Agentic RAG 工作流",
+  "containers": [
+    {
+      "id": "api-layer",
+      "x": 40,
+      "y": 110,
+      "width": 1320,
+      "height": 150,
+      "label": "FastAPI 服务层"
+    },
+    {
+      "id": "workflow-layer",
+      "x": 40,
+      "y": 300,
+      "width": 1320,
+      "height": 390,
+      "label": "Agent 工作流层（LangGraph）"
+    },
+    {
+      "id": "stategraph",
+      "x": 70,
+      "y": 355,
+      "width": 1260,
+      "height": 120,
+      "label": "外层 StateGraph：业务流程控制"
+    },
+    {
+      "id": "react",
+      "x": 70,
+      "y": 510,
+      "width": 1050,
+      "height": 140,
+      "label": "内层 ReAct 子图：推理与工具调用"
+    },
+    {
+      "id": "output",
+      "x": 1120,
+      "y": 510,
+      "width": 210,
+      "height": 140,
+      "label": "验证与输出"
+    },
+    {
+      "id": "infra-layer",
+      "x": 40,
+      "y": 750,
+      "width": 1320,
+      "height": 150,
+      "label": "基础设施层"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "auth",
+      "kind": "double_rect",
+      "x": 70,
+      "y": 160,
+      "width": 260,
+      "height": 64,
+      "label": "认证中间件",
+      "sublabel": "Bearer Token → 角色与权限",
+      "fill": "#fff7ed",
+      "stroke": "#f97316",
+      "flat": true
+    },
+    {
+      "id": "qa",
+      "kind": "rect",
+      "x": 400,
+      "y": 160,
+      "width": 260,
+      "height": 64,
+      "label": "问答 API",
+      "sublabel": "POST /v1/assistant/qa",
+      "fill": "#eff6ff",
+      "stroke": "#60a5fa",
+      "flat": true
+    },
+    {
+      "id": "session",
+      "kind": "rect",
+      "x": 730,
+      "y": 160,
+      "width": 260,
+      "height": 64,
+      "label": "会话 API",
+      "sublabel": "线程、历史与上下文",
+      "fill": "#f0fdfa",
+      "stroke": "#2dd4bf",
+      "flat": true
+    },
+    {
+      "id": "admin",
+      "kind": "rect",
+      "x": 1060,
+      "y": 160,
+      "width": 260,
+      "height": 64,
+      "label": "入库管理 API",
+      "sublabel": "technical 角色专用",
+      "fill": "#fef2f2",
+      "stroke": "#f87171",
+      "flat": true
+    },
+    {
+      "id": "understand",
+      "kind": "rect",
+      "x": 420,
+      "y": 395,
+      "width": 220,
+      "height": 64,
+      "label": "查询理解",
+      "sublabel": "追问消解、注入与 PII 检测",
+      "fill": "#eff6ff",
+      "stroke": "#60a5fa",
+      "flat": true
+    },
+    {
+      "id": "planner",
+      "kind": "double_rect",
+      "x": 660,
+      "y": 395,
+      "width": 220,
+      "height": 64,
+      "label": "生成检索计划",
+      "sublabel": "意图、实体与数据源规划",
+      "fill": "#faf5ff",
+      "stroke": "#a78bfa",
+      "flat": true
+    },
+    {
+      "id": "retrieve",
+      "kind": "rect",
+      "x": 900,
+      "y": 395,
+      "width": 220,
+      "height": 64,
+      "label": "执行检索",
+      "sublabel": "向量 + BM25 + 权限过滤",
+      "fill": "#f0fdf4",
+      "stroke": "#4ade80",
+      "flat": true
+    },
+    {
+      "id": "react-agent",
+      "kind": "double_rect",
+      "x": 910,
+      "y": 555,
+      "width": 200,
+      "height": 64,
+      "label": "ReAct 推理",
+      "sublabel": "证据 + LLM + 工具授权 / 熔断",
+      "fill": "#ede9fe",
+      "stroke": "#8b5cf6",
+      "flat": true
+    },
+    {
+      "id": "output-node",
+      "kind": "rect",
+      "x": 1120,
+      "y": 555,
+      "width": 210,
+      "height": 64,
+      "label": "验证与输出",
+      "sublabel": "来源、数字、合规 → 答案 + 引用",
+      "fill": "#f0fdfa",
+      "stroke": "#2dd4bf",
+      "flat": true
+    },
+    {
+      "id": "sqlite",
+      "kind": "cylinder",
+      "x": 90,
+      "y": 795,
+      "width": 220,
+      "height": 64,
+      "label": "SQLite",
+      "sublabel": "会话、审计与任务状态",
+      "fill": "#f0fdf4",
+      "stroke": "#4ade80",
+      "flat": true
+    },
+    {
+      "id": "bm25",
+      "kind": "rect",
+      "x": 360,
+      "y": 795,
+      "width": 220,
+      "height": 64,
+      "label": "BM25 / RRF",
+      "sublabel": "稀疏检索与结果融合",
+      "fill": "#faf5ff",
+      "stroke": "#a78bfa",
+      "flat": true
+    },
+    {
+      "id": "embedding",
+      "kind": "rect",
+      "x": 630,
+      "y": 795,
+      "width": 220,
+      "height": 64,
+      "label": "Embedding 模型",
+      "sublabel": "Sentence Transformers",
+      "fill": "#fff7ed",
+      "stroke": "#fb923c",
+      "flat": true
+    },
+    {
+      "id": "chroma",
+      "kind": "cylinder",
+      "x": 900,
+      "y": 795,
+      "width": 220,
+      "height": 64,
+      "label": "ChromaDB",
+      "sublabel": "持久化向量检索",
+      "fill": "#eff6ff",
+      "stroke": "#60a5fa",
+      "flat": true
+    }
+  ],
+  "arrows": [
+    {
+      "id": "auth-to-qa",
+      "source": "auth",
+      "target": "qa",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "qa-to-understand",
+      "source": "qa",
+      "target": "understand",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "understand-to-planner",
+      "source": "understand",
+      "target": "planner",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "planner-to-retrieve",
+      "source": "planner",
+      "target": "retrieve",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "retrieve-to-react",
+      "source": "retrieve",
+      "target": "react-agent",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "react-to-output",
+      "source": "react-agent",
+      "target": "output-node",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "data"
+    }
+  ],
+  "legend_orientation": "horizontal",
+  "legend_x": 60,
+  "legend_y": 930,
+  "legend_locked": true,
+  "legend": [
+    { "flow": "control", "label": "控制流" },
+    { "flow": "read", "label": "读取 / 检索" },
+    { "flow": "write", "label": "写入 / 持久化" },
+    { "flow": "data", "label": "数据流" },
+    { "flow": "async", "label": "工具依赖" },
+    { "flow": "feedback", "label": "反馈 / 重试" }
+  ],
+  "footer": "SecRAG · 面试指引 3.1 · Style 1 Flat Icon",
+  "footer_x": 1050,
+  "footer_y": 950
+}
