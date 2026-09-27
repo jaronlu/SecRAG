@@ -174,7 +174,7 @@ class SQLitePortfolioStore:
     def list_symbols_for_user(self, *, user_id: str, position_side: str | None = None) -> list[str]:
         """Distinct active symbols for one user, for downstream daily scans."""
         positions = self.list_positions(user_id=user_id, position_side=position_side)
-        symbols = {item["stock_code"] for item in positions if item.get("stock_code")}
+        symbols = {code for item in positions if (code := item.get("stock_code"))}
         return sorted(symbols)
 
     def update_position(
@@ -187,20 +187,24 @@ class SQLitePortfolioStore:
         """Apply a partial update; only provided keys are touched."""
         assignments: list[str] = []
         params: list[object] = []
-        if changes.get("stock_name") is not None:
+        stock_name = changes.get("stock_name")
+        if stock_name is not None:
             assignments.append("stock_name = ?")
-            params.append(str(changes["stock_name"]).strip())
-        if changes.get("weight") is not None:
-            _validate_weight(float(changes["weight"]))  # type: ignore[arg-type]
+            params.append(stock_name.strip())
+        weight = changes.get("weight")
+        if weight is not None:
+            _validate_weight(weight)
             assignments.append("weight = ?")
-            params.append(float(changes["weight"]))  # type: ignore[arg-type]
-        if changes.get("note") is not None:
+            params.append(weight)
+        note = changes.get("note")
+        if note is not None:
             assignments.append("note = ?")
-            params.append(str(changes["note"]).strip())
-        if changes.get("position_side") is not None:
-            _validate_side(str(changes["position_side"]))
+            params.append(note.strip())
+        position_side = changes.get("position_side")
+        if position_side is not None:
+            _validate_side(position_side)
             assignments.append("position_side = ?")
-            params.append(str(changes["position_side"]))
+            params.append(position_side)
         if not assignments:
             return self.get_position(position_id=position_id, user_id=user_id)
 
