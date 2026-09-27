@@ -63,12 +63,8 @@ exclude = [".venv"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 
-[tool.basedpyright]
-# venvPath + venv 拼接得到 ./.venv，basedpyright 从此目录解析第三方包
-venvPath = "."
-venv = ".venv"
-typeCheckingMode = "standard"
-
+# basedpyright 配置在同目录 basedpyright.json：pyproject 同时保留 [tool.basedpyright]
+# 与 [tool.pyright] 会导致 basedpyright 解析失败并回退默认严格模式
 [tool.pyright]
 # VSCode Pylance / pyright 读取此配置节
 venvPath = "."

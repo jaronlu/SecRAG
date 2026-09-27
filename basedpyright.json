@@ -1,0 +1,8 @@
+{
+  // CLI 的 basedpyright 与 pyproject 的 [tool.pyright]（VSCode Pylance）互斥，
+  // 因此 basedpyright 配置独立放在本文件；strictness 与 [tool.pyright] 保持一致
+  "venvPath": ".",
+  "venv": ".venv",
+  "typeCheckingMode": "standard",
+  "exclude": [".venv", "data", "node_modules"]
+}
