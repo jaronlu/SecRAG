@@ -81,7 +81,7 @@ def evaluate_conversations(dataset_path: str | Path) -> dict[str, float]:
 
             turns = store.get_recent_turns(thread_id=thread_id, user_id=user.user_id)
             current_turn_citations_only = (
-                len(turns) == 1 and turns[0]["citations"] == state[STATE_CITATIONS]
+                len(turns) == 1 and turns[0].get("citations") == state[STATE_CITATIONS]
             )
 
             audit_entry = AuditLogger().log(state)

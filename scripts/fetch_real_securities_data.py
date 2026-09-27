@@ -22,7 +22,7 @@ import json
 import re
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import ModuleType
 from typing import Any, Callable, Sequence, cast
@@ -198,7 +198,7 @@ def utc_now() -> str:
 def window(months: int = 12) -> tuple[str, str]:
     """Return the inclusive [start, end] date window covering the last N months."""
     end = datetime.now(timezone.utc)
-    start = end - pd.Timedelta(days=DEFAULT_LOOKBACK_DAYS if months >= 12 else months * 30)
+    start = end - timedelta(days=DEFAULT_LOOKBACK_DAYS if months >= 12 else months * 30)
     return start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")
 
 
@@ -343,7 +343,7 @@ def query_cninfo_annual_report(
 
 def read_manifest(path: Path) -> ManifestMetadata | None:
     manifest = read_json(path.with_name(path.name + ".meta.json"), None)
-    return manifest if isinstance(manifest, dict) else None
+    return cast(ManifestMetadata | None, manifest if isinstance(manifest, dict) else None)
 
 
 def load_cached_record(output_dir: Path, path: Path) -> MetadataRecord | None:
@@ -353,7 +353,7 @@ def load_cached_record(output_dir: Path, path: Path) -> MetadataRecord | None:
     manifest = read_manifest(path)
     if manifest is None or not manifest.get("sha256"):
         return None
-    if sha256_file(path) != manifest["sha256"]:
+    if sha256_file(path) != manifest.get("sha256"):
         return None
     cached = dict(manifest)
     cached.pop("relative_path", None)

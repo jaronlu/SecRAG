@@ -20,7 +20,7 @@ def evaluate_compliance(dataset_path: str | Path) -> dict[str, float]:
             user_role=item.get("user_role"),
             client_id=item.get("client_id"),
         )
-        actual_blocked = not result["passed"]
+        actual_blocked = not result.get("passed")
         expected_blocked = bool(item.get("expected_blocked", False))
         correct += int(actual_blocked == expected_blocked)
         restricted_text = str(item.get("restricted_text", ""))
