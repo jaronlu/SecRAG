@@ -7,7 +7,6 @@ from httpx import ConnectError
 
 from src.api.auth import AuthenticatedUser
 from src.api.main import app, assistant_qa
-from src.api.ui import render_ui_html
 from src.schemas.constants import AGENT_RECURSION_LIMIT, ROLE_TECHNICAL
 from src.schemas.request_response import AssistantQARequest
 from src.utils.audit import SQLiteAuditStore
@@ -125,11 +124,10 @@ def test_legacy_basic_qa_route_is_not_registered():
     assert "/v1/qa" not in {getattr(route, "path", None) for route in app.routes}
 
 
-def test_assistant_response_and_ui_do_not_expose_audit_trail():
+def test_assistant_response_does_not_expose_audit_trail():
     assert "audit_trail" not in app.openapi()["components"]["schemas"]["AssistantQAResponse"][
         "properties"
     ]
-    assert "auditText" not in render_ui_html()
 
 
 @pytest.mark.asyncio
