@@ -57,6 +57,7 @@ from src.schemas.constants import (
     MAX_QUERY_LENGTH,
     META_CHUNK_ID,
     META_ALLOWED_ROLES,
+    META_DATE_DAY,
     META_PERMISSION_LEVEL,
     META_SOURCE,
     META_TITLE,
@@ -260,6 +261,101 @@ def test_planner_injects_stock_code_filter_for_report_search(monkeypatch):
     result = planner(state)
 
     assert result[STATE_RETRIEVAL_PLAN][0][PLAN_FILTERS] == {"stock_code": "600519"}
+
+
+def _planner_llm_response(steps: list[dict]) -> Any:
+    response = MagicMock()
+    response.content = json.dumps(steps)
+    return type("FakeLLM", (), {"invoke": lambda self, messages: response})()
+
+
+class TestPlannerDateFilters:
+    """标题年份（报告期）≠ 发布日期：时间范围不得变成 report_search 硬过滤（ISSUE-2）。"""
+
+    def _state(self, **overrides: Any) -> AssistantState:
+        return _state(**{
+            STATE_USER_ROLE: ROLE_ADVISOR,
+            STATE_ORIGINAL_QUERY: "贵州茅台2025年研报的核心观点是什么？",
+            STATE_REWRITTEN_QUERY: "贵州茅台 600519 2025年研报核心观点",
+            STATE_INTENT: "研报观点",
+            STATE_QUERY_TYPE: "report_inquiry",
+            STATE_ENTITIES: {
+                "stock_code": "600519.SH",
+                "time_range": {"start": "2025-01-01", "end": "2025-12-31"},
+            },
+            **overrides,
+        })
+
+    def test_report_search_gets_no_publish_date_filter(self, monkeypatch):
+        monkeypatch.setattr(
+            "src.agents.nodes.llm",
+            _planner_llm_response(
+                [
+                    {PLAN_SOURCE: SOURCE_REPORT, PLAN_QUERY: "贵州茅台2025年研报", PLAN_TOP_K: 5},
+                    {PLAN_SOURCE: SOURCE_PRODUCT, PLAN_QUERY: "贵州茅台", PLAN_TOP_K: 3},
+                ]
+            ),
+        )
+
+        result = planner(self._state())
+
+        plan = result[STATE_RETRIEVAL_PLAN]
+        assert plan[0][PLAN_SOURCE] == SOURCE_REPORT
+        # 研报只保留 stock_code 语义过滤，date_day 留在查询文本里做语义召回
+        assert plan[0][PLAN_FILTERS] == {"stock_code": "600519"}
+        # 其他来源仍保留时间范围过滤
+        assert plan[1][PLAN_FILTERS] == {
+            "$and": [
+                {META_DATE_DAY: {"$gte": 20250101}},
+                {META_DATE_DAY: {"$lte": 20251231}},
+            ]
+        }
+
+    def test_retry_after_empty_round_drops_date_filters_for_all_sources(self, monkeypatch):
+        monkeypatch.setattr(
+            "src.agents.nodes.llm",
+            _planner_llm_response(
+                [
+                    {
+                        PLAN_SOURCE: SOURCE_PRODUCT,
+                        PLAN_QUERY: "贵州茅台",
+                        PLAN_TOP_K: 3,
+                        PLAN_FILTERS: {"product_type": "fund", META_DATE_DAY: {"$gte": 20250101}},
+                    },
+                    {PLAN_SOURCE: SOURCE_REPORT, PLAN_QUERY: "贵州茅台研报", PLAN_TOP_K: 5},
+                ]
+            ),
+        )
+        state = self._state(
+            **{STATE_RETRIEVAL_ATTEMPTS: 1, STATE_RETRIEVAL_RESULTS: []},
+        )
+
+        result = planner(state)
+
+        plan = result[STATE_RETRIEVAL_PLAN]
+        assert META_DATE_DAY not in plan[0][PLAN_FILTERS]
+        assert plan[0][PLAN_FILTERS] == {"product_type": "fund"}
+        assert plan[1].get(PLAN_FILTERS) == {"stock_code": "600519"}
+
+    def test_retry_with_usable_results_keeps_date_filters(self, monkeypatch):
+        monkeypatch.setattr(
+            "src.agents.nodes.llm",
+            _planner_llm_response(
+                [{PLAN_SOURCE: SOURCE_PRODUCT, PLAN_QUERY: "贵州茅台", PLAN_TOP_K: 3}]
+            ),
+        )
+        state = self._state(
+            **{
+                STATE_RETRIEVAL_ATTEMPTS: 1,
+                STATE_RETRIEVAL_RESULTS: [_result("已有可用结果", score=0.8)],
+            },
+        )
+
+        result = planner(state)
+
+        plan = result[STATE_RETRIEVAL_PLAN]
+        assert plan
+        assert {META_DATE_DAY: {"$gte": 20250101}} in plan[0][PLAN_FILTERS]["$and"]
 
 
 # ══════════════════════════════════════════════════════════════════════

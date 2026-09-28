@@ -228,6 +228,37 @@ def _time_range_to_filters(time_range: dict[str, Any] | None) -> dict[str, Any] 
     return {"$and": conditions}
 
 
+def _retrying_after_empty_retrieval(state: AssistantState) -> bool:
+    """多跳重试且此前没有任何可用检索结果时返回 True。
+
+    0 召回放宽重试（todo/issues.md ISSUE-2 修复方向 3）：元数据过滤（尤其是
+    日期硬过滤）是 0 召回的常见根因，重试时不再沿用。
+    """
+    if state.get(STATE_RETRIEVAL_ATTEMPTS, 0) <= 0:
+        return False
+    results = state.get(STATE_RETRIEVAL_RESULTS, [])
+    return not any(not result.get(RR_DENIED) for result in results)
+
+
+def _strip_date_day_filters(filters: dict[str, Any] | None) -> dict[str, Any] | None:
+    """去掉过滤器中的 date_day 条件，其余条件保留；清空后返回 None。"""
+    if not filters:
+        return None
+    cleaned = {key: value for key, value in filters.items() if key != META_DATE_DAY}
+    conditions = cleaned.get("$and")
+    if isinstance(conditions, list):
+        kept = [
+            condition
+            for condition in conditions
+            if not (isinstance(condition, dict) and META_DATE_DAY in condition)
+        ]
+        if kept:
+            cleaned["$and"] = kept
+        else:
+            cleaned.pop("$and")
+    return cleaned or None
+
+
 def _cached_retrieve(
     retriever: HybridRetriever,
     plan: list[RetrievalPlanStep],
@@ -608,6 +639,15 @@ def planner(state: AssistantState) -> dict[str, Any]:
         entities = _extract_entities_from_results(state.get(STATE_RETRIEVAL_RESULTS, []))
         if entities:
             entity_context = f"\n【已检索到的实体】{', '.join(entities)}\n请基于这些实体扩展查询，寻找关联信息，不要重复相同查询。"
+    # ISSUE-2: 0 召回放宽重试——上一轮没有任何可用结果时，去掉日期硬过滤
+    # 并提示 LLM 放宽计划
+    relax_date_filters = _retrying_after_empty_retrieval(state)
+    empty_round_hint = (
+        "\n【上一轮结果】检索 0 条可用结果：请放宽条件——不要依赖元数据过滤，"
+        "改用更宽泛的语义查询和同义表述。\n"
+        if relax_date_filters
+        else ""
+    )
 
     prompt = f"""根据以下查询理解结果，生成检索计划：
 
@@ -616,7 +656,7 @@ def planner(state: AssistantState) -> dict[str, Any]:
 【意图】{state[STATE_INTENT]}
 【查询类型】{state[STATE_QUERY_TYPE]}
 【实体】{json.dumps(state[STATE_ENTITIES], ensure_ascii=False)}
-【用户角色】{state[STATE_USER_ROLE]}{entity_context}
+【用户角色】{state[STATE_USER_ROLE]}{entity_context}{empty_round_hint}
 
 可用数据源（基于角色权限）：
 - product_search: 理财产品说明书、产品合同、风险揭示书
@@ -658,6 +698,9 @@ def planner(state: AssistantState) -> dict[str, Any]:
     filtered_plan: list[RetrievalPlanStep] = []
     # P1-2: 从 entities 中提取时间范围，转为 ChromaDB 过滤器
     time_filters = _time_range_to_filters(state.get(STATE_ENTITIES, {}).get("time_range"))
+    # ISSUE-2: 研报的发布日期通常晚于报告期（如 2025 年报研报 2026 年才发布），
+    # 查询里的年份是报告期语义，映射为发布日期硬过滤必然漏检。因此 report_search
+    # 一律不做 date_day 硬过滤，日期语义保留在查询文本里参与语义召回。
     for raw_step in raw_steps:
         step = _normalize_plan_step(raw_step, state[STATE_REWRITTEN_QUERY])
         if step is not None and step.get(PLAN_SOURCE) in allowed_sources:
@@ -669,8 +712,10 @@ def planner(state: AssistantState) -> dict[str, Any]:
                     # 只保留代码部分，去掉沪市 .SH / 深市 .SZ 等后缀
                     filters[META_STOCK_CODE] = stock_code.split(".", maxsplit=1)[0]
                     step[PLAN_FILTERS] = filters
-            # P1-2: 合并时间范围过滤器
-            if time_filters:
+            # P1-2: 合并时间范围过滤器（report_search 与 0 召回重试除外）
+            if relax_date_filters:
+                step[PLAN_FILTERS] = _strip_date_day_filters(step.get(PLAN_FILTERS))
+            elif time_filters and step.get(PLAN_SOURCE) != SOURCE_REPORT:
                 existing_filters = dict(step.get(PLAN_FILTERS) or {})
                 existing_filters.update(time_filters)
                 step[PLAN_FILTERS] = existing_filters
