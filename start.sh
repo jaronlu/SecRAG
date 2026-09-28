@@ -52,7 +52,6 @@ echo "Logs: ${LOG_FILE}"
 echo
 echo "UI:      http://${HOST}:${PORT}/"
 echo "Admin:   http://${HOST}:${PORT}/admin"
-echo "Legacy:  http://${HOST}:${PORT}/legacy"
 echo "Docs:    http://${HOST}:${PORT}/docs"
 echo "Health:  http://${HOST}:${PORT}/health"
 echo "Metrics: http://${HOST}:${PORT}/metrics"

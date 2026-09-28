@@ -21,7 +21,6 @@ from src.api.auth import (
     build_assistant_initial_state,
 )
 from src.api.ingestion import router as ingestion_router
-from src.api.ui import render_ui_html
 from src.config import config
 from src.schemas.constants import (
     AGENT_RECURSION_LIMIT,
@@ -72,37 +71,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# P1-6: React 前端静态文件挂载（如果 frontend/dist 存在）
+# P1-6: React 前端静态文件挂载（frontend/dist 必须已构建，缺失即启动失败）
 _FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
-if _FRONTEND_DIST.exists():
-    app.mount("/assets", StaticFiles(directory=str(_FRONTEND_DIST / "assets")), name="assets")
-    audit_logger.info("React frontend mounted from %s", _FRONTEND_DIST)
-else:
-    audit_logger.info("React frontend not found at %s, using legacy HTML UI", _FRONTEND_DIST)
+
+
+def _ensure_frontend_dist() -> None:
+    """fail-fast：React 构建产物缺失时启动即报错，不再静默兜底旧 HTML UI（ISSUE-7）。"""
+    if not _FRONTEND_DIST.exists():
+        raise RuntimeError(
+            f"React frontend build not found at {_FRONTEND_DIST}; "
+            "run `cd frontend && npm run build` first"
+        )
+
+
+_ensure_frontend_dist()
+app.mount("/assets", StaticFiles(directory=str(_FRONTEND_DIST / "assets")), name="assets")
+audit_logger.info("React frontend mounted from %s", _FRONTEND_DIST)
 
 
 @app.get("/", response_class=HTMLResponse)
 async def ui():
-    # P1-6: 如果 React 前端构建产物存在，优先服务 React 前端
-    if _FRONTEND_DIST.exists():
-        return FileResponse(str(_FRONTEND_DIST / "index.html"))
-    return render_ui_html()
-
-
-@app.get("/legacy", response_class=HTMLResponse)
-async def legacy_ui():
-    """旧版 HTML UI（React 前端启用时可通过 /legacy 访问）。"""
-    return render_ui_html()
+    return FileResponse(str(_FRONTEND_DIST / "index.html"))
 
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_ui():
-    """P2: 知识库管理后台页面。"""
-    # P1-6: 如果 React 前端存在，React 路由处理 /admin
-    if _FRONTEND_DIST.exists():
-        return FileResponse(str(_FRONTEND_DIST / "index.html"))
-    admin_html = Path(__file__).parent / "admin.html"
-    return HTMLResponse(content=admin_html.read_text(encoding="utf-8"))
+    """知识库管理后台页面（React AdminPage 路由）。"""
+    return FileResponse(str(_FRONTEND_DIST / "index.html"))
 
 
 @app.get("/health")
