@@ -108,13 +108,15 @@ export interface StreamEvent {
   detail?: string
 }
 
-// 流式进度节点
+// 流式进度节点。key 必须与后端图节点注册名一致（src/agents/graph.py 的
+// CLIENT_PROGRESS_NODES），SSE progress 事件携带的就是这些名字；
+// 两侧契约由 tests/test_stream_progress_contract.py 守护
 export const STREAM_NODES = [
-  { key: 'query_understanding', label: '查询理解' },
-  { key: 'retrieval_planning', label: '生成检索计划' },
-  { key: 'retrieval_execution', label: '执行检索' },
-  { key: 'result_filtering', label: '过滤结果' },
-  { key: 'reasoning', label: '推理' },
-  { key: 'verification', label: '验证' },
-  { key: 'answer_organization', label: '组织回答' },
+  { key: 'query_understand', label: '查询理解' },
+  { key: 'planner', label: '生成检索计划' },
+  { key: 'retrieve', label: '执行检索' },
+  { key: 'grade_and_filter', label: '过滤结果' },
+  { key: 'reason', label: '推理' },
+  { key: 'verify', label: '验证' },
+  { key: 'compose', label: '组织回答' },
 ] as const

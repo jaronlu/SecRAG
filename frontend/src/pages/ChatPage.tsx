@@ -20,6 +20,7 @@ export default function ChatPage() {
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamEnabled, setStreamEnabled] = useState(true)
   const [currentNode, setCurrentNode] = useState<string | null>(null)
+  const [progressCompleted, setProgressCompleted] = useState(false)
   const [threads, setThreads] = useState<{ thread_id: string; title: string }[]>([])
   const [currentThreadId, setCurrentThreadId] = useState<string | undefined>()
   const [token, setToken] = useState(localStorage.getItem('secrag_token') || 'demo-advisor')
@@ -85,6 +86,7 @@ export default function ChatPage() {
     setInput('')
     setIsStreaming(true)
     setCurrentNode(null)
+    setProgressCompleted(false)
 
     const assistantId = (Date.now() + 1).toString()
 
@@ -109,6 +111,7 @@ export default function ChatPage() {
               setCurrentThreadId(event.thread_id)
             }
             // 打字机效果
+            setProgressCompleted(true)
             let i = 0
             const typeInterval = setInterval(() => {
               if (i < text.length) {
@@ -324,7 +327,7 @@ export default function ChatPage() {
             {/* 流式进度 */}
             {isStreaming && streamEnabled && messages.length > 0 && (
               <div className="max-w-[80%]">
-                <StreamingProgress currentNode={currentNode} completed={false} />
+                <StreamingProgress currentNode={currentNode} completed={progressCompleted} />
               </div>
             )}
 
