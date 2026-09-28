@@ -1596,7 +1596,11 @@ class TestBuildAgentGraph:
         graph = build_agent_graph()
         assert "no_results_response" in graph.nodes
         branches = graph.branches.get("grade_and_filter", {})
-        ends = {end for branch in branches.values() for end in branch.ends.values()}
+        ends = {
+            end
+            for branch in branches.values()
+            for end in (branch.ends or {}).values()
+        }
         assert "no_results_response" in ends
 
 
