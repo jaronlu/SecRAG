@@ -28,6 +28,7 @@ from src.agents.nodes import (
     compose,
     extract_citations,
     grade_and_filter,
+    no_results_response,
     planner,
     prepare_reason,
     record_tool_results,
@@ -53,6 +54,7 @@ from src.schemas.constants import (
     CONFIDENCE_HIGH,
     CONFIDENCE_LOW,
     CONFIDENCE_MEDIUM,
+    DEFAULT_MAX_HOPS,
     MAX_TOOL_ITERATIONS,
     MAX_QUERY_LENGTH,
     META_CHUNK_ID,
@@ -107,6 +109,7 @@ from src.schemas.constants import (
     STATE_RETRIEVAL_TOTAL_CHUNKS,
     STATE_REWRITTEN_QUERY,
     STATE_RISK_DISCLOSURE,
+    STATE_TERMINAL,
     STATE_THREAD_ID,
     STATE_TOOL_CALLS,
     STATE_TOOL_ITERATIONS,
@@ -1508,6 +1511,39 @@ class TestShouldRetryRetrieval:
         state = _state(**{STATE_RETRIEVAL_RESULTS: [_result("x", score=0.9)]})
         assert should_retry_retrieval(state) == "retrieve"
 
+    def test_hops_exhausted_without_results_short_circuits(self):
+        """检索轮次耗尽仍 0 结果：短路返回"未找到资料"，不进入无证据推理（ISSUE-3）。"""
+        state = _state(**{STATE_RETRIEVAL_RESULTS: [], STATE_RETRIEVAL_ATTEMPTS: DEFAULT_MAX_HOPS})
+        assert should_retry_retrieval(state) == "no_results"
+
+    def test_hops_exhausted_with_usable_results_continues(self):
+        state = _state(
+            **{
+                STATE_RETRIEVAL_RESULTS: [
+                    _result("a", score=0.74),
+                    _result("b", score=0.70),
+                    _result("c", score=0.65),
+                ],
+                STATE_RETRIEVAL_ATTEMPTS: DEFAULT_MAX_HOPS,
+            }
+        )
+        assert should_retry_retrieval(state) == "continue"
+
+
+class TestNoResultsResponse:
+    def test_short_circuits_with_not_found_answer(self):
+        result = no_results_response(_state())
+
+        assert result[STATE_TERMINAL] is True
+        assert result[STATE_FINAL_ANSWER].startswith("## 结论")
+        assert "未找到" in result[STATE_FINAL_ANSWER]
+        assert result[STATE_CITATIONS] == []
+        assert result[STATE_CONFIDENCE] == CONFIDENCE_LOW
+        # verification 置为失败：审计如实记录，且避免"未找到"终态被语义缓存
+        assert result[STATE_VERIFICATION]["passed"] is False
+        assert result[STATE_VERIFICATION]["issues"] == ["no_retrieval_results"]
+        assert result[STATE_COMPLIANCE]["passed"] is True
+
 
 class TestShouldReasonAgain:
     def test_not_passed(self):
@@ -1554,6 +1590,14 @@ class TestBuildAgentGraph:
         graph = build_agent_graph()
         compiled = graph.compile()
         assert compiled is not None
+
+    def test_no_results_route_wired_to_terminal_response(self):
+        """ISSUE-3: 检索耗尽 0 结果的短路路由必须接到 no_results_response 终态节点。"""
+        graph = build_agent_graph()
+        assert "no_results_response" in graph.nodes
+        branches = graph.branches.get("grade_and_filter", {})
+        ends = {end for branch in branches.values() for end in branch.ends.values()}
+        assert "no_results_response" in ends
 
 
 class TestPromptInjection:

@@ -19,6 +19,7 @@ from src.agents.nodes import (
     finalize_reason,
     grade_and_filter,
     load_conversation_context,
+    no_results_response,
     permission_denied_response,
     persist_conversation_turn,
     planner,
@@ -190,15 +191,19 @@ def _traced_node(
 
 def should_retry_retrieval(
     state: AssistantState,
-) -> Literal["denied", "continue", "retrieve"]:
-    """判断是否需要补充检索（最多 DEFAULT_MAX_HOPS 次，计数器由 retrieve 节点维护）"""
+) -> Literal["denied", "continue", "retrieve", "no_results"]:
+    """判断是否需要补充检索（最多 DEFAULT_MAX_HOPS 次，计数器由 retrieve 节点维护）。
+
+    重试轮次耗尽仍无任何可用结果时走 no_results 短路（ISSUE-3）：
+    不再进入 reason 让模型无证据作答，直接返回"未找到资料"。
+    """
     attempts = state.get(STATE_RETRIEVAL_ATTEMPTS, 0)
     results = state.get(STATE_RETRIEVAL_RESULTS, [])
     usable = [result for result in results if not result.get("denied")]
     if results and not usable:
         return "denied"
     if attempts >= DEFAULT_MAX_HOPS:
-        return "continue"
+        return "continue" if usable else "no_results"
 
     if not results:
         return "retrieve"
@@ -323,6 +328,11 @@ def build_agent_graph() -> StateGraph[AssistantState]:
         "permission_denied_response",
         _traced_node("permission_denied_response", permission_denied_response),
     )
+    # ISSUE-3: 检索耗尽仍 0 结果时提前终止，不进入无证据推理
+    graph.add_node(
+        "no_results_response",
+        _traced_node("no_results_response", no_results_response),
+    )
     # ReAct 推理与工具调用
     graph.add_node("reason", reason_subgraph)
     # 提取引用
@@ -358,7 +368,8 @@ def build_agent_graph() -> StateGraph[AssistantState]:
     graph.add_edge("planner", "retrieve")
     graph.add_edge("retrieve", "grade_and_filter")
 
-    # 条件路由：检索不足则重新规划并补充检索（最多 DEFAULT_MAX_HOPS 次）
+    # 条件路由：检索不足则重新规划并补充检索（最多 DEFAULT_MAX_HOPS 次）；
+    # 耗尽仍无可用结果则短路返回"未找到资料"（ISSUE-3）
     graph.add_conditional_edges(
         "grade_and_filter",
         should_retry_retrieval,
@@ -366,10 +377,12 @@ def build_agent_graph() -> StateGraph[AssistantState]:
             "continue": "reason",
             "retrieve": "planner",
             "denied": "permission_denied_response",
+            "no_results": "no_results_response",
         },
     )
 
     graph.add_edge("permission_denied_response", "persist_conversation_turn")
+    graph.add_edge("no_results_response", "persist_conversation_turn")
     # P1-8: 澄清节点直接进入会话保存（跳过检索/推理/验证）
     graph.add_edge("clarify", "persist_conversation_turn")
     graph.add_edge("reason", "extract_citations")
