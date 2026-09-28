@@ -145,6 +145,23 @@ def demo_agent_qa_denied(client: httpx.Client) -> None:
     _print_assistant_response(data)
 
 
+# 面向真实 LLM 的场景允许少量重试：planner 与答案生成存在采样波动
+# （如偶发的 product_type 过滤 0 命中、答案不带字面 R2/[来源1]），
+# 断言本身保持严格，不因重试放宽
+MAX_SCENARIO_ATTEMPTS = 3
+
+
+def _run_scenario(title: str, scenario, client: httpx.Client) -> None:
+    for attempt in range(1, MAX_SCENARIO_ATTEMPTS + 1):
+        try:
+            scenario(client)
+            return
+        except DemoValidationError as exc:
+            print(f"[{attempt}/{MAX_SCENARIO_ATTEMPTS}] {title} 验证未通过: {exc}")
+            if attempt == MAX_SCENARIO_ATTEMPTS:
+                raise
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
@@ -153,8 +170,8 @@ def main() -> None:
 
     with build_client(args.base_url, args.read_timeout) as client:
         try:
-            demo_agent_qa_allowed(client)
-            demo_agent_qa_denied(client)
+            _run_scenario("授权场景", demo_agent_qa_allowed, client)
+            _run_scenario("权限拒绝场景", demo_agent_qa_denied, client)
         except httpx.ConnectError:
             print(f"无法连接 {args.base_url}，请先启动服务：uv run uvicorn src.api.main:app --port 8000")
             sys.exit(1)
