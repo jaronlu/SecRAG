@@ -1,0 +1,16 @@
+{
+  "doc_type": "financial_data",
+  "retrieval_source": "sql_query",
+  "permission_level": "internal",
+  "allowed_roles": [
+    "advisor",
+    "institutional_sales",
+    "compliance"
+  ],
+  "title": "宁德时代 估值行情",
+  "date": "2026-09-28",
+  "stock_code": "300750",
+  "source": "baostock.query_history_k_data_plus",
+  "provider": "baostock",
+  "sha256": "f9ff6b8412dff6ea11d70861d45fcef7ea1bc83c706ff1dbe888dab7dc82f320"
+}

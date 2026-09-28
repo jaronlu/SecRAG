@@ -1,0 +1,16 @@
+{
+  "doc_type": "financial_data",
+  "retrieval_source": "sql_query",
+  "permission_level": "internal",
+  "allowed_roles": [
+    "advisor",
+    "institutional_sales",
+    "compliance"
+  ],
+  "title": "平安银行 估值行情",
+  "date": "2026-09-28",
+  "stock_code": "000001",
+  "source": "baostock.query_history_k_data_plus",
+  "provider": "baostock",
+  "sha256": "8b1b5b59f58960353f7427e13ba69b55e5b50d08f070962ca485cc8ebe022840"
+}

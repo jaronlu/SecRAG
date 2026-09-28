@@ -1,0 +1,16 @@
+{
+  "doc_type": "announcement",
+  "retrieval_source": "report_search",
+  "permission_level": "internal",
+  "allowed_roles": [
+    "advisor",
+    "institutional_sales",
+    "compliance"
+  ],
+  "title": "宁德时代2026年半年度报告",
+  "date": "2026-07-25",
+  "stock_code": "300750",
+  "source": "http://static.cninfo.com.cn/finalpage/2026-07-25/1225441586.PDF",
+  "provider": "cninfo",
+  "sha256": "d96b5d49ae75bec5913d032de781873565f5405bf99fd8b011eab152549862b9"
+}

@@ -1,0 +1,16 @@
+{
+  "doc_type": "financial_data",
+  "retrieval_source": "sql_query",
+  "permission_level": "internal",
+  "allowed_roles": [
+    "advisor",
+    "institutional_sales",
+    "compliance"
+  ],
+  "title": "贵州茅台 行情快照",
+  "date": "2026-09-28",
+  "stock_code": "600519",
+  "source": "efinance.stock.get_quote_history",
+  "provider": "efinance/eastmoney",
+  "sha256": "63b5d2a02b5acc9e17bd1ad50e1cbad64613b6b16f1f3d700dee10eb4cd62fa4"
+}
