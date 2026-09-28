@@ -1354,6 +1354,38 @@ def permission_denied_response(state: AssistantState) -> dict[str, Any]:
     }
 
 
+def no_results_response(state: AssistantState) -> dict[str, Any]:
+    """检索轮次耗尽仍无任何可用结果时短路返回，不进入无证据推理（ISSUE-3）。
+
+    此前 0 召回会继续 call_reason_model 让模型凭参数知识作答，再被
+    source_verification 拦截成"验证未通过"兜底，浪费整条多跳推理链路且
+    文案不准确。改为直接返回"未找到资料"。
+
+    verification 置为失败（no_retrieval_results）：一是审计如实体记录本轮
+    没有产出经过验证的回答；二是 API 只缓存 verification 与 compliance 均
+    通过的终态，避免把"未找到"结果缓存后在资料入库后仍被复用。
+    """
+    return {
+        STATE_FINAL_ANSWER: _structure_answer(
+            "知识库中未找到与该问题相关的资料。请尝试调整时间范围、补充产品或公司名称，或换个问法重试。"
+        ),
+        STATE_TERMINAL: True,
+        STATE_CITATIONS: [],
+        STATE_CONFIDENCE: CONFIDENCE_LOW,
+        STATE_RISK_DISCLOSURE: "",
+        STATE_VERIFICATION: {
+            "passed": False,
+            "issues": ["no_retrieval_results"],
+            "confidence": CONFIDENCE_LOW,
+        },
+        STATE_COMPLIANCE: {
+            "passed": True,
+            "flags": [],
+            "risk_disclosure": "",
+        },
+    }
+
+
 # ══════════════════════════════════════════════════════════════════════
 # 4.9 Compose — 引用标注、置信度、风险提示
 # ══════════════════════════════════════════════════════════════════════
