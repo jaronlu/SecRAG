@@ -125,7 +125,7 @@ def test_loads_financial_csv_metadata_manifest():
 
 def test_loads_real_securities_data_metadata_manifest():
     metadata = load_sample_metadata(
-        Path("data/raw/real_securities_data/reports/000001_2025_2026.pdf")
+        Path("data/raw/real_securities_data/reports/000001_2026.pdf")
     )
 
     assert metadata[META_DOC_TYPE] == DOC_TYPE_RESEARCH_REPORT
@@ -221,50 +221,53 @@ def test_normalize_chunks_fills_missing_retrieval_source_from_doc_type():
 
 
 def test_derives_real_data_doc_ids_from_stable_sources():
+    # 63a7d66 重建后的 2026 fixture：doc_id 由 sidecar 的 source 字段稳定推导
     annual_metadata = load_sample_metadata(
-        Path("data/raw/real_securities_data/announcements/000001_2025.pdf")
+        Path("data/raw/real_securities_data/announcements/000001_2026.pdf")
     )
     research_metadata = load_sample_metadata(
-        Path("data/raw/real_securities_data/reports/000001_2025_2026.pdf")
+        Path("data/raw/real_securities_data/reports/000001_2026.pdf")
     )
     csv_metadata = load_sample_metadata(
-        Path("data/raw/real_securities_data/financials/baostock_600519_valuation_202501.csv")
+        Path("data/raw/real_securities_data/financials/baostock_600519_valuation.csv")
     )
     efinance_metadata = load_sample_metadata(
-        Path("data/raw/real_securities_data/financials/efinance_600519_base_info.csv")
+        Path("data/raw/real_securities_data/financials/efinance_600519_quote_history.csv")
     )
 
     assert (
         derive_doc_id(
-            Path("data/raw/real_securities_data/announcements/000001_2025.pdf"),
+            Path("data/raw/real_securities_data/announcements/000001_2026.pdf"),
             DOC_TYPE_ANNOUNCEMENT,
             annual_metadata,
         )
-        == "cninfo:announcement:1225022887"
+        == "cninfo:announcement:1225475344"
     )
     assert (
         derive_doc_id(
-            Path("data/raw/real_securities_data/reports/000001_2025_2026.pdf"),
+            Path("data/raw/real_securities_data/reports/000001_2026.pdf"),
             DOC_TYPE_RESEARCH_REPORT,
             research_metadata,
         )
-        == "eastmoney:research:AP202604261821586763"
+        == "eastmoney:research:AP202608251828402313"
     )
     assert (
         derive_doc_id(
-            Path("data/raw/real_securities_data/financials/baostock_600519_valuation_202501.csv"),
+            Path("data/raw/real_securities_data/financials/baostock_600519_valuation.csv"),
             DOC_TYPE_FINANCIAL_DATA,
             csv_metadata,
         )
-        == "dataset:baostock:query_history_k_data_plus:sh.600519:2025-01-02:2025-01-27"
+        == "dataset:baostock:query_history_k_data_plus:sh.600519:2025-09-29:2026-09-28"
     )
     assert (
         derive_doc_id(
-            Path("data/raw/real_securities_data/financials/efinance_600519_base_info.csv"),
+            Path(
+                "data/raw/real_securities_data/financials/efinance_600519_quote_history.csv"
+            ),
             DOC_TYPE_FINANCIAL_DATA,
             efinance_metadata,
         )
-        == "dataset:efinance:eastmoney:get_base_info:600519"
+        == "dataset:efinance:eastmoney:get_quote_history:stocks=600519"
     )
 
 
@@ -283,7 +286,9 @@ def test_manifest_doc_id_survives_file_rename(tmp_path):
 
 
 def test_normalize_chunks_overwrites_loader_path_doc_id():
-    file_path = Path("data/raw/real_securities_data/financials/efinance_600519_base_info.csv")
+    file_path = Path(
+        "data/raw/real_securities_data/financials/efinance_600519_quote_history.csv"
+    )
     chunks = [Document(page_content="content", metadata={META_DOC_ID: "path-derived"})]
 
     normalized = normalize_chunks(
@@ -291,10 +296,13 @@ def test_normalize_chunks_overwrites_loader_path_doc_id():
         file_path=file_path,
         doc_type=DOC_TYPE_FINANCIAL_DATA,
         sample_metadata=load_sample_metadata(file_path),
-        doc_id="dataset:efinance:eastmoney:get_base_info:600519",
+        doc_id="dataset:efinance:eastmoney:get_quote_history:stocks=600519",
     )
 
-    assert normalized[0].metadata[META_DOC_ID] == "dataset:efinance:eastmoney:get_base_info:600519"
+    assert (
+        normalized[0].metadata[META_DOC_ID]
+        == "dataset:efinance:eastmoney:get_quote_history:stocks=600519"
+    )
 
 
 def test_ingest_document_skips_unchanged_file(monkeypatch, tmp_path):
@@ -494,7 +502,6 @@ def test_sample_allowed_roles_match_role_constants():
     manifests = [
         Path("data/raw/demo_knowledge_base/samples/metadata.json"),
         Path("data/raw/demo_knowledge_base/announcements/metadata.json"),
-        Path("data/raw/real_securities_data/metadata.json"),
     ]
 
     for manifest in manifests:
@@ -502,14 +509,21 @@ def test_sample_allowed_roles_match_role_constants():
         for metadata in entries.values():
             assert set(metadata[META_ALLOWED_ROLES]) <= valid_roles
 
+    # 63a7d66 起真实数据契约改为逐文件 .meta.json sidecar，顶层聚合 manifest 已删
+    for sidecar in Path("data/raw/real_securities_data").rglob("*.meta.json"):
+        metadata = json.loads(sidecar.read_text(encoding="utf-8"))
+        assert set(metadata[META_ALLOWED_ROLES]) <= valid_roles, sidecar
+
 
 def test_real_data_manifest_doc_types():
     import json
 
-    entries = json.loads(
-        Path("data/raw/real_securities_data/metadata.json").read_text(encoding="utf-8")
-    )
-    doc_types = {metadata[META_DOC_TYPE] for metadata in entries.values()}
+    # 顶层 metadata.json 已随 63a7d66 删除：从逐文件 sidecar 汇总 doc_type
+    doc_types = {
+        metadata[META_DOC_TYPE]
+        for sidecar in Path("data/raw/real_securities_data").rglob("*.meta.json")
+        for metadata in [json.loads(sidecar.read_text(encoding="utf-8"))]
+    }
 
     assert DOC_TYPE_ANNOUNCEMENT in doc_types
     assert DOC_TYPE_RESEARCH_REPORT in doc_types
