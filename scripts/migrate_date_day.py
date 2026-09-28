@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
-from typing import Any, Protocol
+from typing import Any, Mapping, Protocol
 
 import chromadb
 
@@ -38,9 +38,9 @@ class MigratableCollection(Protocol):
 
     def count(self) -> int: ...
 
-    def get(self, *, include: list[str], limit: int, offset: int) -> dict[str, Any]: ...
+    def get(self, *args: Any, **kwargs: Any) -> Mapping[str, Any]: ...
 
-    def update(self, ids: list[str], metadatas: list[dict[str, Any]]) -> None: ...
+    def update(self, *args: Any, **kwargs: Any) -> object: ...
 
 
 def _needs_backfill(metadata: dict[str, Any]) -> bool:
@@ -92,7 +92,7 @@ def migrate_collection(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "migrate").splitlines()[0])
     parser.add_argument("--apply", action="store_true", help="实际写库（默认 dry-run）")
     parser.add_argument("--batch-size", type=int, default=500)
     parser.add_argument("--persist-dir", default=CHROMA_DEFAULT_PERSIST_DIR)
@@ -104,9 +104,11 @@ def main() -> int:
     summary = migrate_collection(collection, apply=args.apply, batch_size=args.batch_size)
 
     print(f"collection={args.collection} apply={args.apply}")
-    print(f"scanned={summary['scanned']} backfilled={summary['backfilled']} "
-          f"already_had_date_day={summary['already_had_date_day']} "
-          f"unparseable={summary['unparseable']}")
+    print(
+        f"scanned={summary['scanned']} backfilled={summary['backfilled']} "
+        f"already_had_date_day={summary['already_had_date_day']} "
+        f"unparseable={summary['unparseable']}"
+    )
     for key, count in sorted(summary.items()):
         if key.startswith("unparseable|"):
             print(f"  豁免 {key.removeprefix('unparseable|')}: {count}")
