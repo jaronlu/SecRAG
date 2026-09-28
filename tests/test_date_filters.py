@@ -25,6 +25,13 @@ def test_parse_date_day_invalid_returns_none():
     assert parse_date_day("2024-13-01") is None  # 非法月份
 
 
+def test_parse_date_day_float_year_formats():
+    """存量库与 Excel 导出的浮点年份（2024.0）按年处理（ISSUE-1）。"""
+    assert parse_date_day("2024.0") == 20240101
+    assert parse_date_day("2024.00") == 20240101
+    assert parse_date_day(2024.0) == 20240101
+
+
 def test_time_range_filters_are_chroma_compatible():
     """上下界必须拆成两个数值条件并用 $and 组合，不能塞进同一字段表达式。"""
     filters = _time_range_to_filters({"start": "2024-01-01", "end": "2024-12-31"})
