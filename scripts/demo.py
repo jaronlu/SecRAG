@@ -130,12 +130,20 @@ def demo_agent_qa_allowed(client: httpx.Client) -> None:
 
 
 def demo_agent_qa_denied(client: httpx.Client) -> None:
-    """完整 Agent：demo-tech token 只能走其服务端绑定范围。"""
-    _print_section("2. /v1/assistant/qa —— demo-tech token 查询受限资料")
+    """完整 Agent：advisor token 查询其角色不可见的受限内容。
+
+    演练 ISSUE-6：拒绝路由在"全部检索结果被权限过滤"时触发。知识库重建后
+    report_search 混入 1,662 条 public 券商研报 chunk（对所有角色可用），
+    原问题（内部研究摘要/新能源）总会带回可用结果，拒绝分支不可达。
+    本问题的检索只落在内部制度文档上：advisor 允许源不含 faq_search
+    （计划级拒绝），regulation 文档 allowed_roles 排除 advisor（结果级拒绝），
+    两条路径都保证 usable 为空，稳定进入干净拒绝。
+    """
+    _print_section("2. /v1/assistant/qa —— demo-advisor token 查询角色外受限资料")
     resp = client.post(
         API_ROUTE_ASSISTANT_QA,
-        headers={"Authorization": "Bearer demo-tech"},
-        json={"query": "内部研究摘要里对新能源板块怎么看？"},
+        headers={"Authorization": "Bearer demo-advisor"},
+        json={"query": "内部制度对客户数据导出申请的操作流程有什么要求？"},
     )
     resp.raise_for_status()
     data = resp.json()
