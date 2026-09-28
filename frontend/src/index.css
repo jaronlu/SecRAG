@@ -41,3 +41,53 @@ body {
 .progress-active {
   animation: pulse-glow 1.5s infinite;
 }
+
+/* AI 回答 markdown 渲染样式（配合 formatAnswerHTML 输出） */
+.md-answer p {
+  margin: 0.25rem 0;
+}
+.md-answer h2 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin: 0.75rem 0 0.25rem;
+  color: #0f172a;
+}
+.md-answer h2:first-child {
+  margin-top: 0;
+}
+.md-answer strong {
+  font-weight: 600;
+}
+.md-answer code {
+  background: #f1f5f9;
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.25rem;
+  font-size: 0.85em;
+}
+.md-answer table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+  font-size: 0.8125rem;
+}
+.md-answer th,
+.md-answer td {
+  border: 1px solid #e2e8f0;
+  padding: 0.375rem 0.5rem;
+  text-align: left;
+}
+.md-answer th {
+  background: #f8fafc;
+  font-weight: 600;
+}
+.md-answer ul,
+.md-answer ol {
+  margin: 0.25rem 0;
+  padding-left: 1.25rem;
+}
+.md-answer ul {
+  list-style: disc;
+}
+.md-answer ol {
+  list-style: decimal;
+}

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { ChatMessage as ChatMessageType } from '../types'
+import { formatAnswerHTML } from '../utils/markdown'
 
 interface ChatMessageProps {
   message: ChatMessageType
@@ -40,11 +41,23 @@ export default function ChatMessage({ message }: ChatMessageProps) {
             <div className="text-[10px] text-green-600 mb-1 font-medium">⚡ 缓存命中</div>
           )}
 
-          {/* 回答内容 */}
-          <div className={`text-sm leading-relaxed whitespace-pre-wrap ${isUser ? '' : 'text-slate-800'}`}>
-            {message.content}
-            {message.streaming && <span className="cursor-blink">▋</span>}
-          </div>
+          {/* 回答内容：AI 消息按 markdown 渲染（formatAnswerHTML 内部先转义 HTML，
+              输出中唯一 HTML 来自渲染器本身，流式光标也是常量字符串） */}
+          {isUser ? (
+            <div className="text-sm leading-relaxed whitespace-pre-wrap">
+              {message.content}
+              {message.streaming && <span className="cursor-blink">▋</span>}
+            </div>
+          ) : (
+            <div
+              className="text-sm leading-relaxed text-slate-800 md-answer"
+              dangerouslySetInnerHTML={{
+                __html:
+                  formatAnswerHTML(message.content) +
+                  (message.streaming ? '<span class="cursor-blink">▋</span>' : ''),
+              }}
+            />
+          )}
 
           {/* 置信度和合规 */}
           {!isUser && message.confidence && (
