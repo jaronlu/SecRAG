@@ -1,0 +1,20 @@
+{
+  "doc_type": "research_report",
+  "retrieval_source": "report_search",
+  "permission_level": "public",
+  "allowed_roles": [
+    "advisor",
+    "institutional_sales",
+    "compliance",
+    "operations",
+    "technical"
+  ],
+  "title": "贵州茅台贵州茅台公司跟踪报告：以动销定投放，缓解市场压力，低速稳态发展",
+  "date": "2026-09-21",
+  "stock_code": "600519",
+  "source": "https://pdf.dfcfw.com/pdf/H3_AP202609211829719676_1.pdf",
+  "provider": "akshare/eastmoney",
+  "sha256": "8db286454e4d953e69f1d476ff5dc4647e598097f60d68fce754a996942709e2",
+  "institution": "诚通证券",
+  "rating": "买入"
+}

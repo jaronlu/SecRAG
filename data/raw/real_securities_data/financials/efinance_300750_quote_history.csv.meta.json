@@ -1,0 +1,16 @@
+{
+  "doc_type": "financial_data",
+  "retrieval_source": "sql_query",
+  "permission_level": "internal",
+  "allowed_roles": [
+    "advisor",
+    "institutional_sales",
+    "compliance"
+  ],
+  "title": "宁德时代 行情快照",
+  "date": "2026-09-28",
+  "stock_code": "300750",
+  "source": "efinance.stock.get_quote_history",
+  "provider": "efinance/eastmoney",
+  "sha256": "f78fe4af0a4ee7aedb1cd91ddd86a0d66732465f9626de41b1b28a1607b76598"
+}

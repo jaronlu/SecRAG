@@ -1,0 +1,16 @@
+{
+  "doc_type": "announcement",
+  "retrieval_source": "report_search",
+  "permission_level": "internal",
+  "allowed_roles": [
+    "advisor",
+    "institutional_sales",
+    "compliance"
+  ],
+  "title": "贵州茅台贵州茅台2026年半年度报告",
+  "date": "2026-08-15",
+  "stock_code": "600519",
+  "source": "http://static.cninfo.com.cn/finalpage/2026-08-15/1225475868.PDF",
+  "provider": "cninfo",
+  "sha256": "0e10aa26be46b1cf3cd03f06e834c7fb98d5dd0d661b96f8fddd4af7e846a4f6"
+}

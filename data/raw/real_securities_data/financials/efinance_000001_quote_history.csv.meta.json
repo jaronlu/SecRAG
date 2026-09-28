@@ -1,0 +1,16 @@
+{
+  "doc_type": "financial_data",
+  "retrieval_source": "sql_query",
+  "permission_level": "internal",
+  "allowed_roles": [
+    "advisor",
+    "institutional_sales",
+    "compliance"
+  ],
+  "title": "平安银行 行情快照",
+  "date": "2026-09-28",
+  "stock_code": "000001",
+  "source": "efinance.stock.get_quote_history",
+  "provider": "efinance/eastmoney",
+  "sha256": "ba0d8b487aee3cfe08ff015da7ba4ac6350da901e89d07422bff363d17be0038"
+}

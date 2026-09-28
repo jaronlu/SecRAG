@@ -1,0 +1,16 @@
+{
+  "doc_type": "announcement",
+  "retrieval_source": "report_search",
+  "permission_level": "internal",
+  "allowed_roles": [
+    "advisor",
+    "institutional_sales",
+    "compliance"
+  ],
+  "title": "平安银行2026年半年度报告",
+  "date": "2026-08-15",
+  "stock_code": "000001",
+  "source": "http://static.cninfo.com.cn/finalpage/2026-08-15/1225475344.PDF",
+  "provider": "cninfo",
+  "sha256": "04f7b69417f665164ea6b8c636bc6a1ec1f399cedc97faa0662226a54b4f5527"
+}

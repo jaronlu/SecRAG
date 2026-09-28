@@ -1,0 +1,20 @@
+{
+  "doc_type": "research_report",
+  "retrieval_source": "report_search",
+  "permission_level": "public",
+  "allowed_roles": [
+    "advisor",
+    "institutional_sales",
+    "compliance",
+    "operations",
+    "technical"
+  ],
+  "title": "平安银行平安银行2026年中报点评：净息差企稳，财富管理带动中收增长",
+  "date": "2026-08-25",
+  "stock_code": "000001",
+  "source": "https://pdf.dfcfw.com/pdf/H3_AP202608251828402313_1.pdf",
+  "provider": "akshare/eastmoney",
+  "sha256": "a4fbe16e799c96a1ebd85eaf2a3e7a8563c034ce9a912f847ed2498fcbe83293",
+  "institution": "太平洋",
+  "rating": "买入"
+}

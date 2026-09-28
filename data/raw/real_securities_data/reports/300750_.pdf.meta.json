@@ -1,0 +1,20 @@
+{
+  "doc_type": "research_report",
+  "retrieval_source": "report_search",
+  "permission_level": "public",
+  "allowed_roles": [
+    "advisor",
+    "institutional_sales",
+    "compliance",
+    "operations",
+    "technical"
+  ],
+  "title": "宁德时代业绩维持快速增长，回购彰显发展信心",
+  "date": "2026-07-31",
+  "stock_code": "300750",
+  "source": "https://pdf.dfcfw.com/pdf/H3_AP202607311827537552_1.pdf",
+  "provider": "akshare/eastmoney",
+  "sha256": "4de8cb1efefc0ff57a3bbb61174e3ec3326a0e9b521b6c5a319d1fca1a0f1627",
+  "institution": "国信证券",
+  "rating": "增持"
+}
