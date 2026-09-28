@@ -114,10 +114,12 @@ def _validate_denied_response(data: dict) -> None:
 def demo_agent_qa_allowed(client: httpx.Client) -> None:
     """完整 Agent：服务端从 demo token 派生角色。"""
     _print_section("1. /v1/assistant/qa —— demo-advisor token 查询产品风险")
+    # 演练 ISSUE-4：必须用具体产品名提问。无产品名的模糊提问会命中 Agent 的
+    # 澄清追问路径（citations=[]），与下方断言的"验证通过引用"形态不匹配
     resp = client.post(
         API_ROUTE_ASSISTANT_QA,
         headers={"Authorization": "Bearer demo-advisor"},
-        json={"query": "这款理财产品风险等级是多少？"},
+        json={"query": "示例稳健增利理财产品的风险等级是多少？"},
     )
     resp.raise_for_status()
     data = resp.json()
