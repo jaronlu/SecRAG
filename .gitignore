@@ -12,6 +12,8 @@ frontend/.vite/
 # 运行时生成的数据，不提交
 data/chroma/
 data/*.db
+data/*.db-shm
+data/*.db-wal
 data/.DS_Store
 
 # 本地评估产物不提交
