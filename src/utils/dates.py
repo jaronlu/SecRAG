@@ -11,9 +11,12 @@ import re
 from datetime import date, datetime
 
 # 支持：ISO 日期/日期时间、2024/1/1、2024.1.1、20240101、2024年1月1日、2024年、2024
+# 以及 Excel 导出的浮点年份（2024.0，必须先于"年-月"模式匹配，
+# 否则 month=0 会触发 ValueError 提前返回 None）
 _DATE_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"^(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})日?$"),
     re.compile(r"^(\d{4})(\d{2})(\d{2})$"),
+    re.compile(r"^(\d{4})\.0+$"),
     re.compile(r"^(\d{4})[-/.年](\d{1,2})月?$"),
     re.compile(r"^(\d{4})年?$"),
 )
