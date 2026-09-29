@@ -3,9 +3,6 @@ type: testing reference
 title: 测试与评估：pytest 布局、检索评估与权限冒烟
 description: SecRAG 的质量门禁地图：tests/ 单元测试与 tests/e2e/ TC 编号端到端用例的布局与 isolated_stores 隔离 fixture，scripts/evaluate_retrieval.py 的 recall@5/recall@10/MRR/precision@5/覆盖率/权限拦截准确率指标与准入阈值，check_permissions.py 的 RBAC 冒烟检查，LLM-as-Judge 回答质量评估（evaluate_answers_e2e.py + answer_judge.py 四维度），消融实验（evaluate_ablation.py），以及内置评估集规模很小的局限。
 tags: [testing, evaluation, pytest, e2e, retrieval-eval]
-verified:
-  - by: openwiki/0.5.2
-    at: 2026-09-27T15:51:42.447Z
 sources:
   - id: openwiki-source-ed40286a906dbbaceea992aa
     resource: repo://data/raw/demo_knowledge_base/samples/faq/sample_project_technical_faq.html.meta.json
@@ -13,6 +10,8 @@ sources:
     resource: repo://docs/test-plans/e2e-test-cases.md
   - id: openwiki-source-05ccef8d4cf1698187f20464
     resource: repo://pyproject.toml
+  - id: openwiki-source-35400c2ee9759f3c50d9c6d1
+    resource: repo://scripts/build_evaluation_datasets.py
   - id: openwiki-source-843a58e144ca2fc962ad5954
     resource: repo://scripts/check_permissions.py
   - id: openwiki-source-1e9ad33096f9f9618cd93182
@@ -27,23 +26,28 @@ sources:
     resource: repo://scripts/evaluate_conversations.py
   - id: openwiki-source-04483c0b1d79bc8b0b0b799f
     resource: repo://scripts/evaluate_retrieval.py
-  - id: openwiki-source-4b6f137802064d92dc98ccaa
-    resource: repo://scripts/evaluate_retrieval.sample.json
   - id: openwiki-source-3c89b4f9bf3b01d82af78fa3
     resource: repo://scripts/evaluation_common.py
   - id: openwiki-source-cca77dd9640cdd9315de9a9f
     resource: repo://src/evaluation/answer_judge.py
-  - id: openwiki-source-7b9ce1115cc4c844eaa6a7cb
-    resource: repo://src/evaluation/retrieval_eval.py
   - id: openwiki-source-da1cc862f5a540f793502703
     resource: repo://tests/e2e/conftest.py
   - id: openwiki-source-8a05ce1bcff67c5b4e484d81
     resource: repo://tests/e2e/test_e2e_retrieval.py
+  - id: openwiki-source-fe9b9dc1afe30667bff9264b
+    resource: repo://tests/evaluation/answers.json
+  - id: openwiki-source-928201a004cab99b4dc19fc0
+    resource: repo://tests/evaluation/retrieval.json
   - id: openwiki-source-039ee515ff96c365fcc2e43d
     resource: repo://tests/test_evaluate_ablation.py
   - id: openwiki-source-649dddfe0f55d389c9197669
     resource: repo://tests/test_evaluate_retrieval.py
-generated: { by: "openwiki/0.5.2", at: "2026-09-27T15:51:42.447Z" }
+  - id: openwiki-source-c415f45877e0fcd7e93ea434
+    resource: repo://tests/test_evaluation_scripts.py
+generated: { by: "codex", at: "2026-09-29T15:40:40.317Z" }
+verified:
+  - by: openwiki/0.6.1
+    at: 2026-09-29T15:40:40.317Z
 ---
 
 # 测试与评估：pytest 布局、检索评估与权限冒烟
@@ -94,12 +98,23 @@ uv run pytest
 
 ## 3. 检索评估：`scripts/evaluate_retrieval.py`
 
-### 3.1 命令与数据
+### 3.1 评估数据集：由生成器从当前知识库产出（ISSUE-28）
+
+正式评估集由 `scripts/build_evaluation_datasets.py` 从**当前知识库与角色矩阵**生成（impl-08 §3），写入 `tests/evaluation/`，样本绑定真实 `chunk_id`：
 
 ```bash
-uv run python scripts/evaluate_retrieval.py                 # 默认使用 evaluate_retrieval.sample.json
-uv run python scripts/evaluate_retrieval.py path/to/dataset.json --output-root artifacts/evaluation
+uv run python scripts/build_evaluation_datasets.py          # 生成四份数据集（SEED=20260929 可复现）
+uv run python scripts/evaluate_retrieval.py tests/evaluation/retrieval.json --output-root artifacts/evaluation
 ```
+
+| 数据集 | 规模 | 对应 impl-08 条目 |
+| --- | --- | --- |
+| `retrieval.json` | ≥100 条检索正例 + ≥30 条权限负例（source 级 / permission_level 级 / allowed_roles 级拒绝，实际 133 条） | §3.1 |
+| `answers.json` | ≥100 条可回答 + ≥20 条不可回答（另含 tool-only 正/负例，实际 135 条） | §3.2 |
+| `compliance.json` | ≥50 条对抗样本（敏感词、目标价、买卖建议、缺条款号，实际 50 条） | §3.3 |
+| `conversations.json` | ≥20 组多轮/隔离/删除/幂等会话用例（实际 20 组） | §3.4 |
+
+**chunk_id 绑定是硬约束**：`relevant_chunk_ids` 来自当前 Chroma 集合的真实 chunk；重新入库（换 chunker/embedding/语料）后 chunk_id 全部变化，**必须重跑生成器**，否则评估静默失效。注意 `evaluate_retrieval.py` 的 `--dataset` 默认值仍是旧的最小样例集 `evaluate_retrieval.sample.json`（只验证链路），正式评估必须显式传入 `tests/evaluation/retrieval.json`。
 
 评估集是 JSON 数组，每个样本给出 `query`、`user_role`、检索计划（`plan`，或 `source`，或 `expected_query_type` 推导）与 `relevant_chunk_ids` / `relevant_doc_ids`；需要预期被拒的样本用 `expected_permission_denied: true` 且相关文档为空列表（`repo://scripts/evaluate_retrieval.py#L55-L112`）。`_normalize_plan` 优先取显式 `plan`，其次按 `source`，最后按 `expected_query_type → source` 映射（如 `technical_inquiry → faq_search`）推导（`repo://scripts/evaluate_retrieval.py#L38-L45`）。
 
@@ -121,7 +136,7 @@ recall@10 ≥ 0.90
 permission_block_accuracy = 1.0
 ```
 
-`admission_passed` 要求三个门槛同时满足（`repo://scripts/evaluate_retrieval.py#L48-L52`、`#L205-L206`）；`main` 在占位 chunk id 未替换或未过门槛时 `SystemExit(1)`（`repo://scripts/evaluate_retrieval.py#L224-L242`）。样本量只有 5 条，**只验证评估链路本身，不代表生产检索效果**（README 与 quickstart 均明确此局限）。
+`admission_passed` 要求三个门槛同时满足（`repo://scripts/evaluate_retrieval.py#L48-L52`、`#L205-L206`）；`main` 在占位 chunk id 未替换或未过门槛时 `SystemExit(1)`（`repo://scripts/evaluate_retrieval.py#L224-L242`）。门槛语义由 `tests/test_evaluate_retrieval.py` 与 `tests/test_evaluation_scripts.py` 守护：纯权限样本不计入召回分母（ISSUE-28 修正了权限负例拉低召回、门槛永远无法通过的门禁缺陷）。
 
 ### 3.4 产物可复现
 
@@ -176,15 +191,17 @@ uv run python scripts/evaluate_answers_e2e.py --dataset scripts/evaluate_answers
 
 ## 7. 附属评估脚本
 
-- **`scripts/evaluate_answers.py`**：离线验证回答的引用、数字与幻觉指标——`ComprehensiveVerifier.verify` 的 `numeric_accuracy`、`citation_accuracy`（≥0.95）、`hallucination_rate`（≤0.05）、`expected_outcome_accuracy`（=1.0）作为准入门槛；
+- **`scripts/evaluate_answers.py`**：离线验证回答的引用、数字与幻觉指标——`numeric_accuracy=1.0`、`citation_accuracy≥0.95`、`hallucination_rate≤0.05`、`expected_outcome_accuracy=1.0` 作为准入门槛；`expected_outcome_accuracy` 只统计带预期结论标注的样本（ISSUE-28：不可回答/负例分层到门槛之外，否则分母混入负例会让门槛永远无法达标，`tests/test_evaluation_scripts.py::test_answer_evaluation_stratifies_negative_samples_out_of_gates` 锁定）；
 - **`scripts/evaluate_compliance.py`**：合规拦截准确率与受限内容泄漏率，准入要求 `block_accuracy == 1.0` 且 `leakage_rate == 0.0`；
 - **`scripts/evaluate_conversations.py`**：确定性执行会话隔离、删除、request_id 幂等、审计完成与“当前轮只含本轮引用”五组检查，准入要求全部通过；
 - **`src/evaluation/retrieval_eval.py`**：更早的检索质量脚本（内置 5 条用例，Hit@K/MRR/空结果率/平均分，CI 用 Hit@K < 60% 时非零退出）——与 `evaluate_retrieval.py` 并存，后者是按 chunk_id 标注的正式检索评估。
 
 ## 8. 局限与定位建议
 
-- **内置评估集很小**：`evaluate_retrieval.sample.json` 只有 5 条且部分 `relevant_chunk_ids` 可能仍为占位（脚本检测 `replace_me_`/`example_`/`sample_` 前缀并提示）；`evaluate_answers.dataset.json` 约 25 条、标注的是关键词命中而非人工打分。这些集子只证明**评估链路可运行**，不能据此宣称生产 recall/MRR/回答质量。
+- **评估集由生成器派生的偏差**：`tests/evaluation/` 四份数据集规模与门槛已满足 impl-08 §3 且绑定真实 chunk_id（ISSUE-28），但查询是从 chunk 文本截取生成的，与真实用户查询分布不同——召回数字可能偏乐观；answers 标注是从 chunk 摘录的期望答案而非人工打分。它们证明**门禁可运行且当前语料可过门槛**，不能替代真实标注集与人工评审。
+- **重入库后必须重跑生成器**：chunk_id 随入库变化，旧数据集的 `relevant_chunk_ids` 会整体失效。
+- **默认参数陷阱**：`evaluate_retrieval.py` 不带参数跑的是 5 条最小样例集，只证明链路；正式评估必须显式传 `tests/evaluation/retrieval.json`。
 - **demo token 与样例数据**只证明流程，不证明生产安全性、吞吐量或回答质量；固定 token 不能替代生产 IdP/签名 token/授权策略。
-- **事件分级阈值**（P0/P1/P2，见 [数据与离线作业](../operations/data-and-jobs.md)）与检索准入阈值均为启发式起点，未经真实标注数据标定。
+- **事件分级阈值**（P0/P1/P2，见 [数据与离线作业](../operations/data-and-jobs.md)）为启发式起点，未经真实标注数据标定；检索/回答/合规准入门槛定义明确且可复现，但过门槛不等于生产效果达标。
 - **LLM-as-Judge 是相对信号**：评判模型、温度（默认 0.0）与截断长度都会影响分数；合规/准确率等硬门槛仍应配合规则-based 检查（`rule_based_checks`）共同判定。
 - **定位建议**：想验证某次改动不破坏权限/检索/合规契约，跑 `uv run pytest`（重点 `tests/e2e` 的 TC 用例）；想量化检索或回答质量，跑评估脚本并核对产物 JSON；两者都不能替代真实数据上的标注集与人工评审。

@@ -1,8 +1,8 @@
 {
-  "updatedAt": "2026-09-27T16:40:28.100Z",
+  "updatedAt": "2026-09-29T16:34:25.134Z",
   "command": "update",
-  "gitHead": "92aa74e91cea66c8376271f27bf3975182eadb15",
-  "model": "deepseek-v4-flash-ga-260731",
+  "gitHead": "a95b385932ba2f6906272225084c06ef7e06cef5",
+  "model": "host-agent/codex",
   "status": "complete",
   "language": "zh-CN"
 }

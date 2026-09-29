@@ -3,16 +3,19 @@ type: operations reference
 title: 数据与离线作业：样例数据、证券数据抓取、持仓与每日扫描
 description: 覆盖 SecRAG 的数据资产与离线批处理：data/raw 样例知识库与真实证券数据产物的结构与用途、fetch_real_securities_data.py 的批量抓取（运行时成分股解析、内容哈希幂等、失败隔离、水位文件）、按 user_id 隔离的持仓/关注池持久化，以及 run_daily_scan 每日扫描、P0/P1/P2 事件分级与去重/水位不变式。
 tags: [data, jobs, portfolio, daily-scan, securities]
-verified:
-  - by: openwiki/0.5.2
-    at: 2026-09-27T15:51:42.447Z
 sources:
-  - id: openwiki-source-cc6d12e7aed6af0bd606cc8f
-    resource: repo://data/raw/real_securities_data/metadata.json
+  - id: openwiki-source-ea70eb6c045047448e446296
+    resource: repo://.gitignore
+  - id: openwiki-source-2f10ce43ab45d95dffa4c57e
+    resource: repo://data/raw/real_securities_data/announcements/000001_2026.pdf.meta.json
   - id: openwiki-source-23775c3de52f3ab95a13cb8b
     resource: repo://README.md
+  - id: openwiki-source-19790087f881f66577a265be
+    resource: repo://scripts/benchmark_models.py
   - id: openwiki-source-f3a2c33274fc63ce9fd2856a
     resource: repo://scripts/fetch_real_securities_data.py
+  - id: openwiki-source-3ee69dfa0e6877969569dbe9
+    resource: repo://scripts/load_test.py
   - id: openwiki-source-534964cb1b850682e5648457
     resource: repo://src/jobs/daily_scan.py
   - id: openwiki-source-ef07c263c835918901e512db
@@ -25,7 +28,10 @@ sources:
     resource: repo://tests/test_fetch_real_securities_data.py
   - id: openwiki-source-53ea10bea5311ab9351b507e
     resource: repo://tests/test_portfolio_store.py
-generated: { by: "openwiki/0.5.2", at: "2026-09-27T15:51:42.447Z" }
+generated: { by: "codex", at: "2026-09-29T15:40:40.317Z" }
+verified:
+  - by: openwiki/0.6.1
+    at: 2026-09-29T15:40:40.317Z
 ---
 
 # 数据与离线作业：样例数据、证券数据抓取、持仓与每日扫描
@@ -75,9 +81,11 @@ flowchart TD
 - `announcements/`：年报 PDF 及其同名 `.meta.json`（cninfo，`permission_level=internal`，角色 `advisor/institutional_sales/compliance`）；
 - `reports/`：研报 PDF 及其 `.meta.json`（akshare/eastmoney，`permission_level=public`，角色含 `operations/technical`）；
 - `financials/`：行情/估值 CSV（`efinance_*_quote_history.csv`、`baostock_*_valuation.csv`）与共享的 `research_reports_index.csv`；
-- `metadata.json`：整目录产物清单，逐文件记录 doc_type、title、date、stock_code、source、provider、sha256。
+- 逐文件同名 `.meta.json` 边车：记录 doc_type、retrieval_source、permission_level、allowed_roles、title、date、stock_code、source、provider、sha256（整目录聚合清单 `metadata.json` 已停止跟踪并从仓库移除，产物清单以边车为准）。
 
-每个工件旁的同名 `.meta.json` 边车（sidecar）同时作为**内容哈希幂等**与**每日扫描文档候选**的依据。仓库固定这些样本，用于保证本地解析、入库与扫描验证不依赖实时抓取。
+当前固定样本是 2026-09 演练刷新的三只代表股（000001 / 300750 / 600519）的 2026 年报与配套数据（`63a7d66`）。
+
+每个工件旁的同名 `.meta.json` 边车（sidecar）同时作为**内容哈希幂等**与**每日扫描文档候选**的依据。仓库固定这些样本，用于保证本地解析、入库与扫描验证不依赖实时抓取。`.fetch_state.json` / `.fetch_failures.json` 水位与失败清单是机器本地产物，已加入 `.gitignore` 不再入库。
 
 ## 3. 批量抓取：`scripts/fetch_real_securities_data.py`
 
@@ -125,6 +133,11 @@ uv run --with akshare --with efinance --with baostock \
 - **约束**：同一用户同一 side 的活跃重复标的抛 `DuplicatePositionError`；`weight` 必须在 `[0,100]`，side/source 取枚举，否则 `InvalidPositionError`。
 
 `list_symbols_for_user(user_id)` 返回该用户去重、排序后的活跃代码集合（默认含持仓与关注两侧），是每日扫描的输入来源。
+
+## 4.1 离线运维脚本
+
+- `scripts/benchmark_models.py`：模型分层选型的实测依据（ISSUE-20）——对候选模型测 TTFT 与吞吐，输出选型报告（结论沉淀在 `todo/model-tiering-report-20260929.md`），`config.openai_plan_model` 的取值由此支撑；
+- `scripts/load_test.py`：并发压测入口，用于验证限流、SSE 流式与请求级截止时间在负载下的行为。
 
 ## 5. 每日扫描与事件分级
 

@@ -14,8 +14,8 @@ sources:
     resource: repo://pyproject.toml
   - id: openwiki-source-23775c3de52f3ab95a13cb8b
     resource: repo://README.md
-  - id: openwiki-source-843a58e144ca2fc962ad5954
-    resource: repo://scripts/check_permissions.py
+  - id: openwiki-source-35400c2ee9759f3c50d9c6d1
+    resource: repo://scripts/build_evaluation_datasets.py
   - id: openwiki-source-d7ed0bb14d48547c9f500bad
     resource: repo://scripts/demo.py
   - id: openwiki-source-04483c0b1d79bc8b0b0b799f
@@ -52,10 +52,12 @@ sources:
     resource: repo://src/utils/semantic_cache.py
   - id: openwiki-source-d61d83066a37e33b8d45f791
     resource: repo://start.sh
-generated: { by: "openwiki/0.5.2", at: "2026-09-27T15:51:42.447Z" }
+  - id: openwiki-source-d9d4eeeef2d8e15b49f18560
+    resource: repo://tests/test_legacy_ui_removal.py
+generated: { by: "codex", at: "2026-09-29T15:40:40.317Z" }
 verified:
-  - by: openwiki/0.5.2
-    at: 2026-09-27T15:51:42.447Z
+  - by: openwiki/0.6.1
+    at: 2026-09-29T15:40:40.317Z
 ---
 
 # 快速开始：从启动服务到第一次问答
@@ -159,11 +161,11 @@ uv run uvicorn src.api.main:app --host 127.0.0.1 --port 8000
 
 | 地址或接口 | 用途 |
 | --- | --- |
-| `http://127.0.0.1:8000/` | 前端 UI：存在 `frontend/dist` 构建产物时服务 React SPA，否则回退旧版 HTML UI（`/legacy` 始终可访问旧 UI） |
+| `http://127.0.0.1:8000/` | 前端 UI：React SPA（唯一 UI；`frontend/dist` 缺失时启动直接失败，先 `cd frontend && npm run build`） |
 | `http://127.0.0.1:8000/admin` | 知识库管理后台（admin 角色） |
 | `http://127.0.0.1:8000/docs` | FastAPI 自动生成的 Swagger UI |
 | `POST /v1/assistant/qa` | 问答接口（普通 JSON） |
-| `POST /v1/assistant/qa/stream` | 问答接口（SSE 流式，逐节点进度 + 终态 answer 事件） |
+| `POST /v1/assistant/qa/stream` | 问答接口（SSE 流式：逐节点 progress + reason token 的 answer_delta 增量 + 终态 answer 事件） |
 | `/v1/assistant/threads*` | 会话创建、查询和删除 |
 | `/v1/admin/ingestion/*` | technical 角色的入库管理 |
 | `/v1/admin/documents*` | admin/technical 的知识库列表、统计、chunk 详情、搜索与删除 |
@@ -210,7 +212,7 @@ curl -X POST http://127.0.0.1:8000/v1/assistant/qa \
 - `compliance`：合规检查结果；
 - `thread_id` / `turn_id`：会话和轮次标识。
 
-完整审计链路不会通过这个接口返回，而是由服务端写入 SQLite。答案语义缓存默认关闭；开启后也只缓存验证与合规均通过的成功终态，且按角色隔离。
+完整审计链路不会通过这个接口返回，而是由服务端写入 SQLite。答案语义缓存默认启用（ISSUE-26）：缓存条目绑定身份、授权范围、客户上下文、规范化问题、上下文摘要与知识库版本六维后才能命中，且只缓存验证与合规均通过的成功终态，命中路径仍补审计并保存会话回合。
 
 ## 6. 运行两个内置演示场景
 
@@ -220,7 +222,7 @@ curl -X POST http://127.0.0.1:8000/v1/assistant/qa \
 uv run python scripts/demo.py
 ```
 
-脚本会调用当前环境配置的真实 LLM，演示一个允许查询和一个因角色权限受限的查询，并检查回答、引用、置信度和合规字段；任一断言失败会以非零码退出。完整审计只在服务端持久化，不通过问答接口返回。
+脚本会调用当前环境配置的真实 LLM，运行允许查询（faq 检索）与权限受限查询（advisor 问内部制度：计划级拒绝 + 结果级拒绝两种形态，失败自动重试以吸收 LLM 采样方差）两类场景，并检查回答、引用、置信度和合规字段；任一断言失败会以非零码退出。完整审计只在服务端持久化，不通过问答接口返回。
 
 固定 demo token 只适合本地演示，不能替代生产环境的 IdP、签名 token 和授权策略。
 
@@ -236,7 +238,7 @@ uv run python scripts/demo.py
 6. 查字段名、枚举值与 `AssistantState` 定义时读 [共享模式](concepts/schemas-and-state.md)，那里是全项目字段常量的唯一权威；
 7. 想搞清 ReAct 工具子系统时读 [工具边界](architecture/tool-boundaries.md)，理解工具注册表、`get_tools_for_role` 的可见性规则（非检索工具必须显式列入白名单）与 `authorize_reason_tool_call` 的四重执行边界检查；
 8. 需要理解样例数据、真实证券数据抓取与每日扫描分级时读 [数据与离线作业](operations/data-and-jobs.md)；
-9. 想跑检索评估或权限冒烟检查时读 [测试与评估](testing/evaluation.md)，了解 `scripts/evaluate_retrieval.py` 与 `scripts/check_permissions.py` 的用法和内置评估集的局限；
+9. 想跑评估或权限冒烟检查时读 [测试与评估](testing/evaluation.md)，了解四份准入评估数据集（`scripts/build_evaluation_datasets.py` 生成、绑定真实 chunk_id）与 `scripts/evaluate_retrieval.py`、`scripts/check_permissions.py` 的用法；重入库后必须重跑生成器；
 10. 部署与排障时读 [观测与运维](operations/observability.md)，了解 SQLite 审计、Prometheus 指标、Langfuse 追踪的隐私红线与 fail-open 语义、缓存与限流。
 
 开发验证命令：
@@ -245,5 +247,7 @@ uv run python scripts/demo.py
 uv run ruff check .
 uv run pytest
 ```
+
+开发提示：`./start.sh` 会按 `BUILD_FRONTEND=auto` 自动构建前端；服务启动时后台预热图编译、向量引擎与 BM25 全量索引（ISSUE-16），SQLite 全部走 WAL（ISSUE-18），首个请求不承担冷启动开销。
 
 这个项目是架构验证原型，不是生产系统；样例数据和固定 token 仅用于本地学习与测试。当前已知边界包括：内存 checkpointer（服务重启不恢复图执行状态）、单机 SQLite 与单进程后台入库（不支持多实例）、事件分级阈值未经真实标注数据标定。

@@ -1,20 +1,24 @@
 ---
 type: architecture reference
 title: API 表面与前端契约
-description: 完整列出 SecRAG 的 HTTP 公共表面：Bearer demo token 认证、问答与 SSE 流式事件协议、会话线程接口、technical 角色入库管理、admin 知识库管理、健康检查与 Prometheus 指标端点，以及 React 前端的消费契约与错误映射。
+description: 完整列出 SecRAG 的 HTTP 公共表面：Bearer demo token 认证、问答与 SSE 流式事件协议（progress/answer_delta/answer/error/done）、会话线程接口、technical 角色入库管理、admin 知识库与语义缓存管理、健康检查与 Prometheus 指标端点，以及 React 前端（唯一 UI）的消费契约、markdown 渲染与错误映射。
 tags: [architecture, api, http, sse, authentication, frontend, contract]
 verified:
-  - by: openwiki/0.5.2
-    at: 2026-09-27T10:44:22.630Z
+  - by: openwiki/0.6.1
+    at: 2026-09-29T15:40:40.317Z
 sources:
   - id: openwiki-source-8d0c2988b5838a5fe14cf2c8
     resource: repo://frontend/src/api.ts
   - id: openwiki-source-454c9bcdde0b77b35e0fc994
     resource: repo://frontend/src/App.tsx
+  - id: openwiki-source-8210effc458ff4a49d2f7ce6
+    resource: repo://frontend/src/components/ChatMessage.tsx
   - id: openwiki-source-c58f7ee64982dfe4fd0b1350
     resource: repo://frontend/src/pages/ChatPage.tsx
   - id: openwiki-source-4d10b5c0828b5f460d7fa71a
     resource: repo://frontend/src/types.ts
+  - id: openwiki-source-3f6bb9bee37ba21bfbcd6ed1
+    resource: repo://frontend/src/utils/markdown.ts
   - id: openwiki-source-ce706aa9fc0c231bbb5791c7
     resource: repo://src/agents/graph.py
   - id: openwiki-source-53bdf62a9d0ee4ca3a837299
@@ -23,8 +27,6 @@ sources:
     resource: repo://src/api/ingestion.py
   - id: openwiki-source-9abd0efc90fa978f061bb160
     resource: repo://src/api/main.py
-  - id: openwiki-source-ef91a225debc4c408188440f
-    resource: repo://src/api/ui.py
   - id: openwiki-source-d502c275990c6476221bf080
     resource: repo://src/config.py
   - id: openwiki-source-4dfdfeeb2b9b7a100ac96cee
@@ -43,7 +45,11 @@ sources:
     resource: repo://tests/test_api_main.py
   - id: openwiki-source-746596f8af92d3df92366719
     resource: repo://tests/test_api_routes.py
-generated: { by: "openwiki/0.5.2", at: "2026-09-27T15:51:42.447Z" }
+  - id: openwiki-source-d9d4eeeef2d8e15b49f18560
+    resource: repo://tests/test_legacy_ui_removal.py
+  - id: openwiki-source-ab69a88b6b4ee9810dd4b942
+    resource: repo://tests/test_stream_progress_contract.py
+generated: { by: "codex", at: "2026-09-29T15:40:40.317Z" }
 ---
 
 # API 表面与前端契约
@@ -52,7 +58,7 @@ generated: { by: "openwiki/0.5.2", at: "2026-09-27T15:51:42.447Z" }
 
 ```mermaid
 flowchart LR
-    FE["React SPA / 旧版 HTML UI"] -->|"Bearer token"| API["FastAPI 应用 src/api/main.py"]
+    FE["React SPA（唯一 UI）"] -->|"Bearer token"| API["FastAPI 应用 src/api/main.py"]
     API --> AUTH["authenticate_user 依赖注入"]
     API -->|"POST /v1/assistant/qa"| QA["assistant_qa"]
     API -->|"POST /v1/assistant/qa/stream"| SSE["assistant_qa_stream SSE"]
@@ -60,10 +66,10 @@ flowchart LR
     API -->|"/v1/admin/ingestion/*"| ING["ingestion router technical-only"]
     API -->|"/v1/admin/documents* / cache* / stats"| ADM["KnowledgeBaseManager / SemanticCache"]
     API -->|"/health /metrics"| OBS["MetricsRegistry / ChromaVectorRetriever"]
-    API -->|"SPA catch-all 最后注册"| SPA["返回 frontend/dist/index.html"]
+    API -->|"静态资源与 SPA catch-all"| SPA["frontend/dist"]
 ```
 
-HTTP 表面总览：所有业务端点（除 `/health`、`/metrics`、静态与 UI 页面）都要求 Bearer token；图内部节点流程不在此页展开。
+HTTP 表面总览：所有业务端点（除 `/health`、`/metrics`、静态与 UI 页面）都要求 Bearer token；图内部节点流程不在此页展开。旧版 HTML UI（`src/api/ui.py`/`ui.html`/`admin.html` 与 `/legacy` 路由）已整体删除，React SPA 是唯一 UI，`frontend/dist` 构建产物缺失时服务启动直接失败。
 
 ## 1. 认证契约：只相信 Bearer token
 
@@ -128,23 +134,25 @@ demo token 只适合本地演示，不能替代生产 IdP 与签名 token。
 
 ### 2.4 语义缓存（admin / technical）
 
+缓存自 ISSUE-26 起默认启用（`config.semantic_cache_enabled` 默认 `True`），绑定身份、授权范围、客户上下文、规范化问题、上下文摘要与知识库版本六维后才能命中；运维语义详见[观测与运维](../operations/observability.md)。
+
 | 方法与路径 | 角色 | 说明 |
 | --- | --- | --- |
 | `GET /v1/admin/cache/stats` | admin/technical | 缓存条目数、命中率（真实 lookup 口径）、阈值、TTL、enabled |
 | `POST /v1/admin/cache/clear?clear_expired_only=` | admin/technical | `false`（默认）全清；`true` 只清过期条目，返回 `{cleared, mode}` |
 
-### 2.5 健康检查、指标与 UI
+### 2.5 健康检查、指标与静态页面
 
 | 方法与路径 | 说明 |
 | --- | --- |
 | `GET /health` | 存活检查：`{status: "ok", timestamp, chroma: {status, doc_count}, metrics: {...}}`。ChromaDB 异常只把 `chroma.status` 置为 `"error"`，整体仍返回 200，避免负载均衡器摘除节点；`metrics` 是 `MetricsRegistry.get_summary()` 摘要（uptime、查询数、成功率和延迟百分位等） |
 | `GET /metrics` | Prometheus 文本格式导出（`text/plain; version=0.0.4`），指标清单见[观测与运维](../operations/observability.md) |
-| `GET /` | 存在 `frontend/dist` 时返回 React `index.html`，否则渲染旧版 HTML UI |
-| `GET /legacy` | 始终返回旧版 HTML UI（React 启用时也保留） |
-| `GET /admin` | React 构建产物存在时返回 `index.html` 由前端路由处理，否则返回 `src/api/admin.html` |
-| `GET /{full_path:path}` | SPA catch-all：非 `v1/`、`health`、`metrics`、`docs`、`openapi.json` 前缀且构建产物存在时返回 `index.html`，否则 404 |
+| `GET /` | 返回 React SPA `frontend/dist/index.html`（旧版 HTML UI 已删除） |
+| `GET /admin` | 返回 React `index.html`，由前端 `AdminPage` 路由接管 |
+| `GET /assets/*` | `StaticFiles` 挂载的 `frontend/dist/assets` 静态资源 |
+| `GET /{full_path:path}` | SPA catch-all：非 `v1/`、`health`、`metrics`、`docs`、`openapi.json` 前缀时返回 `index.html`，否则 404 |
 
-SPA 通配路由必须注册在所有业务路由之后（`src/api/main.py` 注释明确要求）：Starlette 按注册顺序匹配路径，若通配 GET 先注册会截走 `/health`、`/metrics` 等接口。`tests/test_api_routes.py::test_unknown_api_path_returns_404_not_index_html` 通过真实 ASGI 栈验证未知 API 路径返回 404 而不是 index.html。
+React 构建产物是硬前置：模块导入时 `_ensure_frontend_dist()` 检查 `frontend/dist` 是否存在，缺失直接 `RuntimeError`（提示 `cd frontend && npm run build`）终止启动，不再有任何 HTML 兜底。SPA 通配路由必须注册在所有业务路由之后（`src/api/main.py` 注释明确要求）：Starlette 按注册顺序匹配路径，若通配 GET 先注册会截走 `/health`、`/metrics` 等接口。`tests/test_api_routes.py::test_unknown_api_path_returns_404_not_index_html` 通过真实 ASGI 栈验证未知 API 路径返回 404 而不是 index.html。
 
 ## 3. 问答端点：POST /v1/assistant/qa
 
@@ -178,7 +186,7 @@ SPA 通配路由必须注册在所有业务路由之后（`src/api/main.py` 注�
 关键契约：
 
 - **内部 `audit_trail` 不暴露**：`AssistantQAResponse` 不声明该字段，OpenAPI schema 与响应体都没有；测试断言 `audit_trail` 不在 `app.openapi()` 的 schema properties 中；
-- **语义缓存内部字段不进响应体**：缓存命中与普通执行统一经 `_qa_response_from_outcome` 出口返回同一个结构，`cached`/`cache_similarity` 只进指标与审计（`tests/test_api_routes.py::test_qa_endpoint_cache_hit_returns_stored_compliance` 断言这两个键不在响应中）；
+- **语义缓存内部字段不进响应体**：缓存命中与普通执行统一经 `_qa_response_from_outcome` 出口返回同一个结构，`cached`/`cache_similarity` 只进指标与审计（`tests/test_api_routes.py::test_qa_endpoint_cache_hit_returns_stored_compliance` 断言这两个键不在响应中）；命中响应的 `compliance`/验证终态来自缓存条目存储时的快照；
 - 响应模型不含 `verification`，只有 `compliance`；
 - 图执行整体受 `asyncio.wait_for(agent.invoke, api_request_timeout_seconds)` 总超时约束（默认 60 秒，`config.api_request_timeout_seconds`）。
 
@@ -191,7 +199,8 @@ SPA 通配路由必须注册在所有业务路由之后（`src/api/main.py` 注�
 | 事件名 | data 载荷 | 语义 |
 | --- | --- | --- |
 | `progress` | `{"type": "progress", "node": "...", "status": "done"}` | 节点完成进度，只转发 `CLIENT_PROGRESS_NODES` 白名单 |
-| `answer` | `{"type": "answer", "answer", "citations", "confidence", "thread_id", "turn_id"}` | 终态回答（唯一一次完整载荷） |
+| `answer_delta` | `{"type": "answer_delta", "delta": "..."}` | reason 节点 LLM 的 token 级增量（ISSUE-9），先于 answer 流出 |
+| `answer` | `{"type": "answer", "answer", "citations", "confidence", "thread_id", "turn_id"}` | 终态回答（唯一一次完整载荷，前端以其为准覆盖增量） |
 | `error` | `{"type": "error", "detail"}` | 处理异常或限流 |
 | `done` | `{"type": "done"}` | 流正常结束，总是最后发出 |
 
@@ -201,22 +210,21 @@ sequenceDiagram
     participant S as FastAPI SSE 端点
     F->>S: POST /v1/assistant/qa/stream (Bearer token)
     S-->>F: event: progress, data {"type":"progress","node":"query_understand","status":"done"}
-    S-->>F: event: progress, data {"type":"progress","node":"planner","status":"done"}
-    S-->>F: event: progress, data {"type":"progress","node":"retrieve","status":"done"}
-    S-->>F: event: progress, data {"type":"progress","node":"grade_and_filter","status":"done"}
-    S-->>F: event: progress, data {"type":"progress","node":"reason","status":"done"}
-    S-->>F: event: progress, data {"type":"progress","node":"verify","status":"done"}
+    S-->>F: event: answer_delta, data {"type":"answer_delta","delta":"货币基金…"}
+    S-->>F: event: answer_delta, data {"type":"answer_delta","delta":"…"}
     S-->>F: event: progress, data {"type":"progress","node":"compose","status":"done"}
-    S-->>F: event: answer, data {"type":"answer","answer":"...","citations":[...],"confidence":"...","thread_id":"...","turn_id":"..."}
+    S-->>F: event: answer, data {"type":"answer","answer":"完整回答","citations":[...],"confidence":"...","thread_id":"...","turn_id":"..."}
     S-->>F: event: done, data {"type":"done"}
 ```
+
+`answer_delta` 的产生方式：`agent.astream` 以 `stream_mode=["updates", "messages"]` 且 `subgraphs=True` 运行，产出 `(namespace, mode, data)` 三元组；只有 `chunk_metadata["langgraph_node"] == "call_reason_model"` 的字符串 token 才转成 `answer_delta` 下发——`query_understand`/`planner` 的 JSON 输出与工具调用轮次的中间文本不得进入回答流。首个 `answer_delta` 到达时记录一次 TTFT 指标（`record_ttft`，ISSUE-23）。
 
 SSE 契约约束：
 
 - **`data.type` 必须与 event 名一致**——后端每个事件都带与 event 名相同的 `type` 字段，前端按同一契约解析（issues.md 一.3）；
-- **`progress` 只转发图模块声明的 `CLIENT_PROGRESS_NODES`**：`query_understand`、`planner`、`retrieve`、`grade_and_filter`、`reason`、`verify`、`compose`（`src/agents/graph.py` 的 frozenset）。传输层不解释节点语义、不推断终态；
+- **`progress` 只转发图模块声明的 `CLIENT_PROGRESS_NODES`**：`query_understand`、`planner`、`retrieve`、`grade_and_filter`、`reason`、`verify`、`compose`（`src/agents/graph.py` 的 frozenset）。传输层不解释节点语义、不推断终态；子图内部节点（namespace 非空）不外发进度；
 - **`answer` 事件以节点输出同时含 `STATE_TERMINAL` 且带 `final_answer` 为准**，不按节点名推断：`compose`（正常回答/验证失败/合规拦截）、`clarify`（澄清）、`permission_denied_response`（权限拒绝）按此契约声明终态；ReAct 尝试的中间 `final_answer` 不带 terminal 标记，不会误发 answer；
-- 整条流受 `asyncio.timeout(config.api_request_timeout_seconds)` 总超时约束；超时或异常先发 `error` 事件，正常路径最后必发 `done`；
+- 整条流受 `asyncio.timeout(config.api_request_timeout_seconds)` 总超时约束；超时或异常先发 `error` 事件，正常路径最后必发 `done`；同步 SQLite 会话调用经 `asyncio.to_thread` 移出事件循环（ISSUE-18）；
 - **限流以 `status_code=429` 的 SSE error 事件返回**，而不是普通 HTTP 错误体；错误事件也保证 `data.type == "error"`；
 - 客户端断连（`GeneratorExit`/`CancelledError`）不发 done，但 `finally` 中必须收尾 Langfuse trace（标记 `client_disconnected`/`cancelled`）；
 - 图执行前的准备阶段异常（如 `ensure_thread_for_qa` 抛错）以 `event: error` + `{"detail": str(exc)}` 发出后 return，不发 done。
@@ -276,7 +284,7 @@ SSE 契约约束：
 
 ## 8. React 前端消费契约
 
-前端是 Vite + React 18 + react-router-dom 6 的 SPA（`frontend/package.json`），源码在 `frontend/src`。开发时 `vite.config.ts` 把 `/v1`、`/health`、`/metrics` 代理到 `127.0.0.1:8000`；生产时由 FastAPI 直接挂载 `frontend/dist`。
+前端是 Vite + React 18 + react-router-dom 6 的 SPA（`frontend/package.json`），源码在 `frontend/src`，是 SecRAG 唯一的用户界面。开发时 `vite.config.ts` 把 `/v1`、`/health`、`/metrics` 代理到 `127.0.0.1:8000`；生产时由 FastAPI 直接挂载 `frontend/dist`（缺失即启动失败，见 2.5 节）。
 
 ### 8.1 token 存储
 
@@ -298,7 +306,7 @@ SSE 契约约束：
 
 `request<T>` 统一处理：非 2xx 抛 `HTTP <status>: <body>`，204 返回 `undefined` 而不是解析 JSON。
 
-### 8.3 SSE 解析器
+### 8.3 SSE 解析器与事件消费
 
 `streamQuestion` 用手写解析器而不是 `EventSource`（后者只支持 GET）：
 
@@ -310,17 +318,26 @@ SSE 契约约束：
 `ChatPage.tsx` 的事件消费：
 
 - `progress`：`setCurrentNode(event.node)`，驱动 `StreamingProgress` 组件按 `STREAM_NODES`（`types.ts` 里 7 个带中文 label 的节点）显示“AI 思考中”进度条；
-- `answer`：更新助手消息的 `content`/`citations`/`confidence`，做打字机效果，并把 `thread_id` 回写 `currentThreadId` 以便后续问题沿用同一会话；
+- `answer_delta`：把 `event.delta` 追加到当前助手消息内容（真流式渲染，无假打字机；`tests/test_stream_progress_contract.py` 明确禁止 `setInterval` 式假流）；
+- `answer`：以终态载荷覆盖助手消息的 `content`/`citations`/`confidence`，并把 `thread_id` 回写 `currentThreadId` 以便后续问题沿用同一会话；
 - `error`：把消息内容替换为 `错误: <detail>`；
 - `done`：清空当前节点、标记流结束。
 
 同步路径（`streamEnabled` 关闭时）用 `askQuestion` 的结果回写 `thread_id` 与完整响应字段。
 
-### 8.4 角色选择必须与后端一致
+### 8.4 回答按 markdown 渲染
 
-`ChatPage.tsx` 顶部注释明确：**`ROLES` 的角色取值必须与后端 `TOKEN_USER_BINDINGS` 一致**。前端五个选项 `demo-advisor` / `demo-sales` / `demo-compliance` / `demo-ops` / `demo-tech` 与第 1 节的绑定表一一对应。旧版 HTML UI 也通过 `src/api/ui.py::_render_identity_options` 用同一张 `TOKEN_USER_BINDINGS` 生成角色下拉，若两者漂移会抛 `RuntimeError`（`ROLE_UI_OPTIONS` 校验）。
+`frontend/src/utils/markdown.ts` 的 `formatAnswerHTML` 是助手回答的渲染入口（`ChatMessage.tsx` 经 `dangerouslySetInnerHTML` 注入）：先整体 HTML 转义，再执行 markdown 变换（`##` 标题、`**` 加粗、行内代码、管道表格、有序/无序列表、段落与换行），因此输出中唯一可能出现的 HTML 都是该函数自己生成的，不存在用户内容注入路径。该能力自旧版 `ui.html` 的 `formatAnswerHTML` 移植而来。
 
-### 8.5 React 路由
+### 8.5 角色选择必须与后端一致
+
+`ChatPage.tsx` 顶部注释明确：**`ROLES` 的角色取值必须与后端 `TOKEN_USER_BINDINGS` 一致**。前端五个选项 `demo-advisor` / `demo-sales` / `demo-compliance` / `demo-ops` / `demo-tech` 与第 1 节的绑定表一一对应。
+
+### 8.6 前后端进度节点契约
+
+`types.ts` 的 `STREAM_NODES`（key + 中文 label）的 key 必须与后端 `src/agents/graph.py` 的 `CLIENT_PROGRESS_NODES` 完全一致：SSE `progress` 事件携带的就是这些图节点注册名，前端靠 `findIndex` 匹配显示进度步骤，两侧漂移时所有步骤永久灰置（ISSUE-5 的真实故障形态）。`tests/test_stream_progress_contract.py` 从两侧源码解析并断言集合相等、key 唯一，同时守护 `answer_delta` 的事件类型声明与 ChatPage 的真流式消费。
+
+### 8.7 React 路由
 
 `App.tsx` 定义两条路由：
 
@@ -330,7 +347,7 @@ SSE 契约约束：
 | `/admin` | `AdminPage`（知识库管理后台） |
 | `*` | 重定向到 `/` |
 
-后端 `GET /`、`GET /admin` 在 `frontend/dist` 存在时都返回 React `index.html`，由前端路由接管；无构建产物时分别回退旧版 HTML UI（`render_ui_html()` / `src/api/admin.html`），`/legacy` 始终可访问旧 UI。SPA catch-all 保证 `/admin` 等前端路径刷新不 404（前提是路径不以 `v1/`、`health`、`metrics`、`docs`、`openapi.json` 开头）。
+后端 `GET /`、`GET /admin` 都返回 React `index.html`，由前端路由接管；SPA catch-all 保证 `/admin` 等前端路径刷新不 404（前提是路径不以 `v1/`、`health`、`metrics`、`docs`、`openapi.json` 开头）。
 
 `AdminPage` 聚合 `listDocuments`/`getDocumentStats`/`getCacheStats`（并行加载），提供文档列表、chunk 详情弹窗、按 source 删除、语义搜索预览。
 
@@ -340,4 +357,5 @@ SSE 契约约束：
 - [状态、权限与安全边界](state-and-safety.md)：`AssistantState` 字段与认证、检索权限、工具授权、验证、合规、审计分层；
 - [共享模式：字段常量与 AssistantState](../concepts/schemas-and-state.md)：`STATE_*`/`API_ROUTE_*` 等常量的唯一权威来源；
 - [快速开始](../quickstart.md)：启动服务与第一条 curl 问答；
-- [知识入库链路](../tutorials/knowledge-ingestion.md)：入库管理与后台执行的完整流程。
+- [知识入库链路](../tutorials/knowledge-ingestion.md)：入库管理与后台执行的完整流程；
+- [观测与运维](../operations/observability.md)：语义缓存运维语义、指标清单与追踪接线。

@@ -1,14 +1,18 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:cfd0dc7898ff83c61e3db06aaa8aa584c5968a1751debcca08da519ce41f5a6e",
+  "pageVersion": "sha256:66dad62e075b13e90737b02148f81e4a2597ed48a315acaa250d5b768fd1a618",
   "claims": [
     {
       "id": "claim_9487b0411eee4d238b8d3a242a0c91bf",
-      "statement": "HybridRetriever 是检索计划执行的唯一入口：按角色先做计划级权限过滤、逐 source 实例化领域检索器执行向量+BM25 混合检索、再做结果级权限过滤并返回带权限控制的结果列表；它本身不生成计划、不循环调用 Planner，多跳次数由 Agent Graph 条件路由控制。",
+      "statement": "HybridRetriever 是检索计划执行的唯一入口：按角色先做计划级权限过滤、逐 source 实例化领域检索器执行向量+BM25 混合检索、再做结果级权限过滤并返回带权限控制的结果列表；它本身不生成计划、不循环调用 Planner，多跳由 Agent Graph 条件路由 should_retry_retrieval 控制并经 RETRIEVAL_RETRY_ROUTES 给出五种出口（continue/retrieve/widen/denied/no_results）。",
       "evidence": [
         {
-          "resource": "repo://src/agents/nodes.py#L687-L714",
-          "version": "repo-lines-v1:sha256:df09d890c09a01eeaf49d245e649096bab0b3c6a4309b078363c39f89a9df85f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBhNzRlMDFkMmQxNDJjOWExNjk0ZGU5MGFkYmIwMjUyYmRkNThjYTRmNTgyZTg2ZmE0MTdjMWNkMzMwYmMyZjgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZkZTAxZGRhM2YwZjY5NDUxMTBkOTA3NmY5ODg3OTQ2ODY1ODU3ZmMwYTViNmM5Y2I5OWY2YTJjNTU4Y2UxNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU0NmFkNWRmODRiZDI3MzZiNjM4ZWJkMGFlZDJkYWIwODY2YmYxZTljODYzODgwZDI5ZDQyNmY2ZDkzNWRhMjQifQ"
+          "resource": "repo://src/agents/graph.py#L200-L241",
+          "version": "repo-lines-v1:sha256:241800b05ab8ef2b87cee32f71c2424276e6d29ab84a0d4bbc7e110312e499f0:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc1NDlkMjgxY2RlYmMzYWQ2OTdlNTI3NzdiNDdjMDhhMGIwZjlmNjZiNGMxNDMwMDYwNmQ5YjMxODUxZWI1MDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhiMjNjZWI1NTliMjI1MDI0NTJkNTg2Nzg3ZWVhNGE3NGNlMTFhYzY4NDFhMTAyYmY2OTkzNDAwMmJiYTgwZmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZkZTAxZGRhM2YwZjY5NDUxMTBkOTA3NmY5ODg3OTQ2ODY1ODU3ZmMwYTViNmM5Y2I5OWY2YTJjNTU4Y2UxNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMxZDMxOGZiNzJlYTlhOTRhZGFiOWM4Nzg1YmI3YWVhMWQ3MWUyNGI2YmNmNDY4MThlYWVlZGQ5ZjZlNmMzZjQifQ"
+        },
+        {
+          "resource": "repo://src/agents/nodes.py#L824-L866",
+          "version": "repo-lines-v1:sha256:62f591a4c2c905874925c64dbe5e32504cd0c0ac1d7c53949aeb64eae321cde8:eyJzZWxlY3RlZExpbmVDb3VudCI6NDMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBhNzRlMDFkMmQxNDJjOWExNjk0ZGU5MGFkYmIwMjUyYmRkNThjYTRmNTgyZTg2ZmE0MTdjMWNkMzMwYmMyZjgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZkZTAxZGRhM2YwZjY5NDUxMTBkOTA3NmY5ODg3OTQ2ODY1ODU3ZmMwYTViNmM5Y2I5OWY2YTJjNTU4Y2UxNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhlZmZhZGNiMjQ1YmMyMTUyOWNiOGFjZjYzZThiMTVhMGFlNjdhNGIyYzNmNmZjN2RiNmZhOTk2OGY3MDJkNmIifQ"
         },
         {
           "resource": "repo://src/retrieval/hybrid_retriever.py#L48-L118",
@@ -18,14 +22,14 @@
     },
     {
       "id": "claim_78d06a7b0032432f860491507342cc52",
-      "statement": "计划级权限过滤 _filter_plan_by_role 把越权 source 转为 denied=True 的显式步骤（带原因），不静默跳过，使上层能明确提示部分结果无权查看；未知 source 不在工厂映射中时原样放行并最终生成“未知检索源”错误结果；未映射角色 fail-closed（任何已知 source 都转为拒绝）。",
+      "statement": "计划级权限过滤 _filter_plan_by_role 把越权 source 转为 denied=True 的显式步骤（带原因），不静默跳过，使上层能明确提示部分结果无权查看；未知 source 不在工厂映射中时原样放行并最终生成“未知检索源”错误结果；未映射角色 fail-closed（任何已知 source 都拒绝）。",
       "evidence": [
         {
           "resource": "repo://src/retrieval/hybrid_retriever.py#L120-L139",
           "version": "repo-lines-v1:sha256:0c8aeceae0eb07af095fadcf435fbce5cdd51e0444f51be216b16d88312f1be2:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxNTJlMDk5YjU0NDUwOTMyNGI0ZDAzMjA0ZjVhZDIyNDg2NWZjYWQwMmRjZjYzNDgzNDdhMzZkZTk3Yjk5MjAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgxNmY2NTFhMzczMTBhMGM5ZDQwZTZhNzQwZDgzYzM1MzFkZDU3NzIxMzI4OWJhNmNlZWYwNTVhNzEyNmJmMmEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ3YTM2YzQ4MTg2M2E4ZTQxZmQzYTc0ZGJhYWZkOTE3NDQ2YWMzNjA1ZmRmYmU1OWZmNWE5MzQ2N2IxZTIyOTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFiNTBhOWFkOTQ1YTc1YTRmODQ2YzA5MzBjM2Q1OWU3MTcyZTQ2YjI3N2EwYWI4Yzg2OTllZjcxMDZiNTczMDcifQ"
         },
         {
-          "resource": "repo://src/schemas/constants.py#L298-L304",
+          "resource": "repo://src/schemas/constants.py#L310-L316",
           "version": "repo-lines-v1:sha256:6bdb65776db4e23588f387d97bc8079fb621021e72bd5330ab25a86d5f0a4667:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTVlZjEwYTU1ZDdhZTFlNjAwNjRmYzQyOGEwMzNhNzNjZWQzNDliZWQ1ZjJjYmI4MzI4YjY1MDg1NmQ0YTIyNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTZkNTkyYmJmYWQ2NjA2M2FkM2I5NDI1NmYxMjUwOTE4M2Y2MmU3ZTczOGU2N2MyZGUwY2EwNDQzOTE1OWNmYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmI3M2ZhODU5MmQ3MzI0NDg5YWRkYzRlMGI2ZGRkYzk3ZmFjOGQ0YzQ5NjczOWRlMDY4YmFiNWQ5OGNkMTM3NiJ9"
         }
       ]
@@ -49,8 +53,8 @@
           "version": "repo-lines-v1:sha256:73da3940847fb79481e9575666635c7936f30c078e0c36f6787ec5000c1aa437:eyJzZWxlY3RlZExpbmVDb3VudCI6MzgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk1NzgwNWMzZmU3YWM2MzA3NGY2OWNkYjI1YjlhY2Q3YTg2NzkyZGZlNTQwODE4YWM0Zjg3NjRiNDllN2QxNGEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY5NmIyODk4M2FkOTQzYzcyOGI1OTlmNTFjNDNiZjg5OTgwNDQ3YTgxYWNlOTk5NzQ5NTViMDcxMDRjN2Y1ZjYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ5OTIyYTlhNTUwZjdjYmIwMGU4MWE3NjVlOWUyZDE5NjBjYmEzM2ZlMjdiYjRiZTkwMjliYzJmMjUzMjQxNzMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVkYjFhNWQ3YjA3ODlmZGJjMTc5N2Y5NzhlM2NiYjhjODQ3NDNlZTc0MDc5YmVhY2VjMmM5ZWIxNGFkYzlmMTMifQ"
         },
         {
-          "resource": "repo://src/schemas/constants.py#L322-L325",
-          "version": "repo-lines-v1:sha256:220c0cdcf34d4c174c2f420a3636cec6c97fee2643b9f8e9c5f9017867ed54ca:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNGMxNTdlZDY5MWRkODVlYjFjZjc2OWYzMWZhMzExOGEyOGVjZjg1OWUwZTg2ZjhkZTljZjk3NzIxNzZkMTA2MiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmVhODc3MTc1YTljMGJmYTVkNjljODMxNDBhYWUxNDZkN2UxZDNlODE5MWE1NjQ0M2E0NTkzZTNkZWRiZGNhNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjEyZWU0YTJhYzM3MTA5ODNjZDg4MmM1MjgxYzNhNWYyNjQwZjA0OTg5ZmEyMjczZGJmNzI5NjdiMjBiNzkyYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTM5Y2RjMjY1YjIyYjRlNWFkODgwOGU4ZTU1MTE3ZTdjZjY1YTg0N2E2NzVkMzc2OThkNDg0NDJhNjdkYmViZSJ9"
+          "resource": "repo://src/schemas/constants.py#L335-L338",
+          "version": "repo-lines-v1:sha256:b921b3a15590b5331806a906ded59b9c0183c87e205f94e23b4d207ff20a1183:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODcyNTQwZTU5NWM1NGUzMzgzMjRiNmNkZDY3N2Q2MmRkMjE5ZDIzYjAyZGY1MmNhODg0MDJmYzg0ODNmNDIzNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzQxNWRiNDJmZGZjOGY2YTYzMTM5MTEyMzUxYzY1ZDA2MTVlYzk0NzdkN2NkZGM0YWY2OGQwMzZlYWE2MjY3ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjhmNGYwZGQ1NjA1YmFkMjNjNWRhMzM2MjMyZTY3MDFiN2ZkZmRhZjExNzdmMGE1ZjMxNmFjN2Y1MmM2MWZmYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTVkMTY1OWI3MWVlNGRmZmM0MGEzZDU3ZjAyMmM5MzJiZmY5NWM5NzBjMzBhYzZlNTRmZDBiOGZkODU1YjQ3NiJ9"
         },
         {
           "resource": "repo://tests/test_hybrid_retriever.py#L329-L374",
@@ -102,11 +106,15 @@
     },
     {
       "id": "claim_f7b700a484b34c7094f996eb0afd167d",
-      "statement": "BM25Retriever 用 jieba 精确模式对 ChromaDB 全量文档（分批 5000）分词构建 BM25Okapi 索引，索引带模块级缓存（key=persist_directory 稳定索引身份）；懒加载构建，构建或查询失败时 HybridRetriever 静默降级为纯向量检索，不阻断请求。",
+      "statement": "BM25Retriever 用 jieba 精确模式对 ChromaDB 全量文档（分批 5000）分词构建 BM25Okapi 索引，索引带模块级缓存（key=persist_directory 稳定索引身份）；懒加载构建，构建或查询失败时 HybridRetriever 静默降级为纯向量检索，不阻断请求；warmup()（ISSUE-16）供 API 启动预热显式触发全量索引构建，避免 jieba 10-30s 分词落在首个请求上。",
       "evidence": [
         {
-          "resource": "repo://src/retrieval/bm25_retriever.py#L113-L177",
-          "version": "repo-lines-v1:sha256:8976421529651c7df227e138330a67728de98d3c4f78e30668d71641368ef7c2:eyJzZWxlY3RlZExpbmVDb3VudCI6NjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI5YzhhMzFlYjUwZjQzNDViNDhhZTdhNTVjMmJkOGEwMGU1ZGIxMjY1MTdhOTRlY2Q3ODBkYzQ5MDdmNzAxNWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjViZTI3OWNhOTNjZDYzYzU3ZTEwMjMyNzEyYjEwZTgxNjdlNjVhMWQ3NWJjYjZlMmJlZDcxNmNiNzM2MDM0NjYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQzYWU0ZjE3MzBhNGEwZmY3YTIzNjNkMTYxM2ZkYWMzMzQ1OTAxOGZhOTUyMWI4NjUzNDZkY2JmMzkxYjRiMjciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImFkMjcxMTZhMmNlMDk2NmNhODA2MDYxYTg0ZTc0OTI3NmZkZGM1NzNmMjc4ZDZmMmNjYmE0YmZhM2ViMTNkZDYifQ"
+          "resource": "repo://src/retrieval/bm25_retriever.py#L116-L177",
+          "version": "repo-lines-v1:sha256:e8df775fc3403d947048d74e1ac9114d7df494673c9f4518b8e01c28b3bec19b:eyJzZWxlY3RlZExpbmVDb3VudCI6NjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ4YjViOTM2NjcwMmY1ZDVkZTE4MTI3M2ZkNGY0YWNkYzk0ZWExOGMzYzgzZDA1NGJmMjlhYjA3OTliMjVlZmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJmZWE3MjQ2NDM3OTRjYjc3ZjFkZDNkMjQ3OWRmZDA5ODM1ZDcxOTNjZmFjMTkxZjE2MzAyMWE5MjM2YjdmNDkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU1MzM2NmE4ZTQxZWZhODQ0NTVkZTMwOGY1MDNhNDM3ZmE0NzQzZjcxMDc4NmYxNjlkMGIxZjY0YTFlZWUzNjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBjOTJkMjFmZTk2ZDc3Y2M4MWY3OWI0YzU0ODkxMGY1MzNmMDMxOGQ4NWVmNWJlZmM0ODQyMTMwZDZiMmRlNzQifQ"
+        },
+        {
+          "resource": "repo://src/retrieval/bm25_retriever.py#L137-L143",
+          "version": "repo-lines-v1:sha256:870a64b0f0be2a9d4d0512398666be9837de45b684f14eafcc42c87e5683242f:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWFkZThmNTIyODNhNGU1NWJjNmYyM2FmNTJlMzU1ZGYxZTlmZTc3NzYwYjdhODJjOTlmYzM2OTk1NWZiMmE5YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNTNmYWVmMTc0NTY2ZWVlYzVmZjQ4ZjhhNzg5ZWZjYzA4M2NlNDMxZjhiMzE5MjU4YWUzM2U2N2E5ZDI0Y2I5YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZmViNzFmOWFmZjBjMTI1OThmODA0OTBiNjdlODc2NDI5MWU0OWNjYTMyZTZjNTdmNjkzYmE0OWNlMWVmOWJmZSJ9"
         },
         {
           "resource": "repo://src/retrieval/bm25_retriever.py#L27-L48",
@@ -134,11 +142,11 @@
     },
     {
       "id": "claim_9a9a4351ef374a3cac23a39aa8de11e3",
-      "statement": "rrf_fuse 用 RRF_K=60 按向量/BM25 两路各自排名计 1/(k+rank+1) 累加融合，以 chunk_id（缺省回退 source:content 前 50 字符）去重，把原始量纲 vector_score/bm25_score 与融合分 rrf_score 写入 metadata，返回顺序即融合排序；下游不得用原始 score 重排或阈值过滤融合结果。",
+      "statement": "rrf_fuse 用 RRF_K=60 按向量/BM25 两路各自排名计 1/(k+rank+1) 累加融合，以 chunk_id（缺省回退 source:content 前 50 字符）去重，把原始量纲 vector_score/bm25_score 与融合分 rrf_score 写入 metadata，返回顺序即融合排序。",
       "evidence": [
         {
-          "resource": "repo://src/retrieval/bm25_retriever.py#L211-L267",
-          "version": "repo-lines-v1:sha256:34e935dff427ab1c167de13f6b5c4d2d90e130c5347246f3535b98422729cbde:eyJzZWxlY3RlZExpbmVDb3VudCI6NTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRkMzRiYjNlNTYzMmY0ZThmYWExYmUwMTA4Y2FjMjc1ODRjZjJkNWJlOTRmYTRmNWQ5YzE3ZGQ4MzEzODJjMzQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcwZTRmYjRkNDIzZWMzZTYwYTFkMDNkYjA4OGU1N2U4YjM1MjIxZDkxMzg0OTM2YTg4ZmQ5Mzg5NzllZDlkOTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImY4YTE5YzQ5NGE0NDJkNGUyMzJhMzJkNGE0NzZmNjE1YjVlMDhkZjZiODkzMjhmNmJiNWI1ZjBkZDc1NjU2MjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+          "resource": "repo://src/retrieval/bm25_retriever.py#L218-L267",
+          "version": "repo-lines-v1:sha256:7a72702885e6da5f66bdb1a8b37c355d77cce911638f6365f8644509737ef6ad:eyJzZWxlY3RlZExpbmVDb3VudCI6NTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRkMzRiYjNlNTYzMmY0ZThmYWExYmUwMTA4Y2FjMjc1ODRjZjJkNWJlOTRmYTRmNWQ5YzE3ZGQ4MzEzODJjMzQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImY4YTE5YzQ5NGE0NDJkNGUyMzJhMzJkNGE0NzZmNjE1YjVlMDhkZjZiODkzMjhmNmJiNWI1ZjBkZDc1NjU2MjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVhY2ZhNDFhZWVhMjY5Zjc0NDM0ODU0OGQ5ZDEyMzg1NGJlMzYwYjczODBkZTdmNzJkNGMzNDg4MjY4MGExZGQifQ"
         },
         {
           "resource": "repo://src/schemas/constants.py#L50-L55",
@@ -148,60 +156,72 @@
     },
     {
       "id": "claim_3790eca7d1e74986a30e4968486322ea",
-      "statement": "grade_and_filter 整个候选池只用一种量纲排序：带 rrf_score 的融合结果直接用该分，未融合结果按 cosine 排名折算成 1/(RRF_K+rank+1)（与 rrf_fuse 共用 RRF_K=60），避免混合池（部分来源有 BM25 命中、部分没有）里融合结果被高 cosine 的未融合结果系统性压底；RETRIEVAL_MIN_SCORE=0.6 只过滤未融合结果的原始 score。",
+      "statement": "grade_and_filter 整个候选池只用一种量纲排序：带 rrf_score 的融合结果直接用该分，未融合结果按 cosine 排名折算成 1/(RRF_K+rank+1)（与 rrf_fuse 共用 RRF_K=60），避免混合池（部分来源有 BM25 命中、部分没有）里融合结果被高 cosine 未融合结果系统性压底。",
       "evidence": [
         {
-          "resource": "repo://src/agents/nodes.py#L748-L799",
-          "version": "repo-lines-v1:sha256:a48012982ee6a9de1069a127b38fe18dc1b9fa9ac0620c111a904bebd9f4f5cf:eyJzZWxlY3RlZExpbmVDb3VudCI6NTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxOTRhOGMxMDYyODBlZDY4NjU2NjI5MWQ4OTA5MTdiMjc4MzQ4NDMxMThlZmMwNDY5YzQwODcxODgxMmFlOTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVjMWMzYTZhZjZmMTNkYTJjN2U0MGU4Njk4YzUxZDMxODlkZTMxOGNkMzUyNTczYzRhNDViODFlNWQ1NjZjMDciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVhMmQwYWVhZjVmMWUwM2FjYTA5YWI4NzY3YjZjNGI2YTQzYzQ2N2IwNGVkZDhhYWY3YmQzZjkyYzExNDc5OTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY1ODVjYTA1MGIwMzE3MGFiZjUwNGU1ODAyODk4NzIxZTQzMjVjZDI1OWQ2MTMxM2FhYmMxNTczNjY0ZWRhNjgifQ"
+          "resource": "repo://src/agents/nodes.py#L931-L953",
+          "version": "repo-lines-v1:sha256:fdf02f915aba5f73b4b57e87f4f85760429cfa05cc3974dfd977bb8e8ba997e2:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxOTRhOGMxMDYyODBlZDY4NjU2NjI5MWQ4OTA5MTdiMjc4MzQ4NDMxMThlZmMwNDY5YzQwODcxODgxMmFlOTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBlNTdiYjI4OTZjOTkzMjVmMjNjMGI3YTcxODkzYjZlMDg0Y2NhZjhmMDYwNzhiNDUxMGRhYjQxMTlhMjcwZGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFiMTFhNjAxOWZjNmIyMWM2MjYxMTU4NmQyNmViNTFkOTdmOTkyYzc1ZWVlZDQwOGI4NTI4OWJjZTAwN2QxM2YifQ"
+        },
+        {
+          "resource": "repo://src/agents/nodes.py#L954-L1022",
+          "version": "repo-lines-v1:sha256:018d871140f19a2c56857e3c8ba936870296bc59a6b4f578dcfd2a594f9ad078:eyJzZWxlY3RlZExpbmVDb3VudCI6NjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBkNTZhODc2N2E1NTFiYmQyNWU3OGVlMzQ2NjBkZWVhMmQzZWMwYjczYzZmM2ZhZjljMDExYjcxMjhmMjZiYjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM3MWQwNjhkYmQwOWZkNDM2NzQxOWJkYjM3ZWMwNTNlMjFhNjhjODQ5NDA0NzNmNGE5NTdkMmIwZGI0NmE0YWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY3YzIyYzFmMTBiNjg2ZTNhYmZhNzIyMWZmNzNlYzliMDkxMTA5MzRjNjYzZTk3ODQ2N2E1MzUxYmZjOWRiMWUifQ"
         }
       ]
     },
     {
       "id": "claim_50dc467f580544bf9c4cb843737dbac5",
-      "statement": "grade_and_filter 按 source+chunk_id（缺省 content）去重、把候选池限制在 GRADE_TOP_K*2 以内控制 rerank 开销、尝试 BGE Reranker 语义重排后截断到 GRADE_TOP_K 条，denied 占位符保留在结果末尾；Reranker 未配置（ImportError）时显式降级为 reranker_status=\"unavailable\" 并按原始分排序、RuntimeError 记为 error:<msg>，绝不用 cosine 分冒充语义重排。",
+      "statement": "grade_and_filter 按 source+chunk_id（缺省 content）去重、把候选池限制在 GRADE_TOP_K*2 以内控制 rerank 开销、尝试 BGE Reranker 语义重排后先执行一手来源优先（ISSUE-22：公告/财报原文提到研报/纪要转述之前，各自保持相关度顺序）再截断到 GRADE_TOP_K 条，denied 占位符保留在结果末尾；Reranker 未配置（FlagEmbedding 不可导入或权重无法加载，归一 RerankerNotConfigured）时显式降级 unavailable，运行期 RuntimeError 记 error:<msg>。",
       "evidence": [
         {
-          "resource": "repo://src/agents/nodes.py#L722-L745",
-          "version": "repo-lines-v1:sha256:73c9ba79f102aa820f5a97794087086ecace5e72a24ba231557688041703e4b0:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFkZDY5NGEzM2VkNzE4YzIwMTQ3OGM4NWU3MGZjMzQwMjU4NGQxNDI3NGI5ZDZhMTQ0OGNlMTVmODUxZGQ0MDUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBmOTdiZDQ4ZjQ1MDc1MjIzMTFjMGUzN2M3NjU5NWU5MzI3Mjg1ZmZkOWE5NmI4ZTY1NWVkZmQxNzdiZDU4N2UiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZkZTAxZGRhM2YwZjY5NDUxMTBkOTA3NmY5ODg3OTQ2ODY1ODU3ZmMwYTViNmM5Y2I5OWY2YTJjNTU4Y2UxNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRjNDY1ZDAzYzQ2ZGI0NmMyODJlZmE1ZTViMmJmYTQyNDNhYTZiOGE5OTAxMWY1NWUwZmMyZmEzNWI0ZWIxODQifQ"
+          "resource": "repo://src/agents/nodes.py#L868-L900",
+          "version": "repo-lines-v1:sha256:1582e9fa2d5e4e92c23e366b44ea9bbcead4e298d30df3a93ddf0b5d181f8746:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFkZDY5NGEzM2VkNzE4YzIwMTQ3OGM4NWU3MGZjMzQwMjU4NGQxNDI3NGI5ZDZhMTQ0OGNlMTVmODUxZGQ0MDUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZkZTAxZGRhM2YwZjY5NDUxMTBkOTA3NmY5ODg3OTQ2ODY1ODU3ZmMwYTViNmM5Y2I5OWY2YTJjNTU4Y2UxNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI2ZmU0M2I1NjFiY2NiODM2MjQ4ZDJlMThiZjliODA4MTkxZmI1Zjg1MzFlMDM2ZGNlYjYyNGMzMDQzOGM2NmEifQ"
         },
         {
-          "resource": "repo://src/agents/nodes.py#L801-L832",
-          "version": "repo-lines-v1:sha256:dc94ab19a6dc64b4a7600941f5086feb1e9e026c151fa2ba82a843f2a8342fc2:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjczNGM4YjVlZjEzOTgxNjIyNzA4OGU0M2YxZDNjNDk2ZGYyMTkxZjhkZTM0M2Y5N2ZmNTVlYzMzYjc1MTY4NGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjYzNTg5YjA1NzY1MGUyOGQ0ZWRlZmU2ZTE3NjdjMGM0NDMwYWFiYTI2MmQ0MmZlY2E4MGEwYjUwMGM0YWZlYTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU0NmFkNWRmODRiZDI3MzZiNjM4ZWJkMGFlZDJkYWIwODY2YmYxZTljODYzODgwZDI5ZDQyNmY2ZDkzNWRhMjQifQ"
+          "resource": "repo://src/agents/nodes.py#L905-L930",
+          "version": "repo-lines-v1:sha256:697d4045175c2b1169f90a1d9a705c6d638c1f2c6ec3ed890b393ada296bc134:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjllNDQwNTY3YWFhZGQ5YWYxMmJiOTE3ZTYxNjdjODhkM2I0ZmI1YThiYjc0YmY0ZTI1MzBhNGU2NmNhODE5MTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImMyNTRjZWFhMmYwZDk2MzhlOTZkYTM1YzRlN2M2NjM2MzljNmM3N2Y3YjE5Yzc4NDRkMDI3ZWZkZWI1MTllYWQifQ"
         },
         {
-          "resource": "repo://src/tools/rerank.py#L16-L64",
-          "version": "repo-lines-v1:sha256:b1d217780b43f232b81cb8c1c7a92dd7134c24bc3f1e1d294b12358217f0bb8f:eyJzZWxlY3RlZExpbmVDb3VudCI6NDksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImExM2QwYjdmNDQyMDA5ZmQ3NDdkODljZGI2YjBhNjg4ZmM4MzMwYWQ2MGY5YjBkYjMxODQxY2I4ZjFhYTJkNTYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3YTgwODcwZjAzMWRmMDMwZTRkNmY1YTEwZDAyMjFlOTcxYzY4YzZkZmZiZmQzMjc5MTg2NTZkZmIyNmIyMmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRlZmM0MDAyMTYwNzBmZDk4NjVkMzE5ZTA1Mzc4MTBhMzU0Nzg5MWY4M2U4ZGVlNjk0OWU1NjE3ODBjOTE1MjciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVkZmMxYmFmNzhlNTg3NzlhZTExNjllNTYwZWJkOWJjYzgzOTAxNzA3NDEzNTI2OWIxNjFmYTVjZjFkMTIyZWQifQ"
+          "resource": "repo://src/agents/nodes.py#L954-L1022",
+          "version": "repo-lines-v1:sha256:018d871140f19a2c56857e3c8ba936870296bc59a6b4f578dcfd2a594f9ad078:eyJzZWxlY3RlZExpbmVDb3VudCI6NjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBkNTZhODc2N2E1NTFiYmQyNWU3OGVlMzQ2NjBkZWVhMmQzZWMwYjczYzZmM2ZhZjljMDExYjcxMjhmMjZiYjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM3MWQwNjhkYmQwOWZkNDM2NzQxOWJkYjM3ZWMwNTNlMjFhNjhjODQ5NDA0NzNmNGE5NTdkMmIwZGI0NmE0YWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY3YzIyYzFmMTBiNjg2ZTNhYmZhNzIyMWZmNzNlYzliMDkxMTA5MzRjNjYzZTk3ODQ2N2E1MzUxYmZjOWRiMWUifQ"
+        },
+        {
+          "resource": "repo://src/tools/rerank.py#L14-L78",
+          "version": "repo-lines-v1:sha256:f0534509a65a1c2494e2da978d9350ba49ffc6d4e16b43d0fb9d5b9c21df3ef4:eyJzZWxlY3RlZExpbmVDb3VudCI6NjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJlOGYzMWIxMmViYmU0NTUzMmQyNmM0MjJiMmZlZDRiYWFkY2FiNTY3YjJlNjliOTg5NjY5MTYxYTY5ZGEzYjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEzYjk4MzY0MDM4MDk3MmE1MjMxYjQ5MDUwYWI5YmVlNTUzZDU3NWEyMDMyOTU0YWI3NGQ1YmIxYThjNTY1ZjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYxZWMzN2JkZmM1MzdjNGFiMTRmMTUxN2EyZGVkYjZhZDNiMmEzYjFjZDk5ZDIzMTc1ZTRlZDFkZTBlMWUwYjUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMwMzk1MDBhNmMyNWZhMjNmNzUxZjgwMWMxOGYzNjQ3ZjNhMmVlMTcwNzRlMzE5OWU4YmIwN2Y2Yzg1ODEyN2QifQ"
         }
       ]
     },
     {
       "id": "claim_ce18bbc49cf64a1e9bd9a6925ec2c970",
-      "statement": "reranker_status 贯穿到 compose：只有 \"applied\" 才是高置信的必要条件之一；\"unavailable\" 视为成功降级、\"error:\" 前缀视为显式执行失败（_traced_node 记 error span）。",
+      "statement": "reranker_status 贯穿到 compose：只有 \"applied\" 才是高置信的必要条件之一；\"unavailable\" 视为成功降级、\"error:\" 前缀视为显式执行失败（_node_execution_succeeded 记 error span）。",
       "evidence": [
         {
-          "resource": "repo://src/agents/graph.py#L78-L85",
-          "version": "repo-lines-v1:sha256:7bf9aabdc47a8b79c482363371af4b629d152157e2afba5e439a1e94f38f9964:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDY5MTA4NTVkNzQxZTEzZGEwMjAxYmUzZmJjMDQwMjA1YmM2YTE3NmU1YmE4ZmU5M2U2NmE0Njg5Y2NiNDU1YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzBlMmE0NjUwMDk1ZmE5NWQwZTJiYjQxYjJkYjI5MDk0ZDM0MDRkMjhjZTEyMzM5ZWM4OGJiNGI1YzViZThmNiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTk4YjA2M2Q5YjQ3ZTY1Mzc5NjI1NTcyY2NlMTk3NjY5ZDU3NjdlMTJjMThiZTA3NTY1MmI4Y2Q5ODFjZThkNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjgxZGY5ZmRlN2MwZjczM2VjYzkyM2IwNGYwMmYzNjE0OGU3MDc1MWUwNTZlOWRhMDkzMWZjM2NkNDU3NmYyNSJ9"
+          "resource": "repo://src/agents/nodes.py#L1338-L1354",
+          "version": "repo-lines-v1:sha256:0a3a89b11ec149bf9239d1995be00a8bc8541dcefa188642ba1065512d47a510:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU1MDMyZTk2NGQwOTMyMzUxZTVkMTg1MjY5MjgxYjE3MWEzYTA5YjA4YjI4NmU2NjFlYTQ3MDMyM2M4MmViNGQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJmMjk1M2E0NTBiYzRiYjk3MDlkMmE3MzFiNmMzODUzNTU3MzFhNjNlYjg2YjJlN2FmZmFkNWMxYjE4MWMyN2MiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI0NDI1MTc0ZTFmMWZiZTdjZGI3NmU4YzgwNjQzZGMzM2NjMzdhYjVjOWMyYmM1ZDk3ODJkODNhMGU5YmM4MmIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE2NjhmMDAzMWVjNjE5NGViMDM5M2IwN2FlMzhmZjViMmQ1NDNjNmY5NDk1MmNkMjQ5YWFiM2ZlMjA1NmIyNWMifQ"
         },
         {
-          "resource": "repo://src/agents/nodes.py#L1338-L1354",
-          "version": "repo-lines-v1:sha256:aa18db50c4c87911c2d16db5f7a4238bff32a6eb5fece2751b0df254543d8816:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE4ODYwYjllNDU3ZDM0ZWRjOWM2MDEzYzBjOGRkMTVmODQwMTVmNmVhNWNlMGEzNWJlNTY4MDNjMDg5NTliMmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgwNGQ2YzJkMWI1NWZjYmMzYTUxZTg5ZmZmNmJhYmU2YWE1ZDhkZjgwYTliNTY5MjM0MDViMzUxNjA0MGM2N2EiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcyZTM1MDU0NmE4MTI3ZmViMjQ4ZTI5NzA5MWZkZjdlM2M3ZGIwN2Q0YzFhYzJiOGMzOTcyYTA1ZDBjMjMxOTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFiZThmMjlmNzI0YzEzMjNjMmUyYjUwYTM3NDU2YThlOTliYzY4Njc2MjQ4MDY3MDI2MTAxOWNjZmM2YmRmOTkifQ"
+          "resource": "repo://src/agents/nodes.py#L1585-L1600",
+          "version": "repo-lines-v1:sha256:2a300456eea7b9adacfe1b91f9842ff26431d9dc524f53a517aed1dbdf2ca6d8:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImViNmUyYmM3ZmFmNDU3MmZlN2U2MDA5ZWYzYjRkZTE0MmUyYTRiZTkyMmYxYWQ1MmFlNDBiZjljYjg4MzY5ZWYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIyYjVhYWUwODM5ODczYmVkNzY0M2Y3MTkyY2UwYWViMWI4ZGU4M2JiMDBhYzM0ZGYyNmQyNjAzOWI2YTc0MGYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjlkMmNlNzE2ZGYzMDUwYTdhYjgwYjY2ZDJhNzQ5ZDQ4NzY4MGVlMWI1NzI0NjVmYzExMzBlYTVkZmIzZTBlYTIifQ"
+        },
+        {
+          "resource": "repo://src/schemas/constants.py#L100-L100",
+          "version": "repo-lines-v1:sha256:daf2453bc7f3a71cd72339442fcd6e7e934943757e6ab68f696d503f235e5fc9:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGFmMjQ1M2JjN2YzYTcxY2Q3MjMzOTQ0MmZjZDZlN2U5MzQ5NDM3NTdlNmFiNjhmNjk2ZDUwM2YyMzVlNWZjOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGFmMjQ1M2JjN2YzYTcxY2Q3MjMzOTQ0MmZjZDZlN2U5MzQ5NDM3NTdlNmFiNjhmNjk2ZDUwM2YyMzVlNWZjOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZGQ5OThiNTIxOWRjMTkxYTE3MDY4NWE4OWI1N2QwOWZhZjU1Yjc3NjFiOTFmMWU2ZGE0ZmQ5N2VkZDdlY2VhZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNWIzYzdhNzdjOTM3MzM3ZThlY2QxMjg5MmExOGQ2ZTU1NTNjY2VjZjZiZTM2MGI2YzM3ZmU2NjdmMDIzN2FmOSJ9"
         }
       ]
     },
     {
       "id": "claim_8e3dfea00b60403cb72bf7adbaaad61b",
-      "statement": "检索结果 TTL 缓存（result_cache.py）以 角色+计划指纹 为 key、TTL=RETRIEVAL_CACHE_TTL_SECONDS（300 秒），计划指纹由每步 source:query:top_k:filters（filters 做 JSON 序列化）拼成；nodes._cached_retrieve 命中时跳过 embedding 与 ChromaDB 查询。",
+      "statement": "检索结果 TTL 缓存（result_cache.py）以 角色+计划指纹 为 key、TTL=RETRIEVAL_CACHE_TTL_SECONDS（300 秒），计划指纹由每步 source:query:top_k:filters（filters 做 JSON 序列化）拼成；nodes._cached_retrieve 先查缓存未命中才执行 HybridRetriever。",
       "evidence": [
         {
-          "resource": "repo://src/agents/nodes.py#L231-L247",
-          "version": "repo-lines-v1:sha256:fe4592ee151537cc17e05caefa37cd6b4a141771e81b3f853c355ef0301dc50d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBjNjFkODliMDc1NjVhMjg3ZTRjMzEwMjVlMjhkZGJhNDk5OGIwZGUyNDY4OTIzNzIxM2QzNGRlZDI5Y2I0NjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcwZTRmYjRkNDIzZWMzZTYwYTFkMDNkYjA4OGU1N2U4YjM1MjIxZDkxMzg0OTM2YTg4ZmQ5Mzg5NzllZDlkOTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI3YWM0MGE0ODBkMGU0ZTZiMzNhMjI4NjkzZWY5ODQxNGU2YzhhZWM3YTZiODk1OWQ4ZTZlY2RlZjhjMmQ0YWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjUxZDE0YWRiMDAzYTFkMWEzYmFhMDBjYmVjNjJmZDA0MjQ0YzcwNzRiZGM2NmViN2UwNWRiYmMxMWU2NTUzODAifQ"
+          "resource": "repo://src/agents/nodes.py#L309-L360",
+          "version": "repo-lines-v1:sha256:486d572e54d5a2161798518053e467c0c1ddc5928523de13ec673b1fb91cc38d:eyJzZWxlY3RlZExpbmVDb3VudCI6NTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBjNjFkODliMDc1NjVhMjg3ZTRjMzEwMjVlMjhkZGJhNDk5OGIwZGUyNDY4OTIzNzIxM2QzNGRlZDI5Y2I0NjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImM2YWFiMTYyZTE3MzI1NTRlYjMzMzk2OWJlZDc1MjUwNjQ4NjJkMDUwODUzNmVjNTdlODNjOGRkYThkNmRlY2EiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImFjMjNkNmRjZjc5NGRjZWIxNzA2NzUxM2M2Y2QzMWMxYmQ5ZDk3MTcwMzZiZDNjY2Y0YTBlMGY3MzhlNmE1MGQifQ"
         },
         {
           "resource": "repo://src/retrieval/result_cache.py#L25-L57",
           "version": "repo-lines-v1:sha256:f5cfb2de028fb6d776544a148a425a15d1d70c5f40ddc0c1bad2e9ca09ee1978:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVhNTNmOWE5ZTRjMDRjNzY2YjIwYWJiY2E3ZmY1NTJmOTc1YzYwNWY0Y2Y5OWRjYjkyZmJiODQ4MjdmYjlkNzMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcwMDIxMGEwOWMxZGUzZTdiZGFkMDU0ZGQyYTIxZmE0YTg5Njk4NzUxNDY5ZGJhOTdjMjBkMThhMDZlMGMyYTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM0OGI4MGI5YmZhN2M4MThjZGRjZDE5MTU1OTM3ZDZiYTIwNjMwMGE3YjEyZWU3MDNmNzM5NjRlZWI5MjA4MTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjgyMDA2N2QxZDdiNmYzOTM4OTQ0ZmIzMjFiYmFjY2IyNDA0YzE3NWM0ZmMzMjc1YThkOGYxMTA2Njk0YTVlZjQifQ"
         },
         {
-          "resource": "repo://src/schemas/constants.py#L102-L102",
+          "resource": "repo://src/schemas/constants.py#L114-L114",
           "version": "repo-lines-v1:sha256:41beab2cc728cf72a53521d8444bcd974e31d4accf1a08b5f57cab6b603bef35:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDFiZWFiMmNjNzI4Y2Y3MmE1MzUyMWQ4NDQ0YmNkOTc0ZTMxZDRhY2NmMWEwOGI1ZjU3Y2FiNmI2MDNiZWYzNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDFiZWFiMmNjNzI4Y2Y3MmE1MzUyMWQ4NDQ0YmNkOTc0ZTMxZDRhY2NmMWEwOGI1ZjU3Y2FiNmI2MDNiZWYzNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDQwZDY3NjEyMGNjZjg5ZTFjNTI5NzI2MGY0MzFhMjE1M2Q2NzUwODA5Y2VhYWExMTI4NDJiMWIyZDZhZmFkYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiY2NmMGViZGM3YTM5MTQ1MWVlZjgwNDAxZDc1OWVkNjM3NzMxMjkxMzllZDJlMWNlZTUzM2NlZTU4Y2IxYzdiYSJ9"
         }
       ]
@@ -222,53 +242,83 @@
     },
     {
       "id": "claim_1a6e5fc6e63b4304b0669f4f279461b7",
-      "statement": "时间范围过滤：_time_range_to_filters 把查询理解的 time_range 解析为数值 date_day（yyyymmdd）的 $gte/$lte 并拆成 $and 条件（Chroma 1.5 契约：同一字段表达式只能一个操作符），任一端不可解析则省略、两端都不可解析返回 None；BM25 侧由 _match_filters 以相同 $and/$gte/$lte 契约做后过滤。",
+      "statement": "时间范围过滤：_time_range_to_filters 把查询理解的 time_range 解析为数值 date_day（yyyymmdd）的 $gte/$lte 并拆成 $and 条件（Chroma 1.5 契约：同一字段表达式只能一个操作符），任一端不可解析则省略、两端都不可解析返回 None；研报年份是报告期语义（ISSUE-2），planner 对 report_search 一律不加 date_day 硬过滤、日期语义留在查询文本，空检索重试时放宽日期过滤。",
       "evidence": [
         {
-          "resource": "repo://src/agents/nodes.py#L206-L228",
-          "version": "repo-lines-v1:sha256:e0ff321cb0de40067a0edc96ed5d4d0caa78747b6cae2a3e996d55c03b868533:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYyYjNmZDc2Yzg2MWNhMWM0NzQ1M2U0NTQ1ZDQ3ZmFmOGE1MWI2YTE4MTZiOGVkMWQ4ZTdhZDIzMDc5YzRiODAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE0MmYzOGMwMDc5MmUyZmYzODk1MGM0MGUzMWRlMjkzMjViZmIzNzBiZjA5Y2YwNTQ2OTRlYjE0ODI3OTcwNDciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkxZmJhYjUxYzczN2ZmYTIwNzdjZmMzYmFjYjM2ZGFmODg5MmRjYzU5MWNhMWZmZGUxMWRlMTVmMDMyNDM0Y2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE0NGZlM2MzZmMzNWJjZmQwZDNlZWY1NWI3YzMxMzJjOGFiOTUyNjU5OTFiOGVlNzIxZWY5ZDhjNDFmNmRjMDQifQ"
+          "resource": "repo://src/agents/nodes.py#L253-L277",
+          "version": "repo-lines-v1:sha256:d2388cb49834a0beab80b2cc2de467177cb413cba4f6f5f792e0b250f805e237:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYyYjNmZDc2Yzg2MWNhMWM0NzQ1M2U0NTQ1ZDQ3ZmFmOGE1MWI2YTE4MTZiOGVkMWQ4ZTdhZDIzMDc5YzRiODAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkxZmJhYjUxYzczN2ZmYTIwNzdjZmMzYmFjYjM2ZGFmODg5MmRjYzU5MWNhMWZmZGUxMWRlMTVmMDMyNDM0Y2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNmMzMzZjgxODc3OWZlYTEyNmUxZWIzZjQ3MTU5ODhhOGZlZWYxOGNiYjI0ZDQwYmE5MTU2ZTIyOTRlOTc4MDkifQ"
         },
         {
-          "resource": "repo://src/retrieval/bm25_retriever.py#L179-L208",
-          "version": "repo-lines-v1:sha256:10e38adc180c74c5ca4f7996423da304738e43fc0cacbecc39ce08fd3c6b476b:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxYWJjZDBjYzY5MTNkNGY1MWViMjFlNGY1YWZjMmU5MGY4NmQzNmE0NTBiYjQyY2IwNWM2ZjNlMGQ3MDZmOGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQxMDQyNGJkZTNhZDkxZmY4ZGFlYTgxYTRhYTUwNGIyZmU5ZDM3OTIzZjU5Mzc5MTUyZDU0M2Q3YjRkZWFmNzEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIyODA0MmU0YjkwZjExZjY1N2E1OTZhOTZmYzZmMjk2MDFjMjQ3OGIzYTBiOWEwYTI5ODhkMzFhM2VkYzlmN2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE2MWI0ZGU3YjU5YmE4M2Q4MzNiMDY5ZmYwYWMyZDdkZmY2N2U5OGJjODY0MTMyYzc2NzI2ODY2ZmY1MDk2ZmYifQ"
+          "resource": "repo://src/agents/nodes.py#L786-L794",
+          "version": "repo-lines-v1:sha256:6f3d7b9af3d3840615e5ad218f02616a94577d4339eb51f514aab0e85435c186:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTZhNzE1MjU3MmVlODRmMTA5MDZjNzRiOWYyYTkyNDM0ZGRhYjBlM2M0MjgxM2IwNGU1OTdlZmNlYzk1MWIyNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDk0NGUyYmVlNTExMjQ2NDMzYTIxZGQ4ZDBlNDA3ZTExNWExYzFhYjM1ZTNkYmVmMTBiODE2MTUzOGNkNjY0NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjc4NTVmNGRmNmYzYTVmNzcxZGQwZGZmNDRjN2MwZjBhM2VmMzM4ZWUyNjhmOThiMmNhOTc0Yjc0NzUyNGVlMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzFmN2NmZDczM2FmMDRmNDY4NjA2ZDg2ZjlmZGU4YjA2N2RlYTFlYTg5YzU3NGY5MjcwYjYzMTNhNThlN2VhZSJ9"
+        },
+        {
+          "resource": "repo://src/retrieval/bm25_retriever.py#L187-L208",
+          "version": "repo-lines-v1:sha256:e6dc00f9d63fb85836619313915b3cda812fad86a683b59ed357d4db58287035:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRkMjA1YThlNDAyZDZiMzYyZTI0ZTA5NmIxOWRmNDdjMmUyYzZmYzM3ODI1ODM1YmY5ZWFjZWVmNzlhNTRlZmUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY1YThmM2RlNDhmNGIzOTljMGM5N2RkMjcxMDJhNGI3ZjQxOTRhNmYyOGYyOTEyMGI0OGEwMTY5MGQ1MGUxZjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImM2YTY4MGU2MmIyZDljYWM3YWE4NzZiMjA1NjQ2OTQ4MmZiZmY2MmY0NzZlZTQzYzE4ZWZmNjVkYzNmNjlmNzgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJlNDU2YjBjYTQ5NDBhOGU0ZDFkOThlNzRlMzYxMTFhZGY5NWI2NGU5NWFiOTkyMDdlNThkNDllNzBmNWJiMTIifQ"
         },
         {
           "resource": "repo://tests/test_date_filters.py#L28-L63",
-          "version": "repo-lines-v1:sha256:edabebc2c5cd9b628df0d14c698e72f624433e96daf367f35ce208a120005c46:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRiYTMzNTU1NjcwY2FhY2U3MzA3NWRhZDNlODBhYjQ3N2IwNjkyMTgwZTAxOWQxZGQwN2Y4Yjk2ZDVlN2YzNTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIxMGE2ZmM4MDczNmJmODNjZTY5ZDc0ZTViZGJkNmU2NGM3N2VlODNkYzAxYzMxM2JiNjE5ZmNmYjg4ZDQyYWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY1NDI2YTYzZmY2ZGE0OTZhYmU0MzAzZTBkYjdjYTRlZjhmZTI3NGU0ZDc0MGI4MWI3OGIzM2U4MTZlZTZjZmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+          "version": "repo-lines-v1:sha256:af1ffa2ea85f1d8d3a02c3ff3bfbb776c6fca8c9a6f46b25c52ab17b1c6a7b41:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAzZDI0ZWRiNDQwZThhM2Q2MWQyYzI0OGViZDJjNzEwY2M4MmNlOWIwZTUxZDAxMWM4NTg3NDYwMDA1OTQyOTYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI1Y2M0YzE3MGFhYzhlNTVjNzY1MDY3ZjVlMDEwNDU1Y2JhOTljZTk1MzU0MTc3MWQ1M2M4ZjliOGRiNDRiNGMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY1NDI2YTYzZmY2ZGE0OTZhYmU0MzAzZTBkYjdjYTRlZjhmZTI3NGU0ZDc0MGI4MWI3OGIzM2U4MTZlZTZjZmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg2NGUyZDlkNjNmMjQzZDkxMmI2YmEyNTNiNDQwY2IxYzdlNjgwNjBlMWQwZjY3Yjk1ZTdlNzVkOTczYWM0YmEifQ"
         }
       ]
     },
     {
       "id": "claim_f84586135b684113aae31684aec6c37d",
-      "statement": "ReAct 检索工具（product/regulation/report/faq search）统一经 _role_aware_search 构造单步检索计划并实例化 HybridRetriever 执行，与外层 retrieve 节点走完全相同的计划级/结果级过滤与混合检索逻辑；工具可见性按 ROLE_ALLOWED_SOURCES 过滤，外层图已满足的检索源对应工具被排除。",
+      "statement": "ReAct 检索工具（product/regulation/report/faq search）统一经 _role_aware_search 构造单步检索计划并实例化 HybridRetriever 执行，与外层 retrieve 节点走完全相同的计划级/结果级过滤与混合检索逻辑；工具可见性由 get_tools_for_role 按 ROLE_ALLOWED_SOURCES 过滤并排除已满足的检索源，reranker_available()（FlagEmbedding 可导入）决定 rerank_tool 是否对模型可见。",
       "evidence": [
         {
-          "resource": "repo://src/agents/tools.py#L183-L198",
-          "version": "repo-lines-v1:sha256:37a44e9dd9805fb575bc69945d38ac0d36efe473d18a8c2cb0e24df6685213c0:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJiMmUxMTQ0YTM4YTRhM2UxYTNkZDkzMDhkNjJlZjA3NzNlMTQzNDA1ODUwNWNjMzYwOWI4NTY0NjE2OGEzM2YiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFkZDI0NDU4MmI2ZmIwM2QyM2I4NDE1YWJlY2QzNDZiMGM5ZjQ2NmI2Zjc1MmIwNjgxODljZTdlOWEyZGMzNTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA5ZjkzMDgzYzE5NzEyMWI5ODI3MDBiYThhZmFiZDE3MjJjZjFkM2U3NDA0NTA5ZTgwZWZhMjcyNDdmNjJmMDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+          "resource": "repo://src/agents/tools.py#L183-L208",
+          "version": "repo-lines-v1:sha256:2f818d559fc8ccb75b226f52549badbf3b25fde2c42a26aa8b32eb86204639fc:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFkZDI0NDU4MmI2ZmIwM2QyM2I4NDE1YWJlY2QzNDZiMGM5ZjQ2NmI2Zjc1MmIwNjgxODljZTdlOWEyZGMzNTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjEzYzk5YjBhYzI5YmQ3MTMyZmY3NDUxNDViYzE4MjVmMTkzZjhmYTlkMDQwZmFjODdjOTNmY2RmODFmNmFlZTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
         },
         {
-          "resource": "repo://src/agents/tools.py#L37-L143",
-          "version": "repo-lines-v1:sha256:738e5e126563f3ddd541f822a42d1dfadb9ad24d1dd9f1bcffdebc4ecf9b2cda:eyJzZWxlY3RlZExpbmVDb3VudCI6MTA3LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiJiMTZkM2QxZmIzMjlhYWZjM2M5ZjU3Yjg5ZWVhY2YyZWQ0NDBhNGQ5NGQ3MjU0OTgzNzE5ZWQxYzViODQ5MWI0IiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIzMGMxZjE4OGYxNDJlZDdhODI0NjgwYjIwNzE3MmM1NTE5YmM2MTRhNDhmZGE3Y2YxNjdlZGI4ZGRmNzk5NTZjIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJmZGUwMWRkYTNmMGY2OTQ1MTEwZDkwNzZmOTg4Nzk0Njg2NTg1N2ZjMGE1YjZjOWNiOTlmNmEyYzU1OGNlMTY0IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJlNDZhZDVkZjg0YmQyNzM2YjYzOGViZDBhZWQyZGFiMDg2NmJmMWU5Yzg2Mzg4MGQyOWQ0MjZmNmQ5MzVkYTI0In0"
+          "resource": "repo://src/agents/tools.py#L39-L62",
+          "version": "repo-lines-v1:sha256:c83455ff3db6f8043ea492139b0cdd68200cc863d6b024dce362626830dcdc01:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIxNmQzZDFmYjMyOWFhZmMzYzlmNTdiODllZWFjZjJlZDQ0MGE0ZDk0ZDcyNTQ5ODM3MTllZDFjNWI4NDkxYjQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEzNGU1OWQ3ZWFkY2E4YTkyOWEyNWZhNjBiYjU0ZmY2YjhhZmIwZmFkOTQwOTljZDFjODg5OGRjZDViZTk2OGMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZkZTAxZGRhM2YwZjY5NDUxMTBkOTA3NmY5ODg3OTQ2ODY1ODU3ZmMwYTViNmM5Y2I5OWY2YTJjNTU4Y2UxNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhkM2RmMjYxYmY2NzZlMGZhNzhlNTBlNzQ4YWQ0ZjRjNjRmNjJkZDk2ZTQ3NWQ1MzJlZGU4ODFhMDZkOTRkOTAifQ"
+        },
+        {
+          "resource": "repo://src/agents/tools.py#L63-L160",
+          "version": "repo-lines-v1:sha256:45e51616d8f18ab341890d58507f73e07acd976aa2f905e2af475d46fd3e24f1:eyJzZWxlY3RlZExpbmVDb3VudCI6OTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQyZDIxYjAwOWI5Zjk3YmRiN2I1YTlmMjA4ZDhiN2NmN2FkOTYyYTI2NzliZmE1ZGMyODk1NGUzZGY2YTcwNGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRhYjUwZTc1ZDEzYTNhZTNiYzMyMDMzMDg3MmFkNGIxZGM3Y2IxM2U3OWExMWU2N2VhZDNkN2ExZjc1YjZhN2UiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVkZmMxYmFmNzhlNTg3NzlhZTExNjllNTYwZWJkOWJjYzgzOTAxNzA3NDEzNTI2OWIxNjFmYTVjZjFkMTIyZWQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJhZjllMmU2Mzk4ZGE4ZjU2ZWEwMTRmMjBlNmJkNWY3MmIyYmQ2ZWFhZTU4M2JmN2RjZTM2M2YyZTgxZjQ5NmQifQ"
         }
       ]
     },
     {
       "id": "claim_8654a2968bfc491fa7d7a2f160395ef7",
-      "statement": "全部检索结果被拒时 should_retry_retrieval 返回 \"denied\"，图在 LLM 推理前经 permission_denied_response 短路（省成本且不把无权限内容带入后续节点，验证/合规置为失败但会话与审计照常落库）；可用结果不足 CONFIDENCE_HIGH_MIN_RESULTS（3）且未到 DEFAULT_MAX_HOPS（3）时回到 planner 补检索。",
+      "statement": "全部检索结果被拒时 should_retry_retrieval 返回 \"denied\"，图在 LLM 推理前经 permission_denied_response 短路（省成本且不把无权限内容带入后续节点，验证/合规置为失败但会话与审计照常落库）；重试轮次耗尽仍 0 召回时返回 \"no_results\"，经 no_results_response 直接返回“未找到资料”，不再进入无证据推理（ISSUE-3）。",
       "evidence": [
         {
-          "resource": "repo://src/agents/graph.py#L191-L207",
-          "version": "repo-lines-v1:sha256:cdb15d876733104740f7238145de41eeb2621fd4235546a96c9e3b9017b81a49:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc1NDlkMjgxY2RlYmMzYWQ2OTdlNTI3NzdiNDdjMDhhMGIwZjlmNjZiNGMxNDMwMDYwNmQ5YjMxODUxZWI1MDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVkMjNhMDFiMzUwNDQ4MGI5ZGQxOGNlZjg5MGE1N2NkMDc2YTQ2ODNiNDgyMzEyY2YwOWNhMjEwMmJmZDQzZTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZkZTAxZGRhM2YwZjY5NDUxMTBkOTA3NmY5ODg3OTQ2ODY1ODU3ZmMwYTViNmM5Y2I5OWY2YTJjNTU4Y2UxNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ0YTdmN2I2ZjE5ODc4ZWQ2YjhiNzlhYzhlOThmOWRlNmIyYTc5MDE2ODUzMDYxODQ5OTExZTBlYTI1NzJmZTgifQ"
+          "resource": "repo://src/agents/graph.py#L200-L241",
+          "version": "repo-lines-v1:sha256:241800b05ab8ef2b87cee32f71c2424276e6d29ab84a0d4bbc7e110312e499f0:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc1NDlkMjgxY2RlYmMzYWQ2OTdlNTI3NzdiNDdjMDhhMGIwZjlmNjZiNGMxNDMwMDYwNmQ5YjMxODUxZWI1MDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhiMjNjZWI1NTliMjI1MDI0NTJkNTg2Nzg3ZWVhNGE3NGNlMTFhYzY4NDFhMTAyYmY2OTkzNDAwMmJiYTgwZmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZkZTAxZGRhM2YwZjY5NDUxMTBkOTA3NmY5ODg3OTQ2ODY1ODU3ZmMwYTViNmM5Y2I5OWY2YTJjNTU4Y2UxNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMxZDMxOGZiNzJlYTlhOTRhZGFiOWM4Nzg1YmI3YWVhMWQ3MWUyNGI2YmNmNDY4MThlYWVlZGQ5ZjZlNmMzZjQifQ"
         },
         {
-          "resource": "repo://src/agents/nodes.py#L1290-L1309",
-          "version": "repo-lines-v1:sha256:f45284d785b51dc7397f7130debe582faac7fa129d5ac130c4dea31dd6ccba69:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU4MTEwY2EwNmNiMWY1MmIwOGE0ZTQ2MzU4NzdlM2RjOWI1ZTFjZDM5ZDgwYzAwNzkzNGRmYTA1ZDYzNTY4ZmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFjMDlkOTU3MzQwNDNhMDA5MzUwYmIzNTdmNjcyYWIwYjc1MzUwMTZiYWRmOWJkMDUwNDUwNTg4ZDg2NTBmMWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU0NmFkNWRmODRiZDI3MzZiNjM4ZWJkMGFlZDJkYWIwODY2YmYxZTljODYzODgwZDI5ZDQyNmY2ZDkzNWRhMjQifQ"
+          "resource": "repo://src/agents/nodes.py#L1506-L1527",
+          "version": "repo-lines-v1:sha256:040c51f49727da5249883cb2586bca8940f76e57b3fd6554adddccf35c4bda4f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU4MTEwY2EwNmNiMWY1MmIwOGE0ZTQ2MzU4NzdlM2RjOWI1ZTFjZDM5ZDgwYzAwNzkzNGRmYTA1ZDYzNTY4ZmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFjMDlkOTU3MzQwNDNhMDA5MzUwYmIzNTdmNjcyYWIwYjc1MzUwMTZiYWRmOWJkMDUwNDUwNTg4ZDg2NTBmMWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRlMmRkYmNkNTI5NzBlZDJkNTZmNDdjNjc2MDYzYWQ4Y2Y5NjA1NDU0OGE1YmRiMDNiMjMxYTQ1Yjk5OGRmYTgifQ"
+        },
+        {
+          "resource": "repo://src/agents/nodes.py#L1528-L1563",
+          "version": "repo-lines-v1:sha256:fb30be2c47b59b432ba0f4951eb425a7425a5ff4afce3dbc48e8f4e55fc69c0e:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMyNjRmMzIzYWFmMjQ5NGQxMDgxOGI5YzkyYTAyZWEyYWRiZTllMTUwM2QyZGIzMTI3NzBkMzQzNzdmODk5Y2YiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRmYmQwMDkzMTRiYzI3MDg0MTY3MzRhMDJhZTVmZjM5YTFlNDhhMDUwYmU5MWY0M2IyZmFhOTIwMDJjNjJiZmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJiMGEwODljNDAwYjA3MWY1MTg2MjM2YmU1OThmMjkwMWUyMWYxODQ1MjE4M2ViY2RlZDMxYjhiOGIwYjQxOWEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_46eee7908e144dbe93482c018cee45cd",
+      "statement": "低召回检索走 widen 放宽轮（ISSUE-24）而不是重跑理解+规划：retrieve 节点在 STATE_RETRIEVAL_WIDENING>0 时用 _widen_top_k（倍率 2、上限 20）放大计划 top_k 后重跑检索；_plan_signature 以 source/query/filters 计算计划实质指纹，与上一轮相同的计划不再重复执行，重规划只保留给 0 召回。",
+      "evidence": [
+        {
+          "resource": "repo://src/agents/graph.py#L200-L241",
+          "version": "repo-lines-v1:sha256:241800b05ab8ef2b87cee32f71c2424276e6d29ab84a0d4bbc7e110312e499f0:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc1NDlkMjgxY2RlYmMzYWQ2OTdlNTI3NzdiNDdjMDhhMGIwZjlmNjZiNGMxNDMwMDYwNmQ5YjMxODUxZWI1MDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhiMjNjZWI1NTliMjI1MDI0NTJkNTg2Nzg3ZWVhNGE3NGNlMTFhYzY4NDFhMTAyYmY2OTkzNDAwMmJiYTgwZmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZkZTAxZGRhM2YwZjY5NDUxMTBkOTA3NmY5ODg3OTQ2ODY1ODU3ZmMwYTViNmM5Y2I5OWY2YTJjNTU4Y2UxNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMxZDMxOGZiNzJlYTlhOTRhZGFiOWM4Nzg1YmI3YWVhMWQ3MWUyNGI2YmNmNDY4MThlYWVlZGQ5ZjZlNmMzZjQifQ"
+        },
+        {
+          "resource": "repo://src/agents/nodes.py#L528-L561",
+          "version": "repo-lines-v1:sha256:4c4fc0d8655ac8df92266f9739f111065ab0e73a98aec0ff10111ad8a9744ea4:eyJzZWxlY3RlZExpbmVDb3VudCI6MzQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJkNGJhMTA2MGMyY2M4NTVlMDZkNWExNjU2NjJjYTk3M2ZmYWM0ZWU3N2UwYzA4ZTRlYzFlNjVhY2QyMjYxZWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImMyNTkzNWViMzRhNWZkNjc0OGM3NDE4MDY1MTdmN2RjNjljNzJkNmFhOGY0ZjA5NmFjMWFlNDYzYjgwNWRhMDUifQ"
+        },
+        {
+          "resource": "repo://src/agents/nodes.py#L824-L840",
+          "version": "repo-lines-v1:sha256:e846c1a12f8bd8dfe6191322f0ccab2e217619ac7d804d53c3847a2473437bd2:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBhNzRlMDFkMmQxNDJjOWExNjk0ZGU5MGFkYmIwMjUyYmRkNThjYTRmNTgyZTg2ZmE0MTdjMWNkMzMwYmMyZjgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI0YWYyYWFjN2I0ZTNiNWI3MDJiMDE1YTVjNDBhYzQ2ZTg3MDNiODNjNWE3OGVmYjE1NDdhMzkwODFjNWU0YjIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZkZTAxZGRhM2YwZjY5NDUxMTBkOTA3NmY5ODg3OTQ2ODY1ODU3ZmMwYTViNmM5Y2I5OWY2YTJjNTU4Y2UxNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM0ZWVhNTgwYmRmODU1ODRlMDRmODE0YmEyMDFkMzQ4YjQzM2E3NzllOGE2ZWY4NTRiZTViNTY4YzNkZTQ4YWQifQ"
         }
       ]
     }
   ],
   "verification": {
-    "by": "openwiki/0.5.2",
-    "at": "2026-09-27T10:44:22.630Z"
+    "by": "openwiki/0.6.1",
+    "at": "2026-09-29T15:40:40.317Z"
   }
 }

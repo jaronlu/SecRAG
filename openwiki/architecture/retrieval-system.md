@@ -1,11 +1,8 @@
 ---
 type: architecture reference
 title: 检索系统：混合检索与权限过滤
-description: 本页解释从 Planner 检索计划到 HybridRetriever 执行、向量 + BM25/RRF 融合、双层权限过滤、grade_and_filter 排序与 BGE 语义重排的完整检索子系统，包括分数语义、结果 TTL 缓存与入库失效联动。
+description: 本页解释从 Planner 检索计划到 HybridRetriever 执行、向量 + BM25/RRF 融合、双层权限过滤、grade_and_filter 排序与 BGE 语义重排的完整检索子系统，包括低召回放宽轮与多跳早停、分数语义、主来源优先、结果 TTL 缓存与入库失效联动。
 tags: [retrieval, hybrid, permission, rrf, bm25, chromadb, reranker]
-verified:
-  - by: openwiki/0.5.2
-    at: 2026-09-27T10:44:22.630Z
 sources:
   - id: openwiki-source-ce706aa9fc0c231bbb5791c7
     resource: repo://src/agents/graph.py
@@ -37,14 +34,17 @@ sources:
     resource: repo://tests/test_hybrid_retriever.py
   - id: openwiki-source-63834379f410a95d2d054e6b
     resource: repo://tests/test_retriever.py
-generated: { by: "openwiki/0.5.2", at: "2026-09-27T10:44:22.630Z" }
+generated: { by: "codex", at: "2026-09-29T15:40:40.317Z" }
+verified:
+  - by: openwiki/0.6.1
+    at: 2026-09-29T15:40:40.317Z
 ---
 
 # 检索系统：混合检索与权限过滤
 
 SecRAG 的检索不是一个“只查向量库”的步骤，而是一条有明确阶段的流水线：**Planner 生成计划 → 计划级权限过滤 → 向量 + BM25 双路取回 → RRF 融合 → 结果级权限过滤 → grade_and_filter 排序/去重/语义重排 → 截断**。这条链路的入口是 `src/retrieval/hybrid_retriever.py` 的 `HybridRetriever`，它被 `retrieve` 节点（`src/agents/nodes.py`）和 ReAct 检索工具（`src/agents/tools.py`）共用；检索结果随后进入 `grade_and_filter` 节点做统一整理，最终交给 ReAct 推理作为证据。
 
-一次问答中，检索子系统在全图中的位置是 `planner → retrieve → grade_and_filter`（条件路由可回到 planner 补检索）。外层图的边界与完整分支见 [问答请求执行链路](../tutorials/request-execution.md) 和 [状态、权限与安全边界](state-and-safety.md)。
+一次问答中，检索子系统在全图中的位置是 `planner → retrieve → grade_and_filter`（条件路由可回到 `retrieve` 放宽重跑或回到 planner 重新规划）。外层图的边界与完整分支见 [问答请求执行链路](../tutorials/request-execution.md) 和 [状态、权限与安全边界](state-and-safety.md)。
 
 ## 1. 检索控制流
 
@@ -64,15 +64,23 @@ flowchart TD
     RF --> OK["可用结果 截断到 top_k"]
     OK --> G["grade_and_filter 单量纲排序"]
     G --> RR["BGE Reranker 语义重排 或显式降级"]
-    RR --> T["截断 GRADE_TOP_K 条"]
+    RR --> PS["一手来源优先 _prioritize_primary_sources"]
+    PS --> T["截断 GRADE_TOP_K 条"]
     T --> OUT["混合结果列表 含 denied 占位"]
     PD --> OUT
     DD --> OUT
+    G -.->|"可用结果 < 2 且非 0 召回"| W["widen：top_k 翻倍重跑检索"]
+    W -.-> FE
+    G -.->|"0 召回且轮次耗尽"| NR["no_results_response 短路"]
 ```
 
-图：检索控制流——计划级与结果级两道权限过滤、向量 + BM25 双路与 RRF 融合、超量取回先于截断、grade_and_filter 排序/重排/截断。
+图：检索控制流——计划级与结果级两道权限过滤、向量 + BM25 双路与 RRF 融合、超量取回先于截断、grade_and_filter 排序/重排/主来源优先/截断，以及 widen 放宽轮与零召回短路。
 
-`HybridRetriever` 本身不生成计划、不循环调用 Planner：多跳次数由 Agent Graph 的条件路由（`should_retry_retrieval`，上限 `DEFAULT_MAX_HOPS`）控制，一次 `retrieve` 调用只执行一轮给定计划。每个步骤按 `source` 映射到工厂类（`_SOURCE_RETRIEVER_FACTORIES`：product / regulation / report / faq），由 `_get_retriever` 实例化并缓存。
+`HybridRetriever` 本身不生成计划、不循环调用 Planner：多跳由 Agent Graph 的条件路由 `should_retry_retrieval`（`src/agents/graph.py`，上限 `DEFAULT_MAX_HOPS`，计数器由 `retrieve` 节点维护）控制，一次 `retrieve` 调用只执行一轮给定计划。每个步骤按 `source` 映射到工厂类（`_SOURCE_RETRIEVER_FACTORIES`：product / regulation / report / faq），由 `_get_retriever` 实例化并缓存。
+
+**多跳路由有五种出口**（`RETRIEVAL_RETRY_ROUTES`）：全部结果被拒走 `denied`；已有 `RETRIEVAL_SUFFICIENT_RESULTS`（2）条可用结果即 `continue` 进入推理（ISSUE-12，不再为置信度评级硬凑证据数）；**非 0 的低召回走 `widen`**——只把 top_k 翻倍重跑检索（ISSUE-24）；0 召回才回 `query_understand` 重新规划；重试耗尽仍 0 召回走 `no_results` 短路（ISSUE-3），不再让模型无证据作答。
+
+**低召回放宽轮**（ISSUE-24）：`retrieve` 节点读 `STATE_RETRIEVAL_WIDENING`，大于 0 时把计划里每步 `top_k` 经 `_widen_top_k` 放大（`WIDEN_TOP_K_FACTOR = 2`，上限 `MAX_WIDEN_TOP_K = 20`）后重跑。放宽是廉价动作（只重跑检索）；`_plan_signature` 以 source/query/filters 计算计划实质指纹，与上一轮相同的计划再跑不会带来新证据，因此重规划只留给 0 召回。
 
 ## 2. 双层权限过滤
 
@@ -104,7 +112,7 @@ flowchart TD
 
 ## 5. BM25 关键词检索与 RRF 融合
 
-`BM25Retriever` 与向量检索互补：向量擅长语义相似，BM25 擅长精确术语（法规条款号、股票代码、产品名）。它在 `_get_index` 中从 ChromaDB collection 全量加载文档（分批 5000）用 jieba 精确模式分词，构建 `BM25Okapi` 索引；索引带**模块级缓存**，key 是 `persist_directory`（稳定的索引身份，不是 engine 实例的 id）。
+`BM25Retriever` 与向量检索互补：向量擅长语义相似，BM25 擅长精确术语（法规条款号、股票代码、产品名）。它在 `_get_index` 中从 ChromaDB collection 全量加载文档（分批 5000）用 jieba 精确模式分词，构建 `BM25Okapi` 索引；索引带**模块级缓存**，key 是 `persist_directory`（稳定的索引身份，不是 engine 实例的 id）。jieba 全量分词耗时 10–30s，`warmup()`（ISSUE-16）让 API 启动时在后台显式触发一次全量索引构建，避免把这笔开销压到重启后的首个请求上。
 
 **构建失败静默降级**：`HybridRetriever._get_bm25_retriever` 懒加载 BM25；构造或索引构建抛异常（如 ChromaDB 为空、依赖缺失）时把 `_bm25_retriever` 置 None 并返回，`retrieve` 里对 BM25 的整个调用块也包在 try/except 中——任何失败都静默回退为**纯向量检索**，不阻断请求。
 
@@ -118,15 +126,16 @@ flowchart TD
 
 返回顺序即融合排序；下游不得再用原始 `score` 重排或阈值过滤融合结果（见第 7 节分数语义）。
 
-## 6. grade_and_filter：单量纲排序、阈值、去重、BGE 语义重排
+## 6. grade_and_filter：单量纲排序、阈值、去重、BGE 语义重排、主来源优先
 
 `grade_and_filter`（`src/agents/nodes.py`）对本轮 `retrieval_results` 做统一整理，产出交给 ReAct 的证据。它先把 denied 结果摘出（保留到末尾供上层提示“部分结果无权查看”），再对可用结果依次：
 
-1. **单量纲排序**：整个候选池只用一种量纲排序（issues.md 一.5）。带 `rrf_score` 的融合结果直接用该分；未融合的纯向量结果按 cosine 排名折算成 RRF 等值分 **`1/(RRF_K + rank + 1)`**（与 `rrf_fuse` 共用 `RRF_K=60`，两处分数可比）。这样混合池（部分来源有 BM25 命中、部分没有）里的融合结果不会被高 cosine 的未融合结果系统性压底。
+1. **单量纲排序**：整个候选池只用一种量纲排序（issues.md 一.5），由 `_comparable_retrieval_scores` 统一计算——带 `rrf_score` 的融合结果直接用该分；未融合的纯向量结果按 cosine 排名折算成 RRF 等值分 **`1/(RRF_K + rank + 1)`**（与 `rrf_fuse` 共用 `RRF_K=60`，两处分数可比）。这样混合池（部分来源有 BM25 命中、部分没有）里的融合结果不会被高 cosine 的未融合结果系统性压底。
 2. **阈值过滤**：`RETRIEVAL_MIN_SCORE = 0.6` 只适用于**未融合结果的原始 score**；RRF 分数量纲不同（最大约 `2/(k+1)`），带 `rrf_score` 的结果不过滤。
-3. **去重**：以 `source + chunk_id（缺省 content）` 为键去重，避免同一证据反复占据上下文。
-4. **BGE 语义重排**：候选池先限制在 `GRADE_TOP_K * 2` 条以内以控制开销，然后 `_try_rerank_candidates` 调用 `src/tools/rerank.py` 的 `RerankService`（单例、懒加载 `BAAI/bge-reranker-v2-m3`）。Reranker **未配置（ImportError）时显式降级**为 `reranker_status="unavailable"` 并保留原始排序，绝不用 cosine 分冒充语义重排；`RuntimeError` 则记为 `error:<msg>`。`reranker_status` 写入 state，`compose` 据此计算置信度（只有 `applied` 才算高置信的必要条件之一），`_traced_node` 把 `error:` 状态视为显式执行失败。
-5. **截断**：保留前 `GRADE_TOP_K`（10）条，denied 占位符追加在结果末尾。
+3. **去重**：以 `source + chunk_id（缺省 content）` 为键去重，避免同一证据反复占据上下文；候选池先限制在 `GRADE_TOP_K * 2` 条以内以控制 rerank 开销。
+4. **BGE 语义重排**：`_try_rerank_candidates` 调用 `src/tools/rerank.py` 的 `RerankService`（单例、懒加载；模型名取自 `config.rerank_model`，缺省 `BAAI/bge-reranker-v2-m3`）。**当前部署 FlagEmbedding 已安装且权重已本地化，重排真实生效**；仍保留显式降级语义——`FlagEmbedding` 不可导入或模型权重无法获取（`OSError`）都归一为 `RerankerNotConfigured`，映射 `reranker_status="unavailable"` 并保留原始排序，绝不用 cosine 分冒充语义重排；运行期 `RuntimeError`（如分数数量不一致）记为 `error:<msg>`。`reranker_status` 写入 state，`compose` 据此计算置信度（只有 `applied` 才算高置信的必要条件之一），`_node_execution_succeeded` 把 `error:` 状态视为显式执行失败而 `unavailable` 不算。
+5. **主来源优先**（ISSUE-22）：重排后、截断前执行 `_prioritize_primary_sources`——公告/财报（一手来源）提到研报/纪要（转述）之前，两组各自保持相关度顺序，防止同一数字的口径被转述带偏。
+6. **截断**：保留前 `GRADE_TOP_K`（10）条，denied 占位符追加在结果末尾。
 
 重排成功时 `RR_SCORE`（顶层 score）被 `RerankService` 覆写为 BGE rerank 分数——这是 `score` 键语义的最后一次变化。
 
@@ -163,17 +172,19 @@ flowchart TD
 {"$and": [{"date_day": {"$gte": 20240101}}, {"date_day": {"$lte": 20241231}}]}
 ```
 
-任一端无法解析则省略该端；两端都不可解析返回 None（不做时间过滤）。Planner 会把时间过滤器合并进步骤 filters，向量侧直接作为 ChromaDB `where`，BM25 侧由 `BM25Retriever._match_filters` 以同样的 `$and`/`$gte`/`$lte` 契约做后过滤。`tests/test_date_filters.py` 覆盖解析格式、Chroma 兼容性与 BM25 过滤契约。
+任一端无法解析则省略该端；两端都不可解析返回 None（不做时间过滤）。Planner 会把时间过滤器合并进步骤 filters，向量侧直接作为 ChromaDB `where`，BM25 侧由 `BM25Retriever._match_filters` 以同样的 `$and`/`$gte`/`$lte` 契约做后过滤。`tests/test_date_filters.py` 覆盖解析格式（含浮点年份）、Chroma 兼容性与 BM25 过滤契约。
+
+**研报年份语义修正**（ISSUE-2）：研报的发布日期通常晚于报告期（2025 年报的研报 2026 年才发布），查询里的年份是报告期语义，映射成 `date_day` 发布日期硬过滤必然漏检。因此 planner 对 `report_search` 一律不加 `date_day` 硬过滤，日期语义保留在查询文本里参与语义召回；空检索重试时还会放宽（`_retrying_after_empty_retrieval`）已带的日期过滤。
 
 ## 10. ReAct 检索工具复用同一执行器
 
-`src/agents/tools.py` 的产品、法规、研报、FAQ 四个知识检索工具统一经 `_role_aware_search` 构造单步 `RetrievalPlanStep`，实例化 `HybridRetriever` 并执行——与外层 `retrieve` 节点走**完全相同的**计划级/结果级过滤与混合检索逻辑。工具可见性由 `get_tools_for_role` 按 `ROLE_ALLOWED_SOURCES` 过滤；外层图检索已满足的 source 对应工具会被排除，避免重复检索。工具执行边界还有一层 `authorize_reason_tool_call` 授权，无权工具在真正执行前被拒绝（见 [状态、权限与安全边界](state-and-safety.md) 第 4 节）。
+`src/agents/tools.py` 的产品、法规、研报、FAQ 四个知识检索工具统一经 `_role_aware_search` 构造单步 `RetrievalPlanStep`，实例化 `HybridRetriever` 并执行——与外层 `retrieve` 节点走**完全相同的**计划级/结果级过滤与混合检索逻辑。工具可见性由 `get_tools_for_role` 按 `ROLE_ALLOWED_SOURCES` 过滤；外层图检索已满足的 source 对应工具会被排除，避免重复检索；`reranker_available()`（FlagEmbedding 可导入）决定 `rerank_tool` 是否对模型可见。工具执行边界还有一层 `authorize_reason_tool_call` 授权，无权工具在真正执行前被拒绝（见 [状态、权限与安全边界](state-and-safety.md) 第 4 节）。
 
 ## 11. 相关测试
 
 - `tests/test_hybrid_retriever.py`：计划级/结果级权限过滤（未知角色 fail-closed、未知源错误结果、allowed_roles 标签过滤、非公开缺 allowed_roles 默认拒绝）、超量取回先于截断、BM25 来源过滤用 retrieval_source 精确匹配、RRF 排序穿过 grade_and_filter、混合池不压底融合结果、领域检索器共享同一向量引擎；
 - `tests/test_retriever.py`：`_format` 的 distance→score 转换、top_k/filters 透传、领域检索器强制 `retrieval_source` 过滤且 extra filters 不能覆盖该条件；
-- `tests/test_date_filters.py`：date_day 解析格式、Chroma 兼容的 `$and` 上下界过滤器、BM25 `_match_filters` 的 `$and`/范围契约；
+- `tests/test_date_filters.py`：date_day 解析格式（含浮点年份）、Chroma 兼容的 `$and` 上下界过滤器、BM25 `_match_filters` 的 `$and`/范围契约；
 - `tests/test_agents.py::TestCompiledGraphRerankerStatus`：编译后完整图上 `reranker_status="applied"` 可达 compose 并产出高置信；
 - `tests/e2e/conftest.py`：`isolated_stores` fixture 在用例前后调用 `invalidate_retrieval_caches`，隔离检索 TTL 缓存与 BM25 索引缓存。
 
@@ -184,5 +195,6 @@ flowchart TD
 1. **权限不能靠提示词**：计划级与结果级过滤都在执行层强制，denied 结果永远是不带原文的占位符；全部 denied 时图在推理前短路。
 2. **过滤先于截断**：超量取回（3 倍）→ 结果级过滤 → 截断，顺序颠倒会把可访问文档误杀。
 3. **一个量纲一种用途**：`score` 的语义随阶段变化（cosine / BM25 / rerank），排序每阶段只用一个量纲；`rrf_score` 与未融合折算共用 `RRF_K`，融合结果不套 `RETRIEVAL_MIN_SCORE`。
-4. **降级必须显式**：BM25 失败静默降级为纯向量；Reranker 未配置降级为 `unavailable` 并影响置信度，而不是冒充重排。
-5. **缓存生命周期与知识库统一**：检索结果 TTL 缓存与 BM25 索引由 `invalidate_retrieval_caches()` 在入库发布后一并失效；embedding 模型切换必须全量重新入库，检索器在模型不一致时抛 `RuntimeError`。
+4. **降级必须显式**：BM25 失败静默降级为纯向量；Reranker 未安装或权重未本地化降级为 `unavailable` 并影响置信度，运行期故障记 `error:` 并视为节点失败——两者都不冒充语义重排。当前部署重排真实生效。
+5. **低召回放宽，零召回重规划**：非 0 低召回只翻倍 top_k 重跑检索（廉价）；0 召回且重试耗尽直接短路返回“未找到资料”，绝不进入无证据推理。
+6. **缓存生命周期与知识库统一**：检索结果 TTL 缓存与 BM25 索引由 `invalidate_retrieval_caches()` 在入库发布后一并失效；embedding 模型切换必须全量重新入库，检索器在模型不一致时抛 `RuntimeError`。

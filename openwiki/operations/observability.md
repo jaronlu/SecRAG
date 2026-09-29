@@ -3,9 +3,6 @@ type: operations reference
 title: 观测与运维：审计、指标、追踪、缓存与限流
 description: SecRAG 的部署与排障入口：SQLite 审计模型与 outbox 降级、Prometheus /metrics 指标清单与 /health 摘要、Langfuse 追踪的 metadata 白名单与导出层脱敏两层防线及 fail-open 语义、答案语义缓存运维语义（默认关闭、角色隔离、只缓存成功终态、TTL 24h、命中补审计）、进程内滑动窗口限流，以及 docker-compose 单机部署形态与已知边界。
 tags: [observability, audit, metrics, langfuse, cache, rate-limit]
-verified:
-  - by: openwiki/0.5.2
-    at: 2026-09-27T15:51:42.447Z
 sources:
   - id: openwiki-source-b79fbbd921df689b4bbdc82f
     resource: repo://docker-compose.yml
@@ -35,6 +32,8 @@ sources:
     resource: repo://src/utils/rate_limit.py
   - id: openwiki-source-fc93c11230538bb59131c2e8
     resource: repo://src/utils/semantic_cache.py
+  - id: openwiki-source-fc4acfc4f1102287fcb5a79d
+    resource: repo://src/utils/sqlite_support.py
   - id: openwiki-source-d61d83066a37e33b8d45f791
     resource: repo://start.sh
   - id: openwiki-source-ac1d9c4d491f969a45e4c4c6
@@ -45,9 +44,14 @@ sources:
     resource: repo://tests/test_langfuse_acceptance.py
   - id: openwiki-source-8b1d7e20a9755a5f42a5612a
     resource: repo://tests/test_langfuse_wiring.py
-  - id: openwiki-source-0cb9f1daf63b53c123aa6d9d
-    resource: repo://tests/test_semantic_cache.py
-generated: { by: "openwiki/0.5.2", at: "2026-09-27T15:51:42.447Z" }
+  - id: openwiki-source-aed2ef968345082deb0a7a17
+    resource: repo://tests/test_sqlite_support.py
+  - id: openwiki-source-9836d205b3f1f79527a3b19b
+    resource: repo://tests/test_startup_warmup.py
+generated: { by: "codex", at: "2026-09-29T15:40:40.317Z" }
+verified:
+  - by: openwiki/0.6.1
+    at: 2026-09-29T15:40:40.317Z
 ---
 
 # 观测与运维：审计、指标、追踪、缓存与限流
@@ -160,15 +164,16 @@ outbox 本身写失败时只记日志、绝不抛出。`tests/e2e/test_e2e_audit
 
 API 入口 `start_request_trace` 建根 trace（`agent.request`），`set_current_trace` 挂到 contextvar，请求 finally 里 `reset_current_trace` + `trace.finish`。节点侧 `start_node_span` 取当前 trace 建 span；`_traced_node` 包装器给每个外层图节点建 span（`_node_span_metadata` 只放标量：检索数、重试数、验证/合规状态、模型名），ReAct 子图内 `call_reason_model` 手动建 `call_reason_model` span（含 token 用量与尝试序号），工具 span 在 `authorize_reason_tool_call`（图线程内）创建——权限校验失败的调用不产生工具 span。回调经 `RunnableConfig.callbacks` 传入 LangGraph，覆盖节点内 LLM 调用与工具调用；传播依赖 Python 上下文语义（`asyncio.to_thread` 与 LangGraph astream 复制 context），工具线程池 `executor.submit` 不复制 context 但工具 span 在创建侧不受影响。未采样/未启用时 handler 为 None，业务零感知。
 
-## 5. 语义缓存：默认关闭、角色隔离、只缓存成功终态
+## 5. 语义缓存：默认启用、六维绑定、只缓存成功终态
 
 `SemanticCache`（`src/utils/semantic_cache.py`）基于 embedding 余弦相似度（阈值 0.90）复用历史答案。运维语义：
 
-- **默认关闭**：`semantic_cache_enabled` 默认 `false`（`src/config.py` 与 `semantic_cache.py` 的 `DEFAULT_CACHE_ENABLED=False`）——缓存未绑定会话上下文与知识库版本，且命中路径绕过会话保存/审计；重新启用前需满足 issues.md 一.1 的条件；
-- **角色隔离**：`cache_entries.role` 参与查询条件，跨角色不得命中（TC-033）；
+- **默认启用（ISSUE-26）**：`semantic_cache_enabled` 默认 `True`——启用条件已全部落地：缓存绑定身份与授权范围、客户上下文、规范化问题、上下文摘要哈希与知识库版本；只缓存验证与合规均通过的成功终态；命中路径仍写审计并保存会话回合；
+- **六维绑定**：`CacheBinding` 六个维度（`role`、`user_id`、`client_id`、`permission_scope` 授权范围指纹、`normalized_query` 规范化问题、`context_hash` 上下文摘要哈希、`kb_version` 知识库版本指纹）在 SQL 层全部等值匹配后才进入 embedding 相似度比较——跨用户/跨客户/跨权限集/跨知识库版本都不会复用。`kb_version` 取自 `document_registry` 的文档数 + 最近入库时间哈希：入库成功必然改变指纹，缓存条目随之自然失效，不依赖进程内通知（入库 CLI 与 API 是两个进程）；注册表缺失时指纹为空串，行为退化为未绑定版本；
+- **角色隔离**：绑定维度中的 role/user_id/client_id/permission_scope 使跨角色不得命中（TC-033）；
 - **只缓存成功终态**：API 层仅在 `answer` 非空且长度 > 10、`compliance.passed` 与 `verification.passed` 均为 True 时 `cache.store`（TC-034：合规未通过/答案过短不入缓存）；store 时把 compliance/verification 终态快照随条目落库，命中时原样返回（不再硬编码 `passed=True`，旧库自动补列）；
 - **TTL 24h**（`DEFAULT_CACHE_TTL_SECONDS=86400`），过期条目 lookup 不命中，`clear_expired` 可清理（TC-035）；
-- **命中补审计**：命中路径补 `semantic_cache_hit` 持久化审计并复用 outbox；命中相似度/hit_count 等内部字段只进审计与指标，**不进响应体**——命中与普通路径返回同一 `AssistantQAResponse` 字段集（TC-032 断言 `"cached"`、`"cache_similarity"` 不在响应体）；
+- **命中补审计与会话回合**：命中路径补 `semantic_cache_hit` 持久化审计（`execution_path=["semantic_cache_hit"]`，verification/compliance 取命中快照）并调用 `_persist_cache_hit_turn` 保存会话回合，失败复用 outbox；命中相似度/hit_count 等内部字段只进审计与指标，**不进响应体**——命中与普通路径返回同一 `AssistantQAResponse` 字段集（TC-032 断言 `"cached"`、`"cache_similarity"` 不在响应体）；
 - 存储用 SQLite WAL 模式 + 线程本地连接；命中率按真实 lookup 请求口径统计（`lookup_hits / lookup_total`），禁用态与空查询的短路不计数（`tests/test_semantic_cache.py`）；
 - **admin 缓存统计/清理端点**：`GET /v1/admin/cache/stats`（admin/technical）返回 `get_stats()`（条目数、命中率、阈值、TTL、enabled）；`POST /v1/admin/cache/clear`（admin/technical）按 `clear_expired_only` 清理过期或全清（`clear_all` 同时归零命中计数）。
 
@@ -182,9 +187,15 @@ API 入口 `start_request_trace` 建根 trace（`agent.request`），`set_curren
 - 流式 QA：超限返回 **SSE `error` 事件**（`event: error` + `{"type":"error","detail":"请求过于频繁"}`），HTTP 状态仍为 429；
 - 限流窗口与计数在**进程内存**中，多 worker/多实例各自独立——模块注释明确：生产环境应替换为 Redis 分布式限流，此为单节点部署的轻量实现。
 
-## 7. 部署形态与运维入口
+## 7. SQLite 健壮性与启动预热
 
-### 7.1 docker-compose 单容器
+- **统一连接入口（ISSUE-18）**：所有 SQLite 存储（审计、会话、语义缓存、入库注册表、持仓/扫描）经 `src/utils/sqlite_support.py` 的 `connect_sqlite` 打开——统一 `journal_mode=WAL` 与 `busy_timeout`，写写不再互斥阻塞；各 store 的 DDL 应用按库路径做进程级去重（`_schema_applied_paths`），避免每操作重放 DDL；
+- **同步 IO 移出事件循环（ISSUE-18）**：API 层的同步 SQLite 调用（`ensure_thread_for_qa`、缓存 lookup/store、图执行）经 `asyncio.to_thread` 放到线程池，事件循环不再被磁盘 IO 阻塞；
+- **启动预热（ISSUE-16）**：服务启动时在后台线程依次预热图编译、向量引擎（Chroma 连接 + embedding 模型）、BM25 全量索引（jieba 分词 10-30s 不再落在首个请求上），逐步记录耗时日志（`secrag.warmup`）；单步失败只告警不阻断启动（`tests/test_startup_warmup.py`）。
+
+## 8. 部署形态与运维入口
+
+### 8.1 docker-compose 单容器
 
 `docker-compose.yml` 定义单服务 `secrag`：
 
@@ -195,13 +206,13 @@ API 入口 `start_request_trace` 建根 trace（`agent.request`），`set_curren
 
 `start.sh` 是本地/裸机启动入口：默认 `127.0.0.1:8001`（可用 `HOST`/`PORT` 覆盖），日志 tee 到 `/tmp/secrag-<port>.log`，端口被占时默认 kill 现有进程（`KILL_EXISTING=0` 可关闭），`BUILD_FRONTEND=auto|always|never` 控制 React 前端构建，最终 `uv run uvicorn src.api.main:app`。Dockerfile 侧由 uvicorn 直接启动。
 
-### 7.2 已知边界（单机形态）
+### 8.2 已知边界（单机形态）
 
 - **内存 checkpointer**：`build_agent_with_checkpoint` 用 `InMemorySaver`（`src/agents/graph.py`），服务重启后不恢复图执行状态；会话内容已由 SQLite 持久化，但图级中断不恢复；
 - **单机 SQLite 与单进程后台入库**：会话、审计、语义缓存均本地 SQLite；入库后台任务（`create_ingestion_run` 的 `BackgroundTasks`）基于单机进程，**不支持多实例任务调度**；
-- **限流为进程内**（见上节）；**语义缓存默认关闭**（见第 5 节）。
+- **限流为进程内**（见第 6 节）；语义缓存已默认启用，但命中依赖六维绑定，跨进程入库后由知识库版本指纹自然失效（见第 5 节）。
 
-## 8. 聚焦测试
+## 9. 聚焦测试
 
 | 测试 | 覆盖 |
 | --- | --- |

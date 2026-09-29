@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:8e8d6df93e2372247a1ffcc5f29c7d8343475806c38ece8287d9eb572b8e2d98",
+  "pageVersion": "sha256:0bccf8f1c751ef8b324914e9dbb19bb6e2078fbed8e298dd592ad37f8f2fbaf8",
   "claims": [
     {
       "id": "claim_f2baa53d146b4545bfb08aad3fc360a0",
@@ -110,47 +110,51 @@
     },
     {
       "id": "claim_0404ac2a439d4cefa27d4612c79b3a04",
-      "statement": "data/raw 包含两组数据资产：demo_knowledge_base 最小样例知识库（samples 按 product/regulation/faq/report 分类 + announcements 解析样例，每个源文件旁有 .meta.json 权限清单）；real_securities_data 公开来源证券数据固定样本（announcements 年报、reports 研报、financials 行情/估值 CSV 与 research_reports_index.csv、整体 metadata.json 清单）。",
+      "statement": "data/raw 包含两组数据资产：demo_knowledge_base 最小样例知识库（samples 按 product/regulation/faq/report 分类 + announcements 解析样例，每个源文件旁有 .meta.json 权限清单）；real_securities_data 为 2026-09 演练刷新的三只代表股（000001/300750/600519）2026 年报固定样本，权限清单逐文件以同名 .meta.json 边车维护（聚合清单 metadata.json 已停止跟踪并移除）。",
       "evidence": [
+        {
+          "resource": "repo://.gitignore#L14-L20",
+          "version": "repo-lines-v1:sha256:3a06f4802e227c74a436bef751f9abd8e7b55c4758beb31eb7a0149bf5b09ea5:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmZkNjhjNzU5NWUyYjE3ZWMyYTZjZDRhMTJiY2YzMTkwMDA4ZDk1YTFkYmZiYzBhMDcyODE5YjM2Mzk3MmM0MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmUxOGNjMWEyZDMxMjA5MmFiMmFjMjhkNGY5MzNmOWVmMWViZjZiMTdjNWIyODgyZGI1ZWRkMDg0ZmZlZGY2ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDBmMWM5NjAwYmY1NmQxNzY0ODE3ZmRmZDMwZGNiZTliMWI4NjdiNWFiN2U3YmRjMTYzMzc0Njk0MzM4ZTkzZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTBlZTYzNDcyYjZiM2M1MzAxZDhhZDk2YmU4NGFmNzgyNjRkYjRhNWIwNzVhM2Y3ZmZjY2RjZDYxYzRjMDUzOSJ9"
+        },
         {
           "resource": "repo://README.md#L206-L210",
           "version": "repo-lines-v1:sha256:25124de6697e674078715e02d35c7a2a24288a5ce75f6ea1ebcb294ddd18b5c0:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTUzNmFjNmI4MTA5MzdjNThhMjAzMjUwODg2NWJhYzRlYTExMGUwYmFkYzE0YjU2NmI1NWJhMDNkNGQyODQwMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjNjMGQ4N2RlMGU0YWIxYTJjODRmYWIzMmRiZDU3ZTFiOGUyMTEzNzFlM2ZjMWRhZGJjZWZhYjRhOTIxMmMzYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmYxYTU0YzQ4MGM4YzMxYjU1ZTFkNmI1MDgwMzc4MmFhMDI3MGQyN2ZiMDYxMzEzMjJmODVhYTg4YzVjMjViNSJ9"
         },
         {
-          "resource": "repo://data/raw/real_securities_data/metadata.json#L1-L33",
-          "version": "repo-lines-v1:sha256:0cc9599fc1781fae974e3ffa6c50a3201a040038c8194bad9d1ea9bf0dad86f4:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE2ZmIwOGZkYTFhY2I5NTdiNjExNmJkMzc4MTFhMWZlNDFhMDE2MTFjMDYzMWVkYmY3ODZkNjg4OWEyN2E1NWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRkNWNkMmZiNGYzZGY4ODQ1MTUyNTViMzk1MjNmMmY4YjU0NzJiZWVhOWY1NjZmZmNhMjA0ZGI4MDI1NjEwNDEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVhZmMyYjI4YjAwZDZkMzk2NTIyODBjNWRhNmM3ODI4ODU5YzdmMjgyYjVmZTI5Y2E0ZGM0MDc4ZmZhNGNlMWUifQ"
+          "resource": "repo://data/raw/real_securities_data/announcements/000001_2026.pdf.meta.json",
+          "version": "repo-file-v1:sha256:49c93f14ba462dac899e8dd3e8abfe5b758895497ab8d8529d9339f6361ff5bc"
         }
       ]
     },
     {
       "id": "claim_178ddfb73e7f466b97d473724e671fc5",
-      "statement": "SQLitePortfolioStore 的所有读写按 user_id 隔离，越权（含删除的、他人持有的）统一按不存在处理：_find_row 以 position_id AND user_id 查询，未命中抛 PortfolioNotFoundError，调用方无法探测其他用户持仓存在性。",
+      "statement": "SQLitePortfolioStore 的所有读写按 user_id 隔离，越权（含删除的、他人持有的）统一按不存在处理：_find_row 以 position_id AND user_id 查询，未命中抛 PortfolioNotFoundError，调用方无法探测其他用户的持仓存在性。",
       "evidence": [
         {
-          "resource": "repo://src/portfolio/store.py#L1-L9",
-          "version": "repo-lines-v1:sha256:12eb110a305f69ff96f22a9d0c0757fd0d0ad110b18688f340beb0c2cb5f605c:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMGQ3MGRjZDk5OTliNDE4NWIyNTkyNzViODI5YzI2OTA5NzkyMjU1NGU5NDlmMTA1MTM2ZTY3NmM2Njg3Njc1ZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjY1OWE4NDk2Zjc5YWZjNmY4MmVhYzliM2ZlYWIwZDFlNWEzOGE4MTVmYWVjZDJlNGUxNjZlNmMyOGZjZDJiNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWFhZjc2MzdjYjZlN2U1ZGI4NWQ2MzQyNzQ2MDE0ZGYwNDFjY2Q1NThhOTIwYjI5ZWI2YWM3MTlkN2JhZjVjMiJ9"
+          "resource": "repo://src/portfolio/store.py#L1-L11",
+          "version": "repo-lines-v1:sha256:3f97b70ffd9f0c0a10601a6ba818127fea22435003b4148a17fb9c835dfad4ec:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBkNzBkY2Q5OTk5YjQxODViMjU5Mjc1YjgyOWMyNjkwOTc5MjI1NTRlOTQ5ZjEwNTEzNmU2NzZjNjY4NzY3NWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc1YjI4MDVkOWQyZjk4NjgyNzM5NjE2ZjAwNTk2NDQwNjE2ODc3NWYxYzBmN2FhYWYxYzhhMzY0NWQ2OTYyYjAifQ"
         },
         {
-          "resource": "repo://src/portfolio/store.py#L245-L259",
+          "resource": "repo://src/portfolio/store.py#L247-L261",
           "version": "repo-lines-v1:sha256:2813881dca0b6abf81893bc7c9d670d0d3556d123613bd1a1f7f790a6ee1df6c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgxMDc2MmZjZWY2YTU0ZTIwODZkYzkzNDViZjdkMDU5MzQwYjExNzllMjMyZTgxZGQ4YWYyZWFhOWY5ZDhmZTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlmYjU1ZjZlZDBkNmVkZmJmZWRlZGUwYTFlYTU2YjRmOTliZWQyYzY5YjAyZDcxNTRjODNkMGRiM2QzMmFjZmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjEyNDE5NGU3MTBmNmI4Y2I0ZjliOTcyYjEwNDU0NTZiZTc2ZGM1MDU1NDllZGYyNWYwNDllNzFmNDZmODA0YTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImYxOWY4ODdiN2I5MGFhYTc4ZGEzZGZiYTcxYTgzMjRlNjlmNTAxYjc0ZWVhYThkMTkxZDA0ODVmZDM0YmVjZmIifQ"
         }
       ]
     },
     {
       "id": "claim_518bc40b10504352b15fcebdcd89912a",
-      "statement": "持仓与关注池共用一张 portfolio_positions 表，position_side 取 long/watch 区分；remove_position 软删除（deleted_at + status=deleted），重新 add_position 复活旧行复用 position_id；同一用户同一 side 的活跃重复标抛 DuplicatePositionError，weight 越界或 side/source 非法抛 InvalidPositionError。",
+      "statement": "持仓与关注池共用一张 portfolio_positions 表，position_side 取 long/watch 区分；remove_position 软删除（deleted_at + status=deleted），重新 add_position 复活旧行复用 position_id。",
       "evidence": [
         {
-          "resource": "repo://src/portfolio/store.py#L228-L243",
-          "version": "repo-lines-v1:sha256:d0cbedc1b3b00db40e5311c80dba253592f73252614f5225d297749194570844:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI3NDJhM2FmNjE1NmVhYmJhOTdjNzQwMDY0ZjRjYjdkYmRiMjI0YzdlOGRkOTk4ZmY2ZTZjMjNlYjYxYzdiOTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlmNDkwMmFmMzQzOGNjZmNlM2ZkNzE1YmU1NTc2NDI2ZTFjYTRkYjlmMmQwMzExMjljZTQ5YzAwYTY5MGM1MjEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMyMGY1NmFlMTMxNjc4MjkxMzg3NWY1ODA2NjY4NGQyNjQ2NGYxYjcwZmQwZGUwZTBhMGFhYzUyMGEwMDgwMjciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM3NmFhOTVkN2UzMzM0MWMzMzJmNmYxN2MwOTE1NTI3YTcwYTQzZWJhYjA0YzRmZjExYTIyOTFkYmQxZGUzNTkifQ"
+          "resource": "repo://src/portfolio/store.py#L230-L245",
+          "version": "repo-lines-v1:sha256:7d5ea47bfe6ea672ee87fe2dcdc08c5a54400cb3a6be059c00fbd02c1abc3d8e:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI3NDJhM2FmNjE1NmVhYmJhOTdjNzQwMDY0ZjRjYjdkYmRiMjI0YzdlOGRkOTk4ZmY2ZTZjMjNlYjYxYzdiOTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlmNDkwMmFmMzQzOGNjZmNlM2ZkNzE1YmU1NTc2NDI2ZTFjYTRkYjlmMmQwMzExMjljZTQ5YzAwYTY5MGM1MjEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMyMGY1NmFlMTMxNjc4MjkxMzg3NWY1ODA2NjY4NGQyNjQ2NGYxYjcwZmQwZGUwZTBhMGFhYzUyMGEwMDgwMjciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM3NmFhOTVkN2UzMzM0MWMzMzJmNmYxN2MwOTE1NTI3YTcwYTQzZWJhYjA0YzRmZjExYTIyOTFkYmQxZGUzNTkifQ"
         },
         {
-          "resource": "repo://src/portfolio/store.py#L300-L313",
+          "resource": "repo://src/portfolio/store.py#L302-L315",
           "version": "repo-lines-v1:sha256:088f26ad882ab792d1dc8f4b4acf141ea918c2d37e6c86890f4d1f0b886eca67:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ4ODQ2NjQ2OTE5YTcwNDFiMWJiMGFhNTIyYTI5OWY3Zjg4ODk2ODI5YmU0NjNiMTI0ZDBkOWNlNTUxZDE5ZmMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI1ZjNjYzE0YjUzMTkwZTFjZDU4MTc0MDY4NDljNmU1ZWQ1YjZhMGIxOGQ2ZTkwYTlkNjhiZmM1MjE5ZDUyMmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIzZGYyYWNmMDZlOGMzZjAzYzcxMzVjNmU4YWM1YTljYTU0MzJhYmUwNmE3NGFjYTBmZGQ5YTUzYTAwOGY5ODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
         },
         {
-          "resource": "repo://src/portfolio/store.py#L52-L131",
-          "version": "repo-lines-v1:sha256:0c96673590c50172a4a8147c058ac12bcdacc1de550eab5bce24acbbdd4e6030:eyJzZWxlY3RlZExpbmVDb3VudCI6ODAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUyZDNiMzI5MTc5MDcyZTdkZWZiOGVmMWM0YzgxNzA0MWJiN2FkODFhNWRkNjdlOTYyYjEyODU0ZDUyNWJkMzIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUxMjY1OGI2ZGNlMGEwZTJjNjRjYmU3NjIwN2UyZmI2MDM1OGJhNTRmMTFmMzFmMTg2YTRiZDA5MDAzNWQ2ZTIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJjOTBhZmFmZWQ5MzE1OTIxNzBiNTA0MjVkYWQ1MjY1ZDYyMWE4ZjNmMWFiZGI4MjgwNTcwMDc4MzJkNWU5NjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZhNDVhMmY3Zjg4N2NjYjdlMGQ4Njk5N2I5Mzg1NDgyNGMzMjE3OGZmY2U0YjZhMDgzY2FiNDRlM2MwMDA3ZTMifQ"
+          "resource": "repo://src/portfolio/store.py#L54-L133",
+          "version": "repo-lines-v1:sha256:71c5fe7467a7d2b8825ab8855d20eada03e354b019a1cd9e0dd7762168d0651b:eyJzZWxlY3RlZExpbmVDb3VudCI6ODAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUyZDNiMzI5MTc5MDcyZTdkZWZiOGVmMWM0YzgxNzA0MWJiN2FkODFhNWRkNjdlOTYyYjEyODU0ZDUyNWJkMzIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUxMjY1OGI2ZGNlMGEwZTJjNjRjYmU3NjIwN2UyZmI2MDM1OGJhNTRmMTFmMzFmMTg2YTRiZDA5MDAzNWQ2ZTIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJjOTBhZmFmZWQ5MzE1OTIxNzBiNTA0MjVkYWQ1MjY1ZDYyMWE4ZjNmMWFiZGI4MjgwNTcwMDc4MzJkNWU5NjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZhNDVhMmY3Zjg4N2NjYjdlMGQ4Njk5N2I5Mzg1NDgyNGMzMjE3OGZmY2U0YjZhMDgzY2FiNDRlM2MwMDA3ZTMifQ"
         }
       ]
     },
@@ -163,7 +167,7 @@
           "version": "repo-lines-v1:sha256:630fbb752a164f81dde791b2c11158b29ab131becb3fbaa34195e1e4c91d38a5:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMGM3OWJjY2ExNTQ3NGUxYjc1ZDEzMjdkYWZmMDAxMjYyZDZhZWM0MDJjM2YyMTljZGY0Y2RmZDlmYzIyMDRiNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGEyY2M4MTA1NWMyYWEyYzNhZDllZmNlMmRhYjllYWQ4NmUxMTE5NDFlOGZlNGQ3ZGE5MjkyOGMxYjM0OWNhNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmQxYTExYzlkZDMwYWU2MWIzNjBkNWM2NDJmMmJjZjYyZDY0ZTgxZjljZjM5OTQ3ZDQ3YThlMjYzOWY0OGUwYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDk0ZjUxNTM2OGY2NTZhYjlhYmFlODlkNGI4NzJjZDNmMzdhZDMxNThhN2ZlN2JmNTIwNTljMWQ4MWE5NDQ1YSJ9"
         },
         {
-          "resource": "repo://src/portfolio/store.py#L174-L178",
+          "resource": "repo://src/portfolio/store.py#L176-L180",
           "version": "repo-lines-v1:sha256:5c8c59c3c385c069c81939db94a8ae78f9266d7867f2f1e6dd5d060de4a45410:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2U4N2I2ODhmODRmY2U1NDRmYjAyZmI2ZjJkNTM0YzE1ZDFkMDAxZTRhZThjYWFlODU3MzMyMmJkOGE4NDUzYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMTIzNjBkOGVmOWYzOWViZGIyNmM5ZmZjNDYxMGJmNGI4MzJhMGE5NGRiOTg2ZjA1N2Q3NWRhOWMzMjRkMDVkNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjU4MDRkMmMzOTk0ODg4MDc2Y2M0ZjBmMDI3MmVlZTliODJhNjdiMzI1MjFmNDM3Y2U5YTkzNmEwMGUyMGU5NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMGUzYjg1MzNmY2E5OWE3ZWQ0ZDk5ODZjNzdiMjdjYjUzODg2MTJhOGZjNDNjMGI3ZmNjNjUyNDQ2MDgyOWM1ZiJ9"
         }
       ]
@@ -295,10 +299,38 @@
           "version": "repo-lines-v1:sha256:6ce95f01674b0bcbea7109728ff3f5360a678c641e541710ee6397aeb48fddf1:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAyLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI3YWQzYTQyN2MwMDU2OTY5NjdlMDg0OWViNzdmOTRjNTNhNWNiZGI3ZTAyNDU3ZDA0M2JhNTNiNGU2N2MxNmRmIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwYmZlYzhhMzViYjRlZjY0YzllZDI3ZDk0ZmEwZTU5YzIyOGIwNDQyNDczMTk3ZTdiZWY3YjJlMDc4NTRlNGZiIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiI5OGQyMjkzMWMzMWNiOTkxZGQ4NWNkYzVlODMwNTdmMzhkZWJiYWM1YmYzZGNkZDk2YzIyYWY0MDBhNjEyMzk5IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MiwiZm9sbG93aW5nQ29udGV4dEhhc2giOiJlNWMxMjljM2VjYzgyYzM4Y2RkZGJkOGYwYjQ1Mjg2OTM1NTUzM2UxMzQ0ZWI0YTEwMGUxNzY4NTg4YTE4ZTk3In0"
         }
       ]
+    },
+    {
+      "id": "claim_c9d28e7251dc49b08a630053c16335c1",
+      "statement": "抓取水位与失败清单是机器本地产物：.fetch_state.json 与 .fetch_failures.json 写入产物目录但已被 .gitignore 排除（data/raw/real_securities_data/.fetch_*.json），聚合清单 metadata.json 同样停止跟踪——仓库只固定样本与逐文件 .meta.json 边车。",
+      "evidence": [
+        {
+          "resource": "repo://.gitignore#L14-L20",
+          "version": "repo-lines-v1:sha256:3a06f4802e227c74a436bef751f9abd8e7b55c4758beb31eb7a0149bf5b09ea5:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmZkNjhjNzU5NWUyYjE3ZWMyYTZjZDRhMTJiY2YzMTkwMDA4ZDk1YTFkYmZiYzBhMDcyODE5YjM2Mzk3MmM0MCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmUxOGNjMWEyZDMxMjA5MmFiMmFjMjhkNGY5MzNmOWVmMWViZjZiMTdjNWIyODgyZGI1ZWRkMDg0ZmZlZGY2ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDBmMWM5NjAwYmY1NmQxNzY0ODE3ZmRmZDMwZGNiZTliMWI4NjdiNWFiN2U3YmRjMTYzMzc0Njk0MzM4ZTkzZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTBlZTYzNDcyYjZiM2M1MzAxZDhhZDk2YmU4NGFmNzgyNjRkYjRhNWIwNzVhM2Y3ZmZjY2RjZDYxYzRjMDUzOSJ9"
+        },
+        {
+          "resource": "repo://scripts/fetch_real_securities_data.py#L367-L381",
+          "version": "repo-lines-v1:sha256:2fbe9ae9cf4f140f95840017b4c8ca956a0bf74356b7f6bb83e91458f3e0a77e:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI2ZDRmZWY1NzdmNzVkNDkyYzJjNDY1OTM2NWQ1YzlkMWEzNTNhNDhmOGVmYjY1YmJiZTlhY2UxN2M1Y2Y5YWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU2YjA0NDkxNDY5NzIyZTgzNjNhOTRlNDA0NDUzOGUwMTNhMmEyMTdlMzZiMWU1NjhiYTYwYWNiN2I0YzhmMmUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk4YzdkYjNiYmI5NGUwZGRiNGQ1NWJmMGNiNzEyOTY5NDllNWY4MDVhYmEzMmYyZmMyYjVjNjM1NDNkM2RkNWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzNDdmNWRmZGYwZTQxMTVhMjdkNjc4ODlkYjBmYmQ4ZjVlNjQ1ZGZmZjExNjAzMjgwMjg4ZDYzY2FiMDBiYzQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_761bf85df552485b90063da0df00a429",
+      "statement": "离线运维脚本补充两条入口：scripts/benchmark_models.py 对候选模型实测 TTFT 与吞吐支撑模型分层选型（ISSUE-20，config.openai_plan_model 的依据），scripts/load_test.py 提供并发压测验证限流、SSE 与请求级截止时间。",
+      "evidence": [
+        {
+          "resource": "repo://scripts/benchmark_models.py#L1-L40",
+          "version": "repo-lines-v1:sha256:28f1e1f98204b06796cf0ef46db656a8d5e654ddce03a6153ed920c239634183:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU0ZjdiY2RhMGJhY2I0YTNhNTIyNjVhNDI4Y2ViMjA5ZWJlMWUzMjk2MTFmYjcyZTcyYmEzZmM0OTcyMDA1YjgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYwMzZhYTYyMWFjOGY0Nzc0MjcyZjljOTJlYTE3YzU5YmM5OWQ3YzU0ZmM1NGRlNzhiNTAxZDMyZmYwMDM4YTUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA2MGIxMTk4MjZiODU1NjhmMjJiYjM1MDM4ODk1NWI1OWQ0ZjMxNzZiZDg3MjFhOWIxNjYyOTljZDQwYTNjYzcifQ"
+        },
+        {
+          "resource": "repo://scripts/load_test.py#L1-L40",
+          "version": "repo-lines-v1:sha256:9bfefd1a8695f638109db6ca671f1607ba1486d13a623585b4199945f62fb586:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE4OGVmNTZkZTc5ZDNjMmM2OWRkZjRjNTA0MTE0MDI4NDA1ZWYzMjg1ZjhmYTk3ZWZjNmIxZjRlYzZjMjczZmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNkYTUzNTI1MWYwYzBkMzZkZDQ5ZjUyMWFlNjMwZjg2ZjY1YjkzYWVlN2QyMjk0MzlhNGE4ZDMzMjQ0NDExNjUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE5MGQ3NjllMGZhZDk0MWVhM2MwMGUxMzc5Y2JlNTlkMTUyMjMwM2ZkZTQ4YTczMjg2M2FkZDM3ZGJhOGFmYjMifQ"
+        }
+      ]
     }
   ],
   "verification": {
-    "by": "openwiki/0.5.2",
-    "at": "2026-09-27T15:51:42.447Z"
+    "by": "openwiki/0.6.1",
+    "at": "2026-09-29T15:40:40.317Z"
   }
 }

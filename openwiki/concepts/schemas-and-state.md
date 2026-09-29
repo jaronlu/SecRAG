@@ -3,9 +3,6 @@ type: concept
 title: 共享模式：字段常量、TypedDict 与 AssistantState
 description: 本页解释 src/schemas/ 作为全项目字段名与枚举值的唯一权威：metadata 键、retrieval_results/plan 键、STATE_* 常量与 AssistantState 字段组、AUDIT_* 常量、doc_type/role/permission/confidence/query_type/source 枚举、默认阈值，以及常量与 TypedDict 必须同步的约定。
 tags: [schemas, constants, typeddict, assistant-state, audit, enums, thresholds]
-verified:
-  - by: openwiki/0.5.2
-    at: 2026-09-27T10:44:22.630Z
 sources:
   - id: openwiki-source-ce706aa9fc0c231bbb5791c7
     resource: repo://src/agents/graph.py
@@ -37,7 +34,10 @@ sources:
     resource: repo://tests/test_api_main.py
   - id: openwiki-source-8fde650e5d06f7cfec59f812
     resource: repo://tests/test_tool_deadline.py
-generated: { by: "openwiki/0.5.2", at: "2026-09-27T09:27:33.494Z" }
+generated: { by: "codex", at: "2026-09-29T15:40:40.317Z" }
+verified:
+  - by: openwiki/0.6.1
+    at: 2026-09-29T15:40:40.317Z
 ---
 
 # 共享模式：字段常量、TypedDict 与 AssistantState
@@ -120,6 +120,10 @@ Chunk 元数据的键，由入库侧写入、检索与审计侧读取：
 - `STATE_RERANKER_STATUS`（`reranker_status`）：值域 `"applied" | "unavailable" | "error:<msg>"`，`compose` 用它参与置信度判定。
 - `STATE_QUERY_SANITIZED`（`query_sanitized`）：bool，查询命中注入指令并已加固时为 `True`。
 - `STATE_CLARIFICATION_NEEDED`、`STATE_PII_DETECTED`、`STATE_LANGUAGE`：查询理解产出的澄清/安全/语言标记。
+- `STATE_VERIFICATION_ATTEMPTS`（`verification_attempts`，ISSUE-25）：每轮 reason 的验证快照列表 `{round, passed, failure_kind, issues, confidence}`，随审计持久化。
+- `STATE_LLM_USAGE`（`llm_usage`，ISSUE-23）：当前节点一次 LLM 调用的 `prompt_tokens/completion_tokens/total_tokens` 计量，落审计后可按请求区分 prefill 与 completion 开销。
+- `STATE_RETRIEVAL_WIDENING`（`retrieval_widening`，ISSUE-24）：低召回放宽轮计数；`retrieve` 节点据此把计划 top_k 按倍率放大重跑。
+- `STATE_RETRIEVAL_PLAN_RAW`（`retrieval_plan_raw`）：`query_understand` 合并产出未规范化的原始计划，`planner` 节点负责规范化成 `RetrievalPlanStep`。
 
 ### 2.5 配置阈值与默认值（SCHEMA-REFERENCE §4）
 
@@ -140,7 +144,9 @@ Chunk 元数据的键，由入库侧写入、检索与审计侧读取：
 | `GRADE_TOP_K` | 10 | `grade_and_filter` 语义重排后保留条数（候选池限 `GRADE_TOP_K × 2` 控制 rerank 开销） |
 | `CONFIDENCE_HIGH_THRESHOLD` | 0.75 | 规则版置信度：最高分达到该阈值且结果数足够才为 high |
 | `CONFIDENCE_MEDIUM_THRESHOLD` | 0.5 | 最高分达到该阈值为 medium，否则 low |
-| `CONFIDENCE_HIGH_MIN_RESULTS` | 3 | 高置信所需最少结果数；同时被 `should_retry_retrieval` 用作“结果不足则补检”的判断 |
+| `CONFIDENCE_HIGH_MIN_RESULTS` | 3 | 高置信所需最少结果数（`compose` 置信度与 `formatter.py` 规则版置信度使用） |
+| `RETRIEVAL_SUFFICIENT_RESULTS` | 2 | `should_retry_retrieval` 的回环阈值（ISSUE-12）：已有 2 条可用结果即不再补检，避免为置信度评级硬凑证据数 |
+| `WIDEN_TOP_K_FACTOR` / `MAX_WIDEN_TOP_K` | 2 / 20 | 低召回放宽轮（ISSUE-24）的 top_k 倍率与上限（定义于 `nodes.py` 模块常量） |
 | `RETRIEVAL_MIN_SCORE` | 0.6 | `grade_and_filter` 阈值过滤：只适用于未融合结果的原始 score；RRF 分数量纲不同，不得用同一阈值 |
 | `RRF_K` | 60 | RRF 融合常数；`rrf_fuse` 与 `grade_and_filter` 的未融合结果等值折算必须共用，否则两处分数不可比 |
 
@@ -200,10 +206,10 @@ Chunk 元数据的键，由入库侧写入、检索与审计侧读取：
 | 用户上下文 | `user_id`、`user_role`、`department`、`data_permissions`、`client_id`、`thread_id`、`turn_id`、`turn_index` |
 | 会话上下文 | `chat_history`（`list[ConversationMessageDict]`）、`conversation_summary`、`resolved_query` |
 | 查询理解与安全标记 | `original_query`、`rewritten_query`、`intent`、`entities`（`QueryEntities`）、`ambiguity`、`query_type`、`query_sanitized`、`pii_detected`、`language` |
-| 检索计划 | `retrieval_plan`（`list[RetrievalPlanStep]`）、`retrieval_attempts` |
+| 检索计划 | `retrieval_plan`（`list[RetrievalPlanStep]`）、`retrieval_plan_raw`、`retrieval_attempts`、`retrieval_widening` |
 | 检索结果 | `retrieval_results`（`list[RetrievalResult]`）、`retrieval_total_chunks`、`retrieval_filtered_chunks`、`reranker_status` |
-| 推理过程 | `messages`（`Annotated[Sequence[BaseMessage], add_messages]`）、`tool_calls`、`intermediate_steps`、`reason_attempts`、`tool_iterations`、`reason_message_start`、`tool_message_cursor`、`reason_started_perf_counter`、`request_deadline` |
-| 验证与合规 | `verification`（`VerificationResult`）、`compliance`（`ComplianceResult`） |
+| 推理过程 | `messages`（`Annotated[Sequence[BaseMessage], add_messages]`）、`tool_calls`、`intermediate_steps`、`reason_attempts`、`tool_iterations`、`reason_message_start`、`tool_message_cursor`、`reason_started_perf_counter`、`request_deadline`、`llm_usage` |
+| 验证与合规 | `verification`（`VerificationResult`，含 `retry_diagnosis`）、`verification_attempts`（每轮快照，ISSUE-25）、`compliance`（`ComplianceResult`） |
 | 最终回答 | `final_answer`、`terminal`、`citations`（`list[CitationDict]`）、`confidence`、`risk_disclosure` |
 | 追踪 | `audit_trail`（`AuditTrail`） |
 
@@ -250,6 +256,7 @@ erDiagram
 - **分数量纲不变量**：`RETRIEVAL_MIN_SCORE` 只过滤未融合结果的原始 score；`rrf_score` 与未融合结果的 RRF 等值折算共用 `RRF_K`，任何一处改 k 必须同步另一处。
 - **终态标记不变量**：只有对外业务终态节点（`compose`、`clarify`、`permission_denied_response`）置 `STATE_TERMINAL=True`；ReAct 中间 `final_answer` 不带标记，SSE 传输层按此区分。
 - **权限拒绝语义**：越权 source 不静默跳过，而是转为显式 `denied=True` 的 `RetrievalResult`/`RetrievalPlanStep`，让上层能提示“部分结果无权查看”；全部 denied 时 `permission_denied_response` 在 LLM 推理前短路。
+- **回环阈值分离**：`RETRIEVAL_SUFFICIENT_RESULTS`（回环阈值，2）与 `CONFIDENCE_HIGH_MIN_RESULTS`（置信度评级所需证据数，3）是两个决策（ISSUE-12）；非 0 低召回走 widen 放宽轮而非重新规划（ISSUE-24）。
 
 ## 8. 关键实现点与相关测试
 
@@ -259,6 +266,9 @@ erDiagram
 
 ## 相关页面
 
+<!-- openwiki: broken internal link [/openwiki/architecture/state-and-safety.md] link "/openwiki/architecture/state-and-safety.md" is root-absolute, which no real consumer resolves against the repository root (not a coding agent reading the page, not GitHub's Markdown renderer, not a local viewer); use a path relative to this file instead. Fix the href or restore the target, then delete this comment. -->
 - [状态、权限与安全边界](/openwiki/architecture/state-and-safety.md)：`AssistantState` 贯穿节点与各层安全边界的运行时视角。
+<!-- openwiki: broken internal link [/openwiki/tutorials/request-execution.md] link "/openwiki/tutorials/request-execution.md" is root-absolute, which no real consumer resolves against the repository root (not a coding agent reading the page, not GitHub's Markdown renderer, not a local viewer); use a path relative to this file instead. Fix the href or restore the target, then delete this comment. -->
 - [问答请求执行链路](/openwiki/tutorials/request-execution.md)：从 HTTP 到最终答案的节点编排，逐节点消费的 state 键。
+<!-- openwiki: broken internal link [/openwiki/tutorials/knowledge-ingestion.md] link "/openwiki/tutorials/knowledge-ingestion.md" is root-absolute, which no real consumer resolves against the repository root (not a coding agent reading the page, not GitHub's Markdown renderer, not a local viewer); use a path relative to this file instead. Fix the href or restore the target, then delete this comment. -->
 - [知识入库链路](/openwiki/tutorials/knowledge-ingestion.md)：chunk metadata（`META_*`）如何写入并被权限感知检索消费。

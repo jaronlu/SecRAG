@@ -32,12 +32,10 @@ sources:
     resource: repo://src/schemas/constants.py
   - id: openwiki-source-a2b25111b2461a3e64cdf27e
     resource: repo://tests/test_ingestion_api.py
-  - id: openwiki-source-8123cc8ef5db38ed71f5a9d6
-    resource: repo://tests/test_ingestion_service.py
-generated: { by: "openwiki/0.5.2", at: "2026-09-27T09:27:33.494Z" }
+generated: { by: "codex", at: "2026-09-29T15:40:40.317Z" }
 verified:
-  - by: openwiki/0.5.2
-    at: 2026-09-27T09:27:33.494Z
+  - by: openwiki/0.6.1
+    at: 2026-09-29T15:40:40.317Z
 ---
 
 # 知识入库链路：文件如何变成可检索证据
@@ -104,16 +102,25 @@ stateDiagram-v2
 
 只要存在失败文件，任务终态就是 `failed`，`error_code` 取第一个失败文件的错误码。`test_execute_run_processes_only_snapshot` 验证排队后新增的文件不会混入本轮处理；`test_source_change_after_enqueue_fails_without_processing` 验证排队后修改文件会让任务失败且不调用处理函数。
 
-## 4. 文件先解析，再按文档类型分块
+## 4. 文件先解析，元素先聚合去噪，再按文档类型分块
 
-`load_documents` 按后缀选择 PDF（UnstructuredLoader，解析失败返回空列表，随后 pipeline 以“解析结果为空”把该文件标记为 failed）、Word、HTML、CSV 或 Excel loader，把文件统一转换成 LangChain `Document`。随后 `chunk_documents` 按 `doc_type` 选择 `RecursiveCharacterTextSplitter`：
+`load_documents` 按后缀选择 PDF（UnstructuredLoader，解析失败返回空列表，随后 pipeline 以“解析结果为空”把该文件标记为 failed）、Word、HTML、CSV 或 Excel loader，把文件统一转换成 LangChain `Document`。
+
+**解析元素先聚合（CHUNKER v2，ISSUE-21）**：UnstructuredLoader 按“一个元素一个 Document”返回，碎片元素直接送切分器时短元素原样通过、`chunk_size` 永不生效、元素之间也从不合并。`chunk_documents` 对带解析元素标记的文档先执行 `aggregate_document_elements`：
+
+- **版面噪声过滤**：`Header`、`Footer`、`EmailAddress` 三类元素直接丢弃（现网曾把 450+414+2 条噪声写进索引）；
+- **相邻同类文本元素聚合**到设计块大小后再切分，`chunk_size` 真正生效；聚合块记录页码区间（`page_spans`），切出的 chunk 回填正确页码；
+- **表格元素整体保留**：`Table` 块不与正文合并，超长表格按 `<tr>` 行切分并把表头/单位行回填到每一片，表头与其描述的数据行不分离；
+- **重复版面去重**：同一文档内指纹相同且 ≥40 字符的 chunk（如跨页重复的表注）只保留首个。
+
+无解析元素标记的文档（CSV/Excel 等纯文本）仍走原路径：按 `doc_type` 选择 `RecursiveCharacterTextSplitter`：
 
 - 研报和法规：约 500 字、重叠 100 字；
 - 公告：约 300 字、重叠 50 字；
 - 财务数据：约 800 字、重叠 200 字；
 - 会议纪要：约 400 字、重叠 80 字。
 
-重叠区的作用是避免一句话刚好被切在两个 chunk 的边界，导致单独检索时上下文不完整。
+重叠区的作用是避免一句话刚好被切在两个 chunk 的边界，导致单独检索时上下文不完整。当前语料（2026-09 演练）已按 CHUNKER v2 重建，约 3,566 个 chunk；chunk_id 与旧版分块不兼容，重新入库后评估集必须重跑生成器。
 
 注意：`ingest_document` 以 manifest 中的 `doc_type` 为有效文档类型（`effective_doc_type = sample_metadata.get("doc_type", doc_type)`），CLI/API 传入的 doc_type 只是缺省值；分块策略和 `retrieval_source` 映射都基于这个有效值。
 
@@ -135,7 +142,7 @@ manifest 不是可选备注：`load_sample_metadata` 会校验权限等级、角
 
 ## 6. Embedding 和 ChromaDB 写入
 
-`get_embedding_model` 优先从本地 HuggingFace 缓存加载配置的模型（`local_files_only=True`），缓存没有才尝试在线下载。`upsert_chunks` 使用稳定的 chunk ID 按 `CHROMA_UPSERT_BATCH_SIZE`（5000）分批 `add_documents`，并在 collection metadata 里记录 embedding 模型名。
+`get_embedding_model` 优先从本地 HuggingFace 缓存加载配置的模型（`local_files_only=True`），缓存没有才尝试在线下载；模型实例按 `(model_name, 设备/参数)` 做**进程级缓存**（ISSUE-15），同一进程内重复入库不再重复加载模型。`upsert_chunks` 使用稳定的 chunk ID 按 `CHROMA_UPSERT_BATCH_SIZE`（5000）分批 `add_documents`，并在 collection metadata 里记录 embedding 模型名。
 
 入库侧（`get_vectorstore` / `upsert_chunks`）与检索侧（`ChromaVectorRetriever`）都会校验 collection 记录的模型与当前配置一致：
 
@@ -172,21 +179,20 @@ ChromaDB 返回的 distance 会在 `ChromaVectorRetriever._format` 中转换成�
 
 ## 9. 一张图记住整条链路
 
-<!-- openwiki: mermaid parse failed and this diagram was converted to a text fence so it does not break rendering. Fix the diagram source and restore the mermaid fence. Parser error: Heuristic: an unescaped angle bracket inside a label breaks rendering; rephrase the label. -->
-```text
+```mermaid
 flowchart TD
-    A["文件 + .meta.json"] --> B["分类预检<br/>路径安全 / manifest 校验"]
-    B --> C["建立任务快照<br/>状态 queued"]
-    C --> D["worker 领取任务<br/>租约 + 心跳续约"]
-    D --> E["执行时快照复检<br/>哈希 / 路径 / doc_type"]
-    E -- "失败" --> F["动作 failed<br/>unsafe_source_path 或 source_changed_after_enqueue"]
+    A["文件 + .meta.json"] --> B["分类预检：路径安全 / manifest 校验"]
+    B --> C["建立任务快照：状态 queued"]
+    C --> D["worker 领取任务：租约 + 心跳续约"]
+    D --> E["执行时快照复检：哈希 / 路径 / doc_type"]
+    E -- "失败" --> F["动作 failed：unsafe_source_path 或 source_changed_after_enqueue"]
     E -- "通过" --> G["按后缀解析为 Document"]
     G --> H["按 doc_type 分块"]
-    H --> I["normalize_chunks<br/>补齐 doc_id / chunk_id / 权限 / 版本"]
-    I --> J["embedding 向量化<br/>模型一致性校验"]
+    H --> I["normalize_chunks：补齐 doc_id / chunk_id / 权限 / 版本"]
+    I --> J["embedding 向量化：模型一致性校验"]
     J --> K["ChromaDB upsert 新 chunk"]
     K --> L["删除旧 doc_id 的 stale chunk"]
-    L --> M["registry 记录动作<br/>created / skipped / replaced / archived / failed"]
+    L --> M["registry 记录动作：created / skipped / replaced / archived / failed"]
     M --> N["invalidate_retrieval_caches"]
 ```
 

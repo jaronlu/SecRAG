@@ -26,10 +26,10 @@ sources:
     resource: repo://src/utils/conversation.py
   - id: openwiki-source-fc93c11230538bb59131c2e8
     resource: repo://src/utils/semantic_cache.py
-generated: { by: "openwiki/0.5.2", at: "2026-09-27T09:27:33.494Z" }
+generated: { by: "codex", at: "2026-09-29T15:40:40.317Z" }
 verified:
-  - by: openwiki/0.5.2
-    at: 2026-09-27T09:27:33.494Z
+  - by: openwiki/0.6.1
+    at: 2026-09-29T15:40:40.317Z
 ---
 
 # 问答请求执行链路：从 HTTP 到最终答案
@@ -50,16 +50,19 @@ flowchart TD
     RESOLVE --> UNDERSTAND["query_understand (注入/PII/语言)"]
     UNDERSTAND --> CLARIFYQ{"有歧义?"}
     CLARIFYQ -->|"是"| CLARIFY["clarify 澄清终态"]
-    CLARIFYQ -->|"否"| PLAN["planner"]
+    CLARIFYQ -->|"否"| PLAN["planner（规范化，不再调 LLM）"]
     PLAN --> RETR["retrieve (双层权限过滤 + BM25/RRF)"]
-    RETR --> GRADE["grade_and_filter (阈值/去重/重排)"]
+    RETR --> GRADE["grade_and_filter (阈值/去重/重排/主来源优先)"]
     GRADE --> DENIEDQ{"全部越权?"}
     DENIEDQ -->|"是"| PERMDENY["permission_denied_response 短路"]
-    DENIEDQ -->|"否"| RETRYQ{"结果不足且未到 DEFAULT_MAX_HOPS?"}
-    RETRYQ -->|"是"| PLAN
+    DENIEDQ -->|"零召回且轮次耗尽"| NORES["no_results_response 短路"]
+    DENIEDQ -->|"否"| RETRYQ{"可用结果不足 2 条?"}
+    RETRYQ -->|"非 0 低召回"| WIDEN["widen：top_k 翻倍重跑检索"]
+    RETRYQ -->|"零召回"| PLAN
     RETRYQ -->|"否"| REASON["reason 子图"]
+    WIDEN --> RETR
     REASON --> CITE["extract_citations"]
-    CITE --> VERIFY["verify 四类验证"]
+    CITE --> VERIFY["verify 五类验证 + 每轮快照"]
     VERIFY --> REASONQ{"验证通过?"}
     REASONQ -->|"否且未到 MAX_REASON_ATTEMPTS"| REASON
     REASONQ -->|"是或超限"| COMPLIANCE["compliance_check"]
@@ -86,6 +89,8 @@ flowchart TD
 5. 懒加载带 checkpointer 的 Agent Graph（首次请求才 `build_agent_with_checkpoint`，避免启动时触发 ChromaDB 连接）；
 6. 以 `thread_id` 作为 LangGraph 的 `configurable` key、`AGENT_RECURSION_LIMIT`（50）作为递归上限，并把 Langfuse callback 放进 `RunnableConfig`。
 
+同步 SQLite 调用（会话确保、缓存读写、图执行）经 `asyncio.to_thread` 移出事件循环（ISSUE-18）；服务启动时已在后台预热图编译、向量引擎与 BM25 全量索引（ISSUE-16），首个请求不再承担模型加载与 jieba 分词的冷启动开销。
+
 如果语义缓存命中（见第 11 节），API 会在进入 Agent Graph 前直接返回存储的答案、引用、置信度和合规快照，并补写一条 `semantic_cache_hit` 审计事件；这条路径仍然带当前线程号和轮次号。命中与普通执行统一经 `_qa_response_from_outcome` 出口返回同一个 `AssistantQAResponse` 结构（thread_id/turn_id/answer/citations/confidence/compliance），命中相似度等内部字段只进审计与指标，不进响应体。
 
 图执行整体受 `asyncio.wait_for(agent.invoke, api_request_timeout_seconds)` 总超时约束。错误映射都在 API 层完成，不让异常响应变成半截答案：
@@ -101,7 +106,8 @@ flowchart TD
 `POST /v1/assistant/qa/stream`（`assistant_qa_stream`）以 SSE 逐事件返回执行进度和最终回答，事件协议为：
 
 - `event: progress`，`data: {"type": "progress", "node": "...", "status": "done"}`
-- `event: answer`，`data: {"type": "answer", "answer": "...", "citations": [...], "confidence": "...", "thread_id": "...", "turn_id": "..."}`
+- `event: answer_delta`，`data: {"type": "answer_delta", "delta": "..."}`——reason 节点 LLM 的 token 级增量（ISSUE-9），`agent.astream` 以 `stream_mode=["updates","messages"]` 且 `subgraphs=True` 运行，只透出 `langgraph_node == "call_reason_model"` 的字符串 token；首个 delta 记录一次 TTFT 指标（ISSUE-23）
+- `event: answer`，`data: {"type": "answer", "answer": "...", "citations": [...], "confidence": "...", "thread_id": "...", "turn_id": "..."}`——终态完整载荷，前端以其覆盖已流出的增量
 - `event: error`，`data: {"type": "error", "detail": "..."}`
 - `event: done`，`data: {"type": "done"}`
 
@@ -137,13 +143,13 @@ flowchart TD
 - 用已知注入模式（含 Unicode 零宽字符归一化）标记可能的 Prompt Injection——只标记不删除，避免误杀正常业务问题；
 - 记录 PII 发现（不脱敏，仅审计）和语言检测结果。
 
-然后让 LLM 返回固定 JSON：意图、查询类型、实体、重写查询和歧义列表。JSON 解析失败时回退到 `unknown + 原查询`；合法 JSON 但字段类型不符时（如 entities 不是 dict、ambiguity 不是字符串数组）逐字段回退默认值，保证流程还有机会继续。
+然后让 **同一次 LLM 往返**同时返回两部分（ISSUE-11，省掉原先理解/规划两次串行调用）：①理解结果——意图、查询类型、实体、重写查询和歧义列表；②**原始检索计划**（`retrieval_plan_raw`）。调用使用分层 plan 模型（`config.llm.plan_model`，空串回落主模型）、输出预算 `plan_max_tokens=384`（超预算截断走 JSON 解析失败回退），本次 token 用量记入 `llm_usage` 落审计。JSON 解析失败时回退到 `unknown + 原查询 + 兜底单源计划`；合法 JSON 但字段类型不符时逐字段回退默认值，保证流程还有机会继续。请求级截止时间已过时，协同取消检查点直接放弃 LLM 调用（ISSUE-17）。
 
 如果 `ambiguity` 非空，`should_clarify` 把流程路由到 `clarify`。这个节点最多列出三个需要补充的信息，生成澄清问题后直接声明 `terminal=True` 进入会话保存，跳过 Planner、检索、推理和验证。
 
 ## 6. Planner 生成“去哪查、查什么”
 
-没有歧义时，`planner` 根据重写查询、意图、实体和用户角色生成检索计划。计划中的每一步通常包含：
+没有歧义时，`planner` 把 `query_understand` 产出的原始检索计划规范化（ISSUE-11 之后 planner **不再调用 LLM**）。计划中的每一步通常包含：
 
 ```json
 {
@@ -154,11 +160,11 @@ flowchart TD
 }
 ```
 
-Planner 生成的 JSON 仍然是不可信输入。代码会把每一步规范化为 `RetrievalPlanStep`（类型防御，失败丢弃），过滤角色不允许的数据源，并把时间范围（转成数值 `date_day` 的 `$gte`/`$lte` Chroma 过滤器）合并到 filters；`report_search` 步骤还会从实体中提取股票代码并去掉 `.SH`/`.SZ` 后缀补进过滤器。多跳重试时（`retrieval_attempts > 0`），Planner 从已有结果的 metadata 中提取最多 5 个实体用于查询扩展，避免第二轮重复同一个查询；JSON 解析失败时退化为“第一个允许数据源 + 重写查询”的单源计划。
+模型产出的计划仍然是不可信输入。代码会把每一步规范化为 `RetrievalPlanStep`（类型防御，失败丢弃），过滤角色不允许的数据源，并把时间范围合并到 filters——**研报年份是报告期语义**，`report_search` 一律不加 `date_day` 硬过滤（ISSUE-2），`report_search` 步骤还会从实体中提取股票代码并去掉 `.SH`/`.SZ` 后缀补进过滤器。多跳重试轮（零召回回环）由合并节点的计划分支只补计划、不重问查询理解（ISSUE-11）；计划实质指纹（source/query/filters）与上一轮相同时不再重复规划。
 
 ## 7. 检索、权限过滤和相关性过滤
 
-`retrieve` 先把计划重新标准化，创建带角色和数据权限的 `HybridRetriever`，经 `_cached_retrieve`（进程内 TTL 缓存，key 为角色 + 计划指纹，TTL 300 秒，入库发布时统一失效）执行检索；本轮结果累加到状态中，同时递增检索次数和 chunk 计数。
+`retrieve` 先把计划重新标准化——低召回放宽轮（`retrieval_widening > 0`）会把每步 `top_k` 经 `_widen_top_k` 翻倍（上限 20，ISSUE-24）——创建带角色和数据权限的 `HybridRetriever`，经 `_cached_retrieve`（进程内 TTL 缓存，key 为角色 + 计划指纹，TTL 300 秒，入库发布时统一失效）执行检索；本轮结果累加到状态中，同时递增检索次数、放宽轮计数和 chunk 计数。
 
 `HybridRetriever.retrieve` 做双层权限过滤：
 
@@ -172,13 +178,14 @@ Planner 生成的 JSON 仍然是不可信输入。代码会把每一步规范化
 1. 整个候选池只用一种量纲排序：RRF 融合结果直接用 `metadata.rrf_score`，未融合结果按 cosine 排名折算成 RRF 等值分（共用 `RRF_K`），避免混合池里融合结果被系统性压底；
 2. 阈值过滤（`RETRIEVAL_MIN_SCORE` = 0.6 只适用于未融合结果的原始 score，RRF 分数量纲不同不套同一阈值）；
 3. 按 `source + chunk_id/content` 去重；
-4. 尝试用 BGE Reranker 语义重排（未配置时显式降级为原始分排序），保留前 `GRADE_TOP_K`（10）条，denied 占位符保留在结果末尾；
+4. 尝试用 BGE Reranker 语义重排（当前部署 FlagEmbedding 已安装、重排真实生效；未安装或权重未本地化时显式降级为原始分排序），重排后把一手来源（公告/财报）提到研报/纪要转述之前（ISSUE-22），保留前 `GRADE_TOP_K`（10）条，denied 占位符保留在结果末尾；
 5. 记录 `reranker_status`（`applied` / `unavailable` / `error:<msg>`），供 `compose` 计算置信度。
 
-这里要区分两种“没有结果”：
+这里要区分三种“没有（足够）结果”（`should_retry_retrieval` 五种路由，ISSUE-3/12/24）：
 
-- 有结果但全部是 `denied`：`should_retry_retrieval` 返回 `"denied"`，进入 `permission_denied_response`，在 LLM 推理前短路——既省成本，也避免把无权内容送进上下文；该终态同时声明 `verification.passed=False`、`compliance.passed=False` 与 `permission_denied` 标记，会话与审计照常落库；
-- 没有足够可用结果：结果为空、或可用结果不足 `CONFIDENCE_HIGH_MIN_RESULTS`（3）条且未到 `DEFAULT_MAX_HOPS`（3）时回到 `planner` 补检索；达到上限后继续向下，最终由验证/置信度反映证据不足。
+- 有结果但全部是 `denied`：返回 `"denied"`，进入 `permission_denied_response`，在 LLM 推理前短路——既省成本，也避免把无权内容送进上下文；该终态同时声明 `verification.passed=False`、`compliance.passed=False` 与 `permission_denied` 标记，会话与审计照常落库；
+- 非 0 的低召回：可用结果不足 `RETRIEVAL_SUFFICIENT_RESULTS`（2）条时返回 `"widen"`，只把 top_k 翻倍重跑检索（廉价），不重跑理解+规划；已有 2 条可用结果即 `"continue"` 进入推理，不再为置信度评级硬凑证据数（ISSUE-12）；
+- 0 召回：返回 `"retrieve"` 回 `query_understand` 重新规划；`DEFAULT_MAX_HOPS`（3）次后仍 0 召回返回 `"no_results"`，经 `no_results_response` 直接返回“未找到资料”，绝不进入无证据推理（ISSUE-3）。
 
 ## 8. ReAct 子图：模型需要时才调用工具
 
@@ -211,7 +218,9 @@ prepare_reason
 
 ## 9. 引用、验证和有限重推
 
-`extract_citations` 只从本轮非拒绝的检索结果生成引用（用消解/重写后的查询匹配）。随后 `verify` 调用 `ComprehensiveVerifier` 检查四类：来源（SourceVerifier）、数字（NumberVerifier）、一致性（ConsistencyVerifier）、幻觉（HallucinationDetector），并额外检查投顾/销售角色的业务建议表达（目标价若带 `[来源N]` 编号引用且原文确含目标价，可视为归因豁免）。
+`extract_citations` 只从本轮非拒绝的检索结果生成引用（用消解/重写后的查询匹配）。随后 `verify` 调用 `ComprehensiveVerifier` 检查五类：来源（SourceVerifier）、数字（NumberVerifier）、口径（CaliberVerifier，ISSUE-22：口径标签必须与数值绑定、冲突时优先一手来源）、一致性（ConsistencyVerifier）、幻觉（HallucinationDetector），并额外检查投顾/销售角色的业务建议表达（目标价若带 `[来源N]` 编号引用且原文确含目标价，可视为归因豁免）。
+
+失败按 `failure_kind` 分类（ISSUE-13）：仅来源/引用格式问题为 `format`（重推指令只修标注），数字/口径/一致性/幻觉为 `facts`（需重新取证或删除无依据内容）。**每轮验证留痕**（ISSUE-25）：`verify` 把 `{round, passed, failure_kind, issues, confidence}` 追加到 `verification_attempts`，并把汇总的 `retry_diagnosis` 镜像进 `verification` 结果——审计里能区分“验证器误判重推”（`format_only_retries` 应长期为 0）与真的缺证据。
 
 验证通过后继续合规；验证失败时，`should_reason_again` 在 `MAX_REASON_ATTEMPTS`（2）以内把流程送回 `reason`，让模型基于同一轮证据重新组织答案。达到上限后不再重推，`compose` 会把答案替换为“未通过来源或数字验证”的安全提示并清空引用。
 
@@ -226,12 +235,12 @@ prepare_reason
 3. 审计库写失败时不阻断回答：把失败原因写入对话库 audit_outbox 的状态，把完整条目追加到本地 `data/audit_outbox.jsonl`，并返回带 `audit_write_failed` 标记的降级 audit_trail；
 4. API 只返回答案、引用、置信度和合规结果，不把内部 `audit_trail` 暴露给前端（`AssistantQAResponse` 不声明该字段，测试断言 `audit_trail` 不在响应与 OpenAPI schema 中）。
 
-## 11. 语义缓存：默认关闭的双层行为
+## 11. 语义缓存：默认启用、六维绑定的双层行为
 
-语义缓存默认关闭：`config.semantic_cache_enabled` 默认 False，`SemanticCache` 构造时 `enabled` 默认 False（代码注释说明：缓存未绑定会话上下文与知识库版本，命中路径无法复现会话保存/审计流程，重新启用前需满足绑定条件）。启用时行为：
+语义缓存自 ISSUE-26 起默认启用（`config.semantic_cache_enabled` 默认 True——启用条件已落地：绑定身份与授权范围、客户上下文、规范化问题、上下文摘要与知识库版本；只缓存成功终态；命中路径补审计并保存会话回合）。行为：
 
-- **查询**：`lookup` 先查当前角色下未过期条目，再计算查询 embedding 做 cosine 相似度，≥ `DEFAULT_CACHE_THRESHOLD`（0.9）才命中；按角色隔离（不同角色缓存独立，防越权），TTL 24 小时；命中返回 answer/citations/confidence/similarity/hit_count 及**终态 compliance/verification 快照**；
-- **命中路径**：API 在图执行前直接返回存储快照（`_qa_response_from_outcome` 统一出口），并补写一条 `execution_path=["semantic_cache_hit"]` 的持久化审计事件（写失败复用 outbox 机制，不阻断）；命中相似度等内部字段不进响应体；
+- **查询**：`lookup` 先按 `CacheBinding` 六维做 SQL 等值匹配（`role`、`user_id`、`client_id`、`permission_scope` 授权范围指纹、`normalized_query` 规范化问题、`context_hash` 上下文摘要哈希、`kb_version` 知识库版本指纹——取 document_registry 文档数+最近入库时间），只有绑定全一致的条目才进入 embedding 相似度比较，≥ `DEFAULT_CACHE_THRESHOLD`（0.9）才命中；跨用户/跨客户/跨权限集/跨知识库版本不会复用；TTL 24 小时；命中返回 answer/citations/confidence/similarity/hit_count 及**终态 compliance/verification 快照**；
+- **命中路径**：API 在图执行前直接返回存储快照（`_qa_response_from_outcome` 统一出口），补写一条 `execution_path=["semantic_cache_hit"]` 的持久化审计事件并调用 `_persist_cache_hit_turn` 保存会话回合（写失败复用 outbox 机制，不阻断）；命中相似度等内部字段不进响应体；
 - **写入路径**：只有验证与合规均通过的“成功终态”（答案长度 > 10）才入缓存，把 compliance/verification 快照一起落库，避免把拒答/拦截结果以“合规通过”语义缓存后再次返回；
 - 缓存查询涉及 embedding 计算与全表扫描，API 用 `asyncio.to_thread` 放入线程池，避免阻塞事件循环。
 
@@ -247,6 +256,8 @@ prepare_reason
 - `tests/test_agents.py`：grade_and_filter 阈值/去重/重排状态、verify/compliance 边界（投顾建议、目标价归因、条款精度）、ReAct 工具上限与授权、audit_log 字段拼装与写失败降级、条件路由函数、编译后全图 reranker_status 可达性、Prompt Injection 检测；
 - `tests/test_hybrid_retriever.py`：计划级/结果级权限过滤、超量取回先于截断、RRF 排序穿过 grade_and_filter、混合池不压底融合结果；
 - `tests/test_conversation.py`：线程隔离、上下文不匹配、幂等写入；
-- `tests/test_semantic_cache.py`：compliance/verification 快照落库、旧库自动补列、命中率口径、默认关闭不计 lookup。
+- `tests/test_semantic_cache.py`：compliance/verification 快照落库、旧库自动补列、命中率口径、禁用态不计 lookup；
+- `tests/test_stream_progress_contract.py`：SSE progress 节点键前后端契约与 answer_delta 消费（ISSUE-5/9）；
+- `tests/test_startup_warmup.py`：启动预热步骤与失败不阻断（ISSUE-16）。
 
 把测试中的状态构造和断言，与 `src/agents/graph.py` 的边连接对照起来，通常比从头读完所有节点更快理解这条执行链。
