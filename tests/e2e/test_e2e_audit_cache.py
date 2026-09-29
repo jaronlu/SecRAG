@@ -136,7 +136,7 @@ class _HitCache:
     }
     STORED_VERIFICATION = {"passed": True, "issues": [], "confidence": "high"}
 
-    def lookup(self, query, role=""):
+    def lookup(self, query, role="", **kwargs):
         return {
             "query": query,
             "answer": "货币基金风险等级为低。",
@@ -158,11 +158,11 @@ class _SpyCache:
     def __init__(self) -> None:
         self.store_calls: list[dict[str, Any]] = []
 
-    def lookup(self, query, role=""):
+    def lookup(self, query, role="", **kwargs):
         return None
 
     def store(self, query, answer, citations=None, confidence="", role="",
-              compliance=None, verification=None):
+              compliance=None, verification=None, **kwargs):
         self.store_calls.append(
             {"query": query, "answer": answer, "role": role,
              "compliance": compliance, "verification": verification}

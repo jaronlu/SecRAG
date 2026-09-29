@@ -57,7 +57,7 @@ class _StubSemanticCache:
         self.hit = hit
         self.store_calls = []
 
-    def lookup(self, query, role=""):
+    def lookup(self, query, role="", **kwargs):
         return self.hit
 
     def store(
@@ -69,6 +69,7 @@ class _StubSemanticCache:
         role="",
         compliance=None,
         verification=None,
+        **kwargs,
     ):
         self.store_calls.append({
             "query": query,
@@ -232,3 +233,44 @@ async def test_assistant_qa_cache_hit_persists_audit_event(monkeypatch, tmp_path
     assert payload["user_id"] == "user_tech"
     assert "semantic_cache_hit" in payload["reasoning"]["execution_path"]
     assert payload["compliance"]["passed"] is True
+
+
+@pytest.mark.asyncio
+async def test_assistant_qa_cache_hit_persists_conversation_turn(monkeypatch, tmp_path):
+    """ISSUE-26 启用条件：命中路径仍须保存会话回合，多轮上下文不因缓存断裂。"""
+    from src.utils.conversation import SQLiteConversationStore
+
+    store = SQLiteConversationStore(tmp_path / "conversations.db")
+    monkeypatch.setattr("src.api.main._get_conversation_store", lambda: store)
+    cache = _StubSemanticCache(hit={
+        "query": "货币基金风险等级",
+        "answer": "货币基金风险等级为低。",
+        "citations": [{"source": "a.pdf"}],
+        "confidence": "high",
+        "similarity": 0.95,
+        "hit_count": 1,
+        "compliance": {"passed": True, "risk_disclosure": ""},
+        "verification": {"passed": True, "confidence": "high"},
+    })
+    monkeypatch.setattr("src.api.main.get_semantic_cache", lambda: cache)
+    monkeypatch.setattr(
+        "src.api.main._get_cache_hit_audit_store",
+        lambda: SQLiteAuditStore(tmp_path / "audit.db"),
+    )
+    user = AuthenticatedUser("user_tech", ROLE_TECHNICAL, "tech")
+
+    response = await assistant_qa(
+        AssistantQARequest(query="货币基金风险等级"),
+        user,
+    )
+
+    thread = store.get_thread_for_user(thread_id=response.thread_id, user_id=user.user_id)
+    assert thread["turn_count"] == 1
+    messages = store.list_messages(
+        thread_id=response.thread_id,
+        user_id=user.user_id,
+    )
+    # list_messages 按倒序返回，还原成时间顺序再断言
+    chronological = list(reversed(messages))
+    assert [message["role"] for message in chronological] == ["user", "assistant"]
+    assert chronological[1]["content"] == "货币基金风险等级为低。"

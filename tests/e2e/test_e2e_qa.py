@@ -244,11 +244,11 @@ def test_tc018_verification_failure_retries_then_safe_fallback(
 class _DisabledCache:
     """语义缓存替身：永不命中，store 静默成功。"""
 
-    def lookup(self, query, role=""):
+    def lookup(self, query, role="", **kwargs):
         return None
 
     def store(self, query, answer, citations=None, confidence="", role="",
-              compliance=None, verification=None):
+              compliance=None, verification=None, **kwargs):
         return True
 
 
