@@ -36,8 +36,9 @@ class LLMConfig(BaseModel):
     # 空串回落主模型。选型依据 scripts/benchmark_models.py 的 TTFT/吞吐实测
     plan_model: str = ""
     # 理解+计划合并调用的输出预算（ISSUE-11/14）：JSON 体积小，超预算截断
-    # 走既有 JSONDecodeError 回退路径
-    plan_max_tokens: int = 1024
+    # 走既有 JSONDecodeError 回退路径。
+    # ISSUE-23：1024 让模型有机会长输出（实测单轮 5.9-17.0s），收紧到 384
+    plan_max_tokens: int = 384
 
 
 class EmbeddingConfig(BaseModel):
@@ -81,7 +82,8 @@ class Settings(BaseSettings):
     # ISSUE-14：重试次数与输出 token 预算（两个 provider 共用）
     llm_max_retries: int = 1
     llm_max_tokens: int = 4096
-    llm_plan_max_tokens: int = 1024
+    # ISSUE-23：理解/计划输出只有一个小 JSON，1024 的预算放大了补全时长
+    llm_plan_max_tokens: int = 384
 
     # OpenAI-compatible 配置（llm_provider = "openai" 时生效）
     openai_api_base: str = OPENAI_DEFAULT_API_BASE

@@ -42,6 +42,7 @@ from src.schemas.constants import (
     STATE_AMBIGUITY,
     STATE_COMPLIANCE,
     STATE_INTERMEDIATE_STEPS,
+    STATE_LLM_USAGE,
     STATE_REASON_ATTEMPTS,
     STATE_RETRIEVAL_ATTEMPTS,
     STATE_RETRIEVAL_FILTERED_CHUNKS,
@@ -164,6 +165,11 @@ def _traced_node(
         succeeded = _node_execution_succeeded(result)
         span_metadata = _node_span_metadata(name, state, result)
         span_metadata["duration_ms"] = duration_ms
+        # ISSUE-23：节点自报的 LLM token 计量并入 span 与 intermediate_steps，
+        # 使 prefill/completion 开销可按请求从审计的 node_timings 查询
+        llm_usage = result.get(STATE_LLM_USAGE)
+        if isinstance(llm_usage, dict) and llm_usage:
+            span_metadata.update(llm_usage)
         # 重排 error 降级是显式执行失败（见 _node_execution_succeeded），
         # span 状态与之对齐；固定标签，不透出异常消息内容
         span.finish(
@@ -176,6 +182,8 @@ def _traced_node(
             "duration_ms": duration_ms,
             "success": succeeded,
         }
+        if isinstance(llm_usage, dict) and llm_usage:
+            step["metadata"] = dict(llm_usage)
         return {
             **result,
             STATE_INTERMEDIATE_STEPS: state.get(STATE_INTERMEDIATE_STEPS, []) + [step],

@@ -106,6 +106,15 @@ def test_llm_config_has_explicit_retry_and_token_budget_defaults():
 
     assert cfg.max_retries == 1
     assert cfg.max_tokens == 4096
-    assert cfg.plan_max_tokens == 1024
+    # ISSUE-23：理解/计划输出只有一个小 JSON，1024 的预算让模型有机会长输出，
+    # 实测单轮 5.9-17.0s；收紧到 384 封住补全时长
+    assert cfg.plan_max_tokens == 384
     # ISSUE-20：分层选型默认未配置（空串回落主模型），按 benchmark 结果在 .env 配置
     assert cfg.plan_model == ""
+
+
+def test_plan_max_tokens_budget_covers_the_plan_json():
+    """ISSUE-23：预算必须容得下理解+计划的 JSON，否则会截断成非法 JSON。"""
+    settings = _settings(_env_file=None, llm_provider="ollama")
+
+    assert 256 <= settings.llm_plan_max_tokens <= 512

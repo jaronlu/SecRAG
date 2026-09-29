@@ -81,6 +81,10 @@ class AssistantState(TypedDict):
     # 验证结果 — STATE_VERIFICATION
     verification: VerificationResult
 
+    # LLM 计量 — STATE_LLM_USAGE；当前节点一次 LLM 调用的 token 用量
+    # （prompt_tokens/completion_tokens/total_tokens），供审计按请求计量开销
+    llm_usage: dict[str, int]
+
     # 合规检查 — STATE_COMPLIANCE
     compliance: ComplianceResult
 

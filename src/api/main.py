@@ -772,6 +772,10 @@ async def assistant_qa_stream(
 
         thread_id = thread["thread_id"]
         turn_id = str(uuid.uuid4())
+        # ISSUE-23：TTFT 从生成器开始计时，到首个 answer_delta 事件为止，
+        # 只记录一次（设计线 P95 ≤5s，impl-08 §2）
+        stream_started = time.time()
+        ttft_recorded = False
         # request_id 显式生成后传入初始 state：Langfuse 根 trace 与 SQLite 审计
         # 共用同一 id；metadata 只含 request_id/thread_id，无用户身份信息
         request_id = str(uuid.uuid4())
@@ -828,6 +832,11 @@ async def assistant_qa_stream(
                             text = message_chunk.content
                             if not (isinstance(text, str) and text):
                                 continue
+                            if not ttft_recorded:
+                                ttft_recorded = True
+                                get_metrics().record_ttft(
+                                    role=user.role, seconds=time.time() - stream_started
+                                )
                             delta_data = json.dumps(
                                 {"type": "answer_delta", "delta": text},
                                 ensure_ascii=False,

@@ -80,6 +80,7 @@ from src.schemas.constants import (
     STATE_FINAL_ANSWER,
     STATE_INTENT,
     STATE_INTERMEDIATE_STEPS,
+    STATE_LLM_USAGE,
     STATE_TERMINAL,
     STATE_MESSAGES,
     STATE_ORIGINAL_QUERY,
@@ -116,6 +117,14 @@ from src.utils.compliance import (
 from src.utils.dates import parse_date_day
 from src.utils.langfuse_adapter import start_node_span
 from src.utils.verifier import CitationExtractor, ComprehensiveVerifier
+
+
+# ISSUE-23：理解+计划 prompt 的估算 token 预算。prompt 长度直接决定 prefill 时长，
+# 压缩前固定模板约 446 tokens（实测单轮 query_understand 5.9-17.0s），压缩后
+# 必须留在预算内，且不得丢掉 JSON 契约字段。
+PLAN_PROMPT_TOKEN_BUDGET = 300
+# 含最长允许查询（MAX_QUERY_LENGTH=500 字符）时的 prompt 总上限
+PLAN_PROMPT_MAX_TOKENS = 700
 
 
 def _build_llm():
@@ -532,29 +541,14 @@ def _plan_only_llm_call(state: AssistantState) -> dict[str, Any]:
         else ""
     )
 
-    prompt = f"""根据以下查询理解结果，生成检索计划：
-
-【原始查询】{original_query}
-【重写查询】{rewritten_query}
-【意图】{state.get(STATE_INTENT, "unknown")}
-【查询类型】{state.get(STATE_QUERY_TYPE, "unknown")}
-【实体】{json.dumps(state.get(STATE_ENTITIES, {}), ensure_ascii=False)}
-【用户角色】{state[STATE_USER_ROLE]}{entity_context}{empty_round_hint}
-
-可用数据源（基于角色权限）：
-- product_search: 理财产品说明书、产品合同、风险揭示书
-- regulation_search: 规则法规、内部制度、处罚案例
-- report_search: 研报摘要、晨会纪要、策略周报
-- faq_search: 常见问题解答、操作流程
-
-请以 JSON 数组返回检索计划，只使用当前角色允许的数据源：
-[
-  {{"source": "product_search", "query": "...", "top_k": 5, "filters": {{"product_type": "fund"}}}},
-  {{"source": "regulation_search", "query": "...", "top_k": 3, "filters": {{"source": "csrc"}}}},
-  {{"source": "report_search", "query": "...", "top_k": 5}}
-]
-
-只返回 JSON 数组。"""
+    prompt = f"""根据以下查询理解结果生成检索计划（只返回 JSON 数组）：
+原始查询：{original_query}
+重写查询：{rewritten_query}
+意图：{state.get(STATE_INTENT, "unknown")}；查询类型：{state.get(STATE_QUERY_TYPE, "unknown")}
+实体：{json.dumps(state.get(STATE_ENTITIES, {}), ensure_ascii=False)}
+角色：{state[STATE_USER_ROLE]}{entity_context}{empty_round_hint}
+可用数据源（限当前角色）：product_search 产品说明书/合同/风险揭示书；regulation_search 规则法规/内部制度/处罚案例；report_search 研报/晨会/策略周报；faq_search 常见问题/操作流程。
+格式：[{{"source": "report_search", "query": "...", "top_k": 5, "filters": {{}}}}]"""
 
     response = _invoke_with_plan_budget([HumanMessage(content=prompt)])
     try:
@@ -567,7 +561,10 @@ def _plan_only_llm_call(state: AssistantState) -> dict[str, Any]:
 
     if not isinstance(parsed_plan, list):
         parsed_plan = []
-    return {STATE_RETRIEVAL_PLAN_RAW: parsed_plan}
+    return {
+        STATE_RETRIEVAL_PLAN_RAW: parsed_plan,
+        STATE_LLM_USAGE: _llm_usage_metadata(response),
+    }
 
 
 def query_understand(state: AssistantState) -> dict[str, Any]:
@@ -611,41 +608,21 @@ def query_understand(state: AssistantState) -> dict[str, Any]:
 
     language = detect_language(safe_query)
     allowed_sources = ROLE_ALLOWED_SOURCES.get(state[STATE_USER_ROLE], [])
-    prompt = f"""请分析以下行业业务查询，并同时给出该查询的检索计划：
+    prompt = f"""分析下面的业务查询，一次返回查询理解与检索计划（只返回一个 JSON 对象）：
+查询：{safe_query}
+角色：{state[STATE_USER_ROLE]}；部门：{state[STATE_DEPARTMENT]}
+数据源（限当前角色）：product_search 产品说明书/合同/风险揭示书；regulation_search 规则法规/内部制度/处罚案例；report_search 研报/晨会/策略周报；faq_search 常见问题/操作流程。
 
-【用户查询】{safe_query}
-【用户角色】{state[STATE_USER_ROLE]}
-【用户部门】{state[STATE_DEPARTMENT]}
+{{"intent": "产品咨询|交易规则|法规咨询|研报观点|规则审查|FAQ|技术支持",
+ "query_type": "product_inquiry|rule_inquiry|regulation_inquiry|report_inquiry|faq_inquiry|technical_inquiry",
+ "entities": {{"product_name": "", "product_type": "", "stock_code": "", "regulation_name": "", "client_segment": "", "time_range": {{"start": "", "end": ""}}}},
+ "rewritten_query": "优化后的结构化查询",
+ "ambiguity": [],
+ "retrieval_plan": [{{"source": "product_search", "query": "...", "top_k": 5, "filters": {{}}}}]}}
 
-第一部分为查询理解，第二部分为检索计划，二者合并放在同一个 JSON 对象中返回：
-{{
-  "intent": "产品咨询 | 交易规则 | 法规咨询 | 研报观点 | 规则审查 | FAQ | 技术支持",
-  "query_type": "product_inquiry | rule_inquiry | regulation_inquiry | report_inquiry | faq_inquiry | technical_inquiry",
-  "entities": {{"product_name": "", "product_type": "", "stock_code": "", "regulation_name": "", "client_segment": "", "time_range": {{"start": "", "end": ""}}}},
-  "rewritten_query": "优化后的结构化查询",
-  "ambiguity": [],
-  "retrieval_plan": [
-    {{"source": "product_search", "query": "...", "top_k": 5, "filters": {{"product_type": "fund"}}}},
-    {{"source": "report_search", "query": "...", "top_k": 5}}
-  ]
-}}
-
-ambiguity 填写规则（严格遵守）：
-- 仅当查询缺少关键信息、导致无法给出任何有意义回答时，才填入澄清问题
-- 通用/宽泛问题（如"货币基金的风险等级是什么"）可以给出通用回答，不算歧义，ambiguity 留空
-- 只有指向特定产品但未指定产品名、或涉及具体时间但未给时间范围等情况，才视为歧义
-- 绝大多数查询 ambiguity 应为空数组 []
-time_range 说明：如果查询涉及时间范围（如"最近3个月"、"2024年"、"去年"），填入 ISO 日期 start/end；否则留空字符串。
-
-retrieval_plan 填写规则：
-- 只使用当前角色允许的数据源：
-  - product_search: 理财产品说明书、产品合同、风险揭示书
-  - regulation_search: 规则法规、内部制度、处罚案例
-  - report_search: 研报摘要、晨会纪要、策略周报
-  - faq_search: 常见问题解答、操作流程
-- 数组元素含 source / query / top_k，可选 filters；query 使用重写后的查询语义
-
-只返回一个 JSON 对象，不要其他内容。"""
+ambiguity 只在缺少关键信息、无法给出任何有意义回答时填澄清问题；通用问题（如"货币基金的风险等级"）不算歧义，绝大多数应为 []。
+time_range 仅在查询含时间范围时填 ISO 日期，否则留空串。
+retrieval_plan 只列当前角色允许的数据源，元素为 source/query/top_k，可选 filters。"""
 
     response = _invoke_with_plan_budget([HumanMessage(content=prompt)])
     try:
@@ -700,6 +677,7 @@ retrieval_plan 填写规则：
         STATE_QUERY_SANITIZED: injection_detected,
         STATE_PII_DETECTED: pii_findings,
         STATE_LANGUAGE: language,
+        STATE_LLM_USAGE: _llm_usage_metadata(response),
     }
 
 
