@@ -32,6 +32,9 @@ class LLMConfig(BaseModel):
     # 单 invoke 最坏耗时放大到 3 × timeout（90s）；1 次重试封顶 2 × timeout。
     max_retries: int = 1
     max_tokens: int = 4096
+    # ISSUE-20：模型分层——理解/计划等小任务可用更快的小模型；
+    # 空串回落主模型。选型依据 scripts/benchmark_models.py 的 TTFT/吞吐实测
+    plan_model: str = ""
     # 理解+计划合并调用的输出预算（ISSUE-11/14）：JSON 体积小，超预算截断
     # 走既有 JSONDecodeError 回退路径
     plan_max_tokens: int = 1024
@@ -84,6 +87,8 @@ class Settings(BaseSettings):
     openai_api_base: str = OPENAI_DEFAULT_API_BASE
     openai_model: str = OPENAI_DEFAULT_MODEL
     openai_api_key: str = ""
+    # ISSUE-20：理解/计划小任务的分层模型；空串回落 openai_model
+    openai_plan_model: str = ""
 
     # Embedding：入库与检索必须使用同一模型，否则向量空间不匹配导致检索失效。
     # PRD §6.1 选型为 BGE-M3，但当前生产数据（28388 chunks）以 bge-small-zh-v1.5 入库。
@@ -152,6 +157,7 @@ class Settings(BaseSettings):
                 max_retries=self.llm_max_retries,
                 max_tokens=self.llm_max_tokens,
                 plan_max_tokens=self.llm_plan_max_tokens,
+                plan_model=self.openai_plan_model,
             )
         return LLMConfig(
             provider=LLM_PROVIDER_OLLAMA,

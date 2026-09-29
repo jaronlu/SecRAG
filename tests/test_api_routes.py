@@ -308,7 +308,7 @@ def test_qa_stream_emits_answer_delta_for_reason_tokens(qa_client, monkeypatch):
     assert names[-1] == "done"
     assert "answer" in names
 
-    deltas = [data.get("delta") for name, data in events if name == "answer_delta"]
+    deltas = [data.get("delta") or "" for name, data in events if name == "answer_delta"]
     assert deltas == ["货币基金", "风险等级为低。"]
     # answer_delta 全部先于 answer 终态事件
     assert names.index("answer_delta") < names.index("answer")

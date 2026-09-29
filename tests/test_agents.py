@@ -552,7 +552,9 @@ class TestUnderstandAndPlanSingleRoundTrip:
         monkeypatch.setattr(
             "src.agents.nodes.config",
             SimpleNamespace(
-                llm=SimpleNamespace(provider="openai", plan_max_tokens=1024)
+                llm=SimpleNamespace(
+                    provider="openai", plan_max_tokens=1024, plan_model=""
+                )
             ),
         )
 
@@ -578,7 +580,9 @@ class TestUnderstandAndPlanSingleRoundTrip:
         monkeypatch.setattr(
             "src.agents.nodes.config",
             SimpleNamespace(
-                llm=SimpleNamespace(provider="openai", plan_max_tokens=1024)
+                llm=SimpleNamespace(
+                    provider="openai", plan_max_tokens=1024, plan_model=""
+                )
             ),
         )
         state = self._first_pass_state(
@@ -588,6 +592,44 @@ class TestUnderstandAndPlanSingleRoundTrip:
         query_understand(state)
 
         assert seen == [{"max_tokens": 1024}]
+
+    def test_plan_call_uses_tiered_model_when_configured(self, monkeypatch):
+        """ISSUE-20：理解/计划小任务可配置更快的小模型（单次请求级覆盖）。"""
+        from types import SimpleNamespace
+
+        seen: list[dict] = []
+
+        class _RecordingLLM:
+            def invoke(self, messages, **kwargs):
+                seen.append(kwargs)
+                response = MagicMock()
+                response.content = json.dumps({
+                    "intent": "产品咨询",
+                    "query_type": "product_inquiry",
+                    "entities": {},
+                    "rewritten_query": "改写查询",
+                    "ambiguity": [],
+                    "retrieval_plan": [
+                        {PLAN_SOURCE: SOURCE_PRODUCT, PLAN_QUERY: "改写查询", PLAN_TOP_K: 3}
+                    ],
+                })
+                return response
+
+        monkeypatch.setattr("src.agents.nodes.llm", _RecordingLLM())
+        monkeypatch.setattr(
+            "src.agents.nodes.config",
+            SimpleNamespace(
+                llm=SimpleNamespace(
+                    provider="openai",
+                    plan_max_tokens=1024,
+                    plan_model="doubao-seed-1-6-flash",
+                )
+            ),
+        )
+
+        query_understand(self._first_pass_state())
+
+        assert seen == [{"max_tokens": 1024, "model": "doubao-seed-1-6-flash"}]
 
 
 # ══════════════════════════════════════════════════════════════════════
