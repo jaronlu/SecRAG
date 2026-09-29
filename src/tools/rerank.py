@@ -13,6 +13,27 @@ from src.schemas.constants import RR_CONTENT, RR_SCORE
 DEFAULT_RERANK_MODEL = "BAAI/bge-reranker-v2-m3"
 
 
+class RerankerNotConfigured(RuntimeError):
+    """FlagEmbedding 或 reranker 模型未配置。
+
+    与运行期失败（模型崩溃、分数不一致等）区分：调用方据此走显式
+    "unavailable" 降级路径，而不是把"未配置"记成执行失败（ISSUE-10）。
+    """
+
+
+def reranker_available() -> bool:
+    """FlagEmbedding 可导入即视为 reranker 已配置。
+
+    供工具注册表决定是否向 LLM 暴露 rerank_tool；模型加载失败在
+    实际调用时经 RerankerNotConfigured/RuntimeError 显式报错。
+    """
+    try:
+        import_module("FlagEmbedding")
+    except ImportError:
+        return False
+    return True
+
+
 class RerankService:
     _instance: "RerankService | None" = None
 
@@ -29,7 +50,7 @@ class RerankService:
         try:
             flag_embedding = import_module("FlagEmbedding")
         except ImportError as exc:
-            raise RuntimeError(
+            raise RerankerNotConfigured(
                 "未配置 BGE reranker 模型；请安装并配置 FlagEmbedding/BAAI bge-reranker-v2-m3"
             ) from exc
 
