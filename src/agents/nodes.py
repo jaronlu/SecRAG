@@ -149,14 +149,18 @@ def _build_llm():
 
 
 def _invoke_with_plan_budget(messages: list[HumanMessage]) -> Any:
-    """理解/计划合并调用的统一入口：限定单次输出预算（ISSUE-14）。
+    """理解/计划合并调用的统一入口：限定输出预算并支持分层小模型。
 
     超预算截断的输出走既有 JSONDecodeError 回退路径。仅 OpenAI 兼容后端
-    支持 per-call max_tokens kwarg；Ollama 分支不传额外参数（ChatOllama
-    会拒绝未知 kwarg）。
+    支持 per-call max_tokens/model kwarg；Ollama 分支不传额外参数
+    （ChatOllama 会拒绝未知 kwarg，且本地单模型无分层收益）。
     """
     if config.llm.provider == LLM_PROVIDER_OPENAI:
-        return llm.invoke(messages, max_tokens=config.llm.plan_max_tokens)
+        kwargs: dict[str, Any] = {"max_tokens": config.llm.plan_max_tokens}
+        # ISSUE-20：配置了分层小模型时以请求级参数覆盖主模型
+        if config.llm.plan_model:
+            kwargs["model"] = config.llm.plan_model
+        return llm.invoke(messages, **kwargs)
     return llm.invoke(messages)
 
 

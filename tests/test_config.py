@@ -107,3 +107,5 @@ def test_llm_config_has_explicit_retry_and_token_budget_defaults():
     assert cfg.max_retries == 1
     assert cfg.max_tokens == 4096
     assert cfg.plan_max_tokens == 1024
+    # ISSUE-20：分层选型默认未配置（空串回落主模型），按 benchmark 结果在 .env 配置
+    assert cfg.plan_model == ""
