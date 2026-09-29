@@ -1291,6 +1291,30 @@ class TestRoleAwareTools:
         assert "原问题：净利润是多少" in result[STATE_MESSAGES][0].content
         assert "数字缺少来源" in result[STATE_MESSAGES][0].content
 
+    def test_prepare_reason_retry_prompt_differentiates_format_and_facts(self):
+        """ISSUE-13：格式不符与事实缺失的重推指令不同——格式类只修表述不改事实。"""
+        format_result = prepare_reason(_state(**{
+            STATE_ORIGINAL_QUERY: "规模是多少",
+            STATE_REASON_ATTEMPTS: 1,
+            STATE_VERIFICATION: {
+                "passed": False,
+                "issues": ["source_verification: 引用来源 2 不存在"],
+                "failure_kind": "format",
+            },
+        }))
+        assert "格式" in format_result[STATE_MESSAGES][0].content
+
+        facts_result = prepare_reason(_state(**{
+            STATE_ORIGINAL_QUERY: "规模是多少",
+            STATE_REASON_ATTEMPTS: 1,
+            STATE_VERIFICATION: {
+                "passed": False,
+                "issues": ["number_verification: 数字 999 在检索或工具结果中未找到"],
+                "failure_kind": "facts",
+            },
+        }))
+        assert "删除" in facts_result[STATE_MESSAGES][0].content
+
 
 class TestStructuredAnswer:
     def test_structures_multi_section_answer_and_preserves_table(self):

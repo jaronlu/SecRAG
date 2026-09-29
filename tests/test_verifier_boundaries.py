@@ -73,6 +73,56 @@ class TestNumberVerifier:
         assert result["passed"] is False
 
 
+class TestNumberEquivalence:
+    """ISSUE-13：数值等价（小数尾零、千分位）不得词面误杀；单位与精度差异仍拦截。"""
+
+    def test_trailing_zeros_are_equivalent(self):
+        verifier = NumberVerifier()
+        result = verifier.verify(
+            answer="净值 1 元。",
+            retrieval_results=[_result("净值 1.00 元。", "s", "c1")],
+            tool_calls=[],
+        )
+        assert result["passed"] is True
+
+    def test_percent_trailing_zero_is_equivalent(self):
+        verifier = NumberVerifier()
+        result = verifier.verify(
+            answer="七日年化为 3.9%。",
+            retrieval_results=[_result("七日年化收益率为 3.90%。", "s", "c1")],
+            tool_calls=[],
+        )
+        assert result["passed"] is True
+
+    def test_percent_requires_percent_evidence(self):
+        verifier = NumberVerifier()
+        result = verifier.verify(
+            answer="七日年化为 3.9%。",
+            retrieval_results=[_result("收益为 3.9 元。", "s", "c1")],
+            tool_calls=[],
+        )
+        assert result["passed"] is False
+
+    def test_precision_mismatch_still_rejected(self):
+        """0.85 ≠ 0.8513：数值等价不得放过精度差异。"""
+        verifier = NumberVerifier()
+        result = verifier.verify(
+            answer="净值为 0.85 元。",
+            retrieval_results=[_result("净值为 0.8513 元。", "s", "c1")],
+            tool_calls=[],
+        )
+        assert result["passed"] is False
+
+    def test_thousand_separator_is_equivalent(self):
+        verifier = NumberVerifier()
+        result = verifier.verify(
+            answer="募集规模 1234 亿元。",
+            retrieval_results=[_result("募集规模 1,234 亿元。", "s", "c1")],
+            tool_calls=[],
+        )
+        assert result["passed"] is True
+
+
 class TestCitationAlignment:
     def test_citation_numbers_follow_prompt_order(self):
         """同一来源两个 chunk 去重后，后续来源编号不得前移（issues.md 一.7）。"""
@@ -146,3 +196,63 @@ class TestFailedToolOutputNotEvidence:
             [{"tool": "sql_query", "output": error_text, "success": True}],
         )
         assert succeeded["passed"] is True
+
+
+class TestHallucinationNormalization:
+    """ISSUE-13：日期写法与虚词差异导致的同义改写不得判为幻觉。"""
+
+    def test_chinese_date_matches_iso_evidence(self):
+        detector = HallucinationDetector()
+        result = detector.detect(
+            "它的成立日期是2024年4月26日。",
+            [_result("基金成立于2024-04-26，规模保持稳定。", "s", "c1")],
+            [],
+        )
+        assert result["passed"] is True
+
+    def test_function_word_heavy_reformulation_is_supported(self):
+        detector = HallucinationDetector()
+        result = detector.detect(
+            "本产品的申购费率已下调至0.15%。",
+            [_result("申购费率调整为0.15%（费率优惠期内有效）。", "s", "c1")],
+            [],
+        )
+        assert result["passed"] is True
+
+    def test_unsupported_claim_without_numbers_still_rejected(self):
+        """归一化不得放过真正无证据的断言（无数字可查时的兜底线）。"""
+        detector = HallucinationDetector()
+        result = detector.detect(
+            "该基金经理擅长量化套利策略。",
+            [_result("基金成立于2024-04-26，规模保持稳定。", "s", "c1")],
+            [],
+        )
+        assert result["passed"] is False
+
+
+class TestFailureKindClassification:
+    """ISSUE-13：验证失败须区分"格式不符"（可局部修复）与"事实缺失"（需重新取证）。"""
+
+    def test_citation_format_only_failure_is_format(self):
+        from src.utils.verifier import ComprehensiveVerifier
+
+        verifier = ComprehensiveVerifier()
+        results = [_result("基金规模为120亿元。", "s", "c1")]
+        citations = CitationExtractor().extract(results, query="规模")
+
+        result = verifier.verify("规模为120亿元 [来源2]。", citations, results, [])
+
+        assert result["passed"] is False
+        assert result["failure_kind"] == "format"
+
+    def test_fabricated_number_is_facts(self):
+        from src.utils.verifier import ComprehensiveVerifier
+
+        verifier = ComprehensiveVerifier()
+        results = [_result("基金规模为120亿元。", "s", "c1")]
+        citations = CitationExtractor().extract(results, query="规模")
+
+        result = verifier.verify("规模为999亿元 [来源1]。", citations, results, [])
+
+        assert result["passed"] is False
+        assert result["failure_kind"] == "facts"
