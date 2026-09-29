@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import asdict
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 
 from src.schemas.constants import (
     CONFIDENCE_HIGH,
@@ -183,6 +184,8 @@ class NumberVerifier:
         - "20" 不得命中 "120"（前向不能是数字或小数点）
         - "10%" 不得命中 "-10%"（负号必须显式出现在答案数字中才允许匹配）
         - 千分位逗号在两侧同时归一化后再匹配
+        - ISSUE-13 数值等价兜底："1" ≡ "1.00"、"3.9%" ≡ "3.90%"——
+          词面边界匹配会把同值异写的数字误判为编造
         """
         evidence = NumberVerifier._normalize_numeric_text(evidence)
         pattern = re.escape(number.replace(",", ""))
@@ -193,7 +196,28 @@ class NumberVerifier:
             lookbehind = r"(?<![\d.-])"
         # 后向：不能紧跟数字或小数点（"20" 不得命中 "2024"）
         lookahead = r"(?![\d.])"
-        return re.search(f"{lookbehind}{pattern}{lookahead}", evidence) is not None
+        if re.search(f"{lookbehind}{pattern}{lookahead}", evidence) is not None:
+            return True
+        target = NumberVerifier._canonical_number(number.replace(",", ""))
+        return any(
+            NumberVerifier._canonical_number(match) == target
+            for match in NumberVerifier._NUMBER_TOKEN_RE.findall(evidence)
+        )
+
+    _NUMBER_TOKEN_RE = re.compile(r"-?\d+(?:\.\d+)?%?")
+
+    @staticmethod
+    def _canonical_number(number: str) -> str:
+        """数值等价键：小数去尾零后按值比较，保留正负号与百分号单位。"""
+        unit = "%" if number.endswith("%") else ""
+        value = number[:-1] if unit else number
+        try:
+            canonical = format(Decimal(value).normalize(), "f")
+        except InvalidOperation:
+            canonical = value
+        if canonical in ("-0", "+0"):
+            canonical = "0"
+        return canonical + unit
 
     def verify(
         self,
@@ -242,6 +266,34 @@ class ConsistencyVerifier:
 
 
 class HallucinationDetector:
+    # 中文功能词/虚词：不承载业务事实，句子比对时从两侧剔除，
+    # 降低同义改写（语序、措辞）造成的覆盖率噪声（ISSUE-13）。
+    # 刻意不含否定词（不/没/无）——否定歧义交由 ConsistencyVerifier 把关
+    _FUNCTION_WORD_CHARS = frozenset(
+        "的了在是和与及或有为以于由从将已等均也都还并但因所该这那之其它她把被向就才只很更最而"
+    )
+    # 中文日期 → 数字写法："2024年4月26日" 与证据 "2024-04-26" 是同一日期
+    _CN_FULL_DATE_RE = re.compile(r"(\d{4})年(\d{1,2})月(\d{1,2})[日号]")
+    _CN_YEAR_MONTH_RE = re.compile(r"(\d{4})年(\d{1,2})月(?!\d)")
+    _CN_MONTH_DAY_RE = re.compile(r"(?<!\d)(\d{1,2})月(\d{1,2})[日号](?!\d)")
+
+    @classmethod
+    def _content_tokens(cls, text: str) -> set[str]:
+        """内容词归一化：剔除功能字、统一中英日期写法、数字去前导零。"""
+        text = text.replace(",", "").replace("，", "")
+        text = cls._CN_FULL_DATE_RE.sub(r"\1-\2-\3", text)
+        text = cls._CN_YEAR_MONTH_RE.sub(r"\1-\2", text)
+        text = cls._CN_MONTH_DAY_RE.sub(r"\1-\2", text)
+        tokens = set(re.findall(r"[A-Za-z0-9_]+|[\u4e00-\u9fff]", text.lower()))
+        normalized: set[str] = set()
+        for token in tokens:
+            if token.isdigit():
+                # "04" 与 "4" 同一数字（月/日零填充差异）
+                normalized.add(token.lstrip("0") or "0")
+            elif token not in cls._FUNCTION_WORD_CHARS:
+                normalized.add(token)
+        return normalized
+
     def detect(
         self,
         answer: str,
@@ -293,8 +345,8 @@ class HallucinationDetector:
     def _similar(self, text1: str, text2: str) -> bool:
         if text1 in text2 or text2 in text1:
             return True
-        tokens1 = set(re.findall(r"[A-Za-z0-9_]+|[\u4e00-\u9fff]", text1.lower()))
-        tokens2 = set(re.findall(r"[A-Za-z0-9_]+|[\u4e00-\u9fff]", text2.lower()))
+        tokens1 = self._content_tokens(text1)
+        tokens2 = self._content_tokens(text2)
         if not tokens1:
             return False
         return len(tokens1 & tokens2) / len(tokens1) > 0.5
@@ -361,6 +413,16 @@ class ComprehensiveVerifier:
             for issue in result.get("issues", [])
         ]
         passed = all(result.get("passed", False) for result in checks.values())
+        # ISSUE-13：失败分类——仅来源/引用格式问题为 "format"（可局部修复），
+        # 数字/一致性/幻觉为 "facts"（需重新取证或删除无依据内容）。
+        # 重跑节点据此给出不同的修正指令，避免"格式不符"触发整段重检索式重跑
+        failure_kind = None
+        if not passed and issues:
+            failure_kind = (
+                "format"
+                if all(issue.startswith("source_verification:") for issue in issues)
+                else "facts"
+            )
         score = checks["hallucination_detection"].get("hallucination_score", 1.0)
         confidence = (
             CONFIDENCE_LOW if not passed else CONFIDENCE_MEDIUM if score > 0.1 else CONFIDENCE_HIGH
@@ -370,4 +432,5 @@ class ComprehensiveVerifier:
             "issues": issues,
             "checks": checks,
             "confidence": confidence,
+            "failure_kind": failure_kind,
         }

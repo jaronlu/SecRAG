@@ -1038,9 +1038,22 @@ def prepare_reason(state: AssistantState) -> dict[str, Any]:
     issues = state.get(STATE_VERIFICATION, {}).get("issues", [])
     if reason_attempt > 1:
         issue_text = "\n".join(f"- {issue}" for issue in issues) or "- 上次回答未通过验证"
-        user_content = (
-            f"原问题：{query}\n\n上次回答未通过验证：\n{issue_text}\n\n请只依据可验证证据修正回答。"
-        )
+        # ISSUE-13：按验证失败类型给出不同修正指令——格式问题只修表述，
+        # 事实问题要求删除无依据内容；避免把格式不符当成事实缺失整段重跑
+        failure_kind = state.get(STATE_VERIFICATION, {}).get("failure_kind", "")
+        if failure_kind == "format":
+            instruction = (
+                "失败原因属于格式或引用标注问题：保持事实内容不变，"
+                "仅修复格式与引用标注。"
+            )
+        elif failure_kind == "facts":
+            instruction = (
+                "失败原因属于事实缺失：删除无检索结果或工具输出支撑的表述，"
+                "只依据可验证证据修正回答。"
+            )
+        else:
+            instruction = "请只依据可验证证据修正回答。"
+        user_content = f"原问题：{query}\n\n上次回答未通过验证：\n{issue_text}\n\n{instruction}"
     else:
         user_content = query
 
