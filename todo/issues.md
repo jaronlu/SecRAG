@@ -24,5 +24,5 @@ input/output 为空属设计脱敏；验证细节查 `data/audit.db`。
 
 另注意：本机 venv 需 `uv sync --extra dev`（pytest-asyncio 声明在
 `[project.optional-dependencies].dev`，默认 sync 不安装，缺失时 async 测试全挂）。
-`tests/test_ingest_metadata.py` 6 例硬编码依赖 `data/raw/real_securities_data/`
-的历史抓取产物，2026-09-28 演练数据重建后失配，属已知既有失败（与本仓库代码无关）。
+`tests/test_ingest_metadata.py` 曾因 2026-09-28 演练数据重建失配 5 例，
+已对齐现行 per-file `.meta.json` sidecar 契约（1d167b0），全量 525 passed。
