@@ -221,7 +221,7 @@ async def test_qa_creates_root_trace_and_injects_bound_callback(langfuse_env, mo
 @pytest.mark.asyncio
 async def test_qa_cache_hit_marks_cache_hit_on_trace(langfuse_env, monkeypatch):
     class _StubCache:
-        def lookup(self, query: str, role: str = "") -> dict[str, Any]:
+        def lookup(self, query: str, role: str = "", **kwargs: Any) -> dict[str, Any]:
             return {
                 "answer": "货币基金风险等级为低。",
                 "citations": [],

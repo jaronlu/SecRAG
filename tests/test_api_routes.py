@@ -71,10 +71,10 @@ def test_root_serves_html(client):
 class _DisabledCache:
     """默认关闭的缓存替身：lookup 永不命中。"""
 
-    def lookup(self, query, role=""):
+    def lookup(self, query, role="", **kwargs):
         return None
 
-    def store(self, query, answer, citations=None, confidence="", role=""):
+    def store(self, query, answer, citations=None, confidence="", role="", **kwargs):
         return True
 
 
@@ -220,7 +220,7 @@ def test_qa_endpoint_cache_hit_returns_stored_compliance(qa_client, monkeypatch)
     }
 
     class _HitCache:
-        def lookup(self, query, role=""):
+        def lookup(self, query, role="", **kwargs):
             return {
                 "query": query,
                 "answer": "货币基金风险等级为低。",
@@ -232,7 +232,7 @@ def test_qa_endpoint_cache_hit_returns_stored_compliance(qa_client, monkeypatch)
                 "verification": {"passed": True},
             }
 
-        def store(self, query, answer, citations=None, confidence="", role=""):
+        def store(self, query, answer, citations=None, confidence="", role="", **kwargs):
             return True
 
     monkeypatch.setattr("src.api.main.get_semantic_cache", lambda: _HitCache())

@@ -118,3 +118,10 @@ def test_plan_max_tokens_budget_covers_the_plan_json():
     settings = _settings(_env_file=None, llm_provider="ollama")
 
     assert 256 <= settings.llm_plan_max_tokens <= 512
+
+
+def test_semantic_cache_enabled_after_binding_conditions_landed():
+    """ISSUE-26：绑定条件落地后默认启用（原默认关闭的前提已不成立）。"""
+    settings = _settings(_env_file=None, llm_provider="ollama")
+
+    assert settings.semantic_cache_enabled is True

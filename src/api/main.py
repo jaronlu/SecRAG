@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from langchain_core.runnables.config import RunnableConfig
 from openai import APIConnectionError, APIStatusError, APITimeoutError
 
+from src.agents.state import AssistantState
 from src.api.auth import (
     AuthenticatedUser,
     authenticate_user,
@@ -31,13 +32,22 @@ from src.schemas.constants import (
     API_ROUTE_ASSISTANT_THREAD,
     API_ROUTE_ASSISTANT_THREAD_MESSAGES,
     API_ROUTE_ASSISTANT_THREADS,
+    AUDIT_REQUEST_ID,
+    ROLE_DATA_PERMISSIONS,
+    STATE_AUDIT_TRAIL,
     STATE_CITATIONS,
+    STATE_CLIENT_ID,
     STATE_COMPLIANCE,
     STATE_CONFIDENCE,
+    STATE_ENTITIES,
     STATE_FINAL_ANSWER,
+    STATE_ORIGINAL_QUERY,
+    STATE_RESOLVED_QUERY,
     STATE_TERMINAL,
     STATE_THREAD_ID,
     STATE_TURN_ID,
+    STATE_USER_ID,
+    STATE_USER_ROLE,
     STATE_VERIFICATION,
 )
 from src.schemas.request_response import (
@@ -51,7 +61,7 @@ from src.schemas.request_response import (
 from src.schemas.models import AuditEntry
 from src.schemas.typed_dicts import AnswerOutcome, AuditQuery, AuditReasoning, AuditResponse, AuditRetrieval
 from src.utils.rate_limit import check_rate_limit, get_rate_limit_key
-from src.utils.semantic_cache import get_semantic_cache
+from src.utils.semantic_cache import CacheBinding, build_cache_binding, get_semantic_cache
 from src.utils.langfuse_adapter import (
     get_langfuse,
     reset_current_trace,
@@ -485,11 +495,73 @@ def _get_cache_hit_audit_store():
     return _get_audit_store()
 
 
+def _build_request_cache_binding(
+    request: AssistantQARequest,
+    user: AuthenticatedUser,
+    thread_id: str,
+) -> CacheBinding:
+    """构造请求级缓存绑定（ISSUE-26）。
+
+    上下文摘要在图执行前取一次并贯穿 lookup/store：图执行会把本轮回合写入
+    会话，执行后再取摘要会包含本轮实体，使 store 的绑定与 lookup 不一致而
+    永不命中。会话读不到摘要时抛错（fail closed），不放宽绑定维度。
+    """
+    _, summary = _get_conversation_store().load_context(
+        thread_id=thread_id,
+        user_id=user.user_id,
+    )
+    return build_cache_binding(
+        query=request.query,
+        role=user.role,
+        user_id=user.user_id,
+        client_id=request.client_id or "",
+        data_permissions=ROLE_DATA_PERMISSIONS.get(user.role, []),
+        conversation_summary=summary,
+    )
+
+
+def _persist_cache_hit_turn(
+    request: AssistantQARequest,
+    user: AuthenticatedUser,
+    *,
+    thread_id: str,
+    turn_id: str,
+    request_id: str,
+    cache_hit: dict,
+) -> None:
+    """命中路径保存会话回合并标记 outbox（ISSUE-26 启用条件）。
+
+    命中跳过了图执行，persist_conversation_turn 与 audit_log 都不会运行；
+    不补写会话会让多轮上下文在命中后断裂，不标记 outbox 会留下悬挂事件。
+    """
+    state = cast(
+        AssistantState,
+        {
+            STATE_THREAD_ID: thread_id,
+            STATE_TURN_ID: turn_id,
+            STATE_USER_ID: user.user_id,
+            STATE_USER_ROLE: user.role,
+            STATE_CLIENT_ID: request.client_id,
+            STATE_ORIGINAL_QUERY: request.query,
+            STATE_RESOLVED_QUERY: request.query,
+            STATE_FINAL_ANSWER: cache_hit["answer"],
+            STATE_CITATIONS: cache_hit["citations"],
+            STATE_ENTITIES: {},
+            STATE_AUDIT_TRAIL: {AUDIT_REQUEST_ID: request_id},
+        },
+    )
+    store = _get_conversation_store()
+    store.insert_turn(state)
+    if store.get_outbox_status(request_id) is not None:
+        store.mark_outbox_processed(request_id)
+
+
 def _persist_cache_hit_audit_event(
     user: AuthenticatedUser,
     request: AssistantQARequest,
     start_time: float,
     cache_hit: dict,
+    request_id: str | None = None,
 ) -> None:
     """P1-2: 缓存命中跳过了图执行（audit_log 节点不会运行），在此补一条
     持久化审计事件；写入失败时复用 audit 节点的 outbox 机制落本地待重试。
@@ -499,7 +571,7 @@ def _persist_cache_hit_audit_event(
     from src.agents.nodes import _write_audit_outbox
 
     entry = AuditEntry(
-        request_id=str(uuid.uuid4()),
+        request_id=request_id or str(uuid.uuid4()),
         timestamp=datetime.now(timezone.utc).isoformat(),
         user_id=user.user_id,
         user_role=user.role,
@@ -614,8 +686,15 @@ async def assistant_qa(
         # P1-4: 语义缓存——查询前先查缓存，命中则直接返回。
         # 缓存查询涉及 embedding 计算与全表扫描，放到线程池执行，
         # 避免阻塞事件循环（issues.md 二.2）
+        # ISSUE-26：绑定（身份/授权范围/客户/规范化问题/上下文摘要/知识库版本）
+        # 在图执行前构造一次，lookup 与 store 复用同一绑定
         cache = get_semantic_cache()
-        cache_hit = await asyncio.to_thread(cache.lookup, request.query, user.role)
+        cache_binding = await asyncio.to_thread(
+            _build_request_cache_binding, request, user, thread_id
+        )
+        cache_hit = await asyncio.to_thread(
+            cache.lookup, request.query, user.role, binding=cache_binding
+        )
         if cache_hit:
             trace.update({"cache_hit": True})
             audit_logger.info(
@@ -624,7 +703,22 @@ async def assistant_qa(
             )
             # P1-2: 命中路径补持久化审计事件（非阻塞，失败走 outbox）
             await asyncio.to_thread(
-                _persist_cache_hit_audit_event, user, request, start_time, cache_hit
+                _persist_cache_hit_audit_event,
+                user,
+                request,
+                start_time,
+                cache_hit,
+                request_id,
+            )
+            # ISSUE-26: 命中路径仍须保存会话回合，多轮上下文不因缓存断裂
+            await asyncio.to_thread(
+                _persist_cache_hit_turn,
+                request,
+                user,
+                thread_id=thread_id,
+                turn_id=turn_id,
+                request_id=request_id,
+                cache_hit=cache_hit,
             )
             _record_metrics("success", is_cached=True)
             # P1-1: 返回 store 时保存的终态合规快照，不再硬编码 passed=True
@@ -698,6 +792,8 @@ async def assistant_qa(
                 role=user.role,
                 compliance=compliance,
                 verification=verification,
+                # ISSUE-26：与 lookup 使用同一绑定，保证同请求可命中
+                binding=cache_binding,
             )
 
         _record_metrics("success")
