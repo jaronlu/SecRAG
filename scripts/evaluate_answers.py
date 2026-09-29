@@ -16,7 +16,12 @@ def evaluate_answers(dataset_path: str | Path) -> dict[str, float]:
     citation_passed = 0
     hallucination_scores = []
     expected_matches = 0
+    grounded_total = 0
+    # 数字精确率/引用准确率/幻觉率的准入门槛（§2：100% / ≥95% / ≤5%）只对
+    # "应当有据可答"的样本有意义；负例（不可回答、工具失败）的正确性由
+    # expected_outcome_accuracy 度量，混进分母会让门槛永远无法达标
     for item in dataset:
+        expected_passed = bool(item.get("expected_passed", True))
         result = verifier.verify(
             answer=str(item.get("answer", "")),
             citations=item.get("citations", []),
@@ -24,16 +29,22 @@ def evaluate_answers(dataset_path: str | Path) -> dict[str, float]:
             tool_calls=item.get("tool_calls", []),
         )
         checks = result["checks"]
+        expected_matches += int(result["passed"] == expected_passed)
+        if not expected_passed:
+            continue
+        grounded_total += 1
         numeric_passed += int(checks["number_verification"]["passed"])
         citation_passed += int(checks["source_verification"]["passed"])
         hallucination_scores.append(checks["hallucination_detection"]["hallucination_score"])
-        expected_matches += int(result["passed"] == bool(item.get("expected_passed", True)))
     total = len(dataset)
     return {
         "samples": float(total),
-        "numeric_accuracy": numeric_passed / total if total else 0.0,
-        "citation_accuracy": citation_passed / total if total else 0.0,
-        "hallucination_rate": sum(hallucination_scores) / total if total else 1.0,
+        "grounded_samples": float(grounded_total),
+        "numeric_accuracy": numeric_passed / grounded_total if grounded_total else 0.0,
+        "citation_accuracy": citation_passed / grounded_total if grounded_total else 0.0,
+        "hallucination_rate": (
+            sum(hallucination_scores) / grounded_total if grounded_total else 1.0
+        ),
         "expected_outcome_accuracy": expected_matches / total if total else 0.0,
     }
 

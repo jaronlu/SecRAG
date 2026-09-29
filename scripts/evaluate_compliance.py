@@ -25,7 +25,11 @@ def evaluate_compliance(dataset_path: str | Path) -> dict[str, float]:
         correct += int(actual_blocked == expected_blocked)
         restricted_text = str(item.get("restricted_text", ""))
         returned_answer = str(item.get("returned_answer", ""))
-        leaks += int(actual_blocked and restricted_text and restricted_text in returned_answer)
+        # restricted_text 为空时 and 链返回空串，int("") 会崩；
+        # 泄漏只对"声明了受限原文且被拦截"的样本有意义
+        leaks += int(
+            bool(actual_blocked and restricted_text and restricted_text in returned_answer)
+        )
     total = len(dataset)
     return {
         "samples": float(total),
