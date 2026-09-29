@@ -53,6 +53,7 @@ class RecordingChatModel(BaseChatModel):
             messages[-1].content if isinstance(messages[-1].content, str) else str(messages[-1].content)
         )
         if QUERY_UNDERSTAND_MARKER in prompt:
+            # ISSUE-11：首轮合并调用返回理解结果 + 检索计划
             content = json.dumps({
                 "intent": "产品咨询",
                 "query_type": "product_inquiry",
@@ -66,6 +67,9 @@ class RecordingChatModel(BaseChatModel):
                 },
                 "rewritten_query": "XX货币市场基金 风险等级",
                 "ambiguity": [],
+                "retrieval_plan": [
+                    {"source": "product_search", "query": "XX货币市场基金 风险等级", "top_k": 3}
+                ],
             }, ensure_ascii=False)
         elif PLANNER_MARKER in prompt:
             content = json.dumps([

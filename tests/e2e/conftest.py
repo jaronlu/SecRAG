@@ -93,9 +93,12 @@ class FakeChatModel:
     def invoke(self, messages: list[BaseMessage], config: Any = None) -> AIMessage:
         prompt = messages[-1].content if isinstance(messages[-1].content, str) else str(messages[-1].content)
         if QUERY_UNDERSTAND_MARKER in prompt:
+            # ISSUE-11：首轮合并调用返回理解结果 + 检索计划
             self.calls.append(("query_understand", messages))
-            return AIMessage(content=json.dumps(self.query_understand_response, ensure_ascii=False))
+            merged = {**self.query_understand_response, "retrieval_plan": self.plan_response}
+            return AIMessage(content=json.dumps(merged, ensure_ascii=False))
         if PLANNER_MARKER in prompt:
+            # 多跳重试轮只补计划（ISSUE-11 重试分支）
             self.calls.append(("planner", messages))
             return AIMessage(content=json.dumps(self.plan_response, ensure_ascii=False))
         self.calls.append(("reason", messages))
