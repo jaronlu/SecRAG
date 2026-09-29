@@ -4,7 +4,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from src.config import Settings
+from src.config import LLMConfig, Settings
 
 
 def _settings(**kwargs: Any) -> Settings:
@@ -94,3 +94,16 @@ def test_langfuse_enabled_with_full_config_passes_and_rejects_bad_sample_rate():
             langfuse_sample_rate=1.5,
             **_langfuse_stub_keys(),
         )
+
+
+def test_llm_config_has_explicit_retry_and_token_budget_defaults():
+    """ISSUE-14：LLM 客户端默认显式 max_retries=1 与 token 预算。
+
+    langchain-openai 默认 max_retries=2 会把单 invoke 最坏耗时放大到
+    3 × timeout；理解/计划合并调用另设更小的输出预算。
+    """
+    cfg = LLMConfig(provider="openai", base_url="http://x", model="m", temperature=0.0)
+
+    assert cfg.max_retries == 1
+    assert cfg.max_tokens == 4096
+    assert cfg.plan_max_tokens == 1024

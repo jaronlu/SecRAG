@@ -126,6 +126,13 @@ def _build_llm():
             temperature=config.llm.temperature,
             api_key=config.llm.api_key,
             timeout=timeout,
+            # ISSUE-14：显式重试与输出预算——默认 max_retries=2 会把单次
+            # invoke 最坏耗时放大到 3 × timeout。
+            # basedpyright 对别名字段（alias=max_completion_tokens，
+            # populate_by_name 继承自 BaseChatOpenAI）的 __init__ 合成不含
+            # 字段名，运行时已验证可传；类库在 payload 层统一改写键名
+            max_tokens=config.llm.max_tokens,  # pyright: ignore[reportCallIssue]
+            max_retries=config.llm.max_retries,
         )
     from langchain_ollama import ChatOllama
 
@@ -134,8 +141,23 @@ def _build_llm():
         model=config.llm.model,
         temperature=config.llm.temperature,
         reasoning=False,
+        # ChatOllama 无 max_retries 参数（本地服务不重试）；输出预算用
+        # num_predict 等价映射（ISSUE-14）
+        num_predict=config.llm.max_tokens,
         client_kwargs={"trust_env": False, "timeout": timeout},
     )
+
+
+def _invoke_with_plan_budget(messages: list[HumanMessage]) -> Any:
+    """理解/计划合并调用的统一入口：限定单次输出预算（ISSUE-14）。
+
+    超预算截断的输出走既有 JSONDecodeError 回退路径。仅 OpenAI 兼容后端
+    支持 per-call max_tokens kwarg；Ollama 分支不传额外参数（ChatOllama
+    会拒绝未知 kwarg）。
+    """
+    if config.llm.provider == LLM_PROVIDER_OPENAI:
+        return llm.invoke(messages, max_tokens=config.llm.plan_max_tokens)
+    return llm.invoke(messages)
 
 
 # 模块级 LLM 实例，所有节点共享（避免每个节点重复创建）
@@ -525,7 +547,7 @@ def _plan_only_llm_call(state: AssistantState) -> dict[str, Any]:
 
 只返回 JSON 数组。"""
 
-    response = llm.invoke([HumanMessage(content=prompt)])
+    response = _invoke_with_plan_budget([HumanMessage(content=prompt)])
     try:
         raw = response.content
         if not isinstance(raw, str):
@@ -610,7 +632,7 @@ retrieval_plan 填写规则：
 
 只返回一个 JSON 对象，不要其他内容。"""
 
-    response = llm.invoke([HumanMessage(content=prompt)])
+    response = _invoke_with_plan_budget([HumanMessage(content=prompt)])
     try:
         raw = response.content
         if not isinstance(raw, str):

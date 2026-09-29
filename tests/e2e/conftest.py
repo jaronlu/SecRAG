@@ -90,10 +90,11 @@ class FakeChatModel:
         self.reason_content = "## 结论\n\n本基金风险等级为R1（低风险），适合保守型投资者[来源1]。"
         self.calls: list[tuple[str, list[BaseMessage]]] = []
 
-    def invoke(self, messages: list[BaseMessage], config: Any = None) -> AIMessage:
+    def invoke(self, messages: list[BaseMessage], config: Any = None, **kwargs: Any) -> AIMessage:
         prompt = messages[-1].content if isinstance(messages[-1].content, str) else str(messages[-1].content)
         if QUERY_UNDERSTAND_MARKER in prompt:
-            # ISSUE-11：首轮合并调用返回理解结果 + 检索计划
+            # ISSUE-11：首轮合并调用返回理解结果 + 检索计划（ISSUE-14 后
+            # 可能携带 max_tokens 预算 kwarg，替身原样忽略）
             self.calls.append(("query_understand", messages))
             merged = {**self.query_understand_response, "retrieval_plan": self.plan_response}
             return AIMessage(content=json.dumps(merged, ensure_ascii=False))

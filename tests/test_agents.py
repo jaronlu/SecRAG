@@ -144,6 +144,41 @@ def test_agent_ollama_client_ignores_environment_proxy(monkeypatch):
     }
 
 
+def test_build_llm_openai_sets_explicit_retry_and_token_budget(monkeypatch):
+    """ISSUE-14：OpenAI 兼容后端必须显式设置 max_retries 与 max_tokens。
+
+    langchain 默认 max_retries=2 会把单 invoke 最坏耗时放大到
+    3 × llm_timeout_seconds；显式 1 次重试封顶 2 × timeout。
+    """
+    import src.agents.nodes as nodes_module
+
+    chat_openai = MagicMock()
+    monkeypatch.setattr(nodes_module.config, "llm_provider", "openai")
+    monkeypatch.setattr(nodes_module.config, "openai_api_key", "sk-test")
+    monkeypatch.setattr(nodes_module.config, "llm_max_retries", 1)
+    monkeypatch.setattr(nodes_module.config, "llm_max_tokens", 4096)
+    monkeypatch.setattr("langchain_openai.ChatOpenAI", chat_openai)
+
+    nodes_module._build_llm()
+
+    kwargs = chat_openai.call_args.kwargs
+    assert kwargs["max_retries"] == 1
+    assert kwargs["max_tokens"] == 4096
+
+
+def test_build_llm_ollama_maps_token_budget_to_num_predict(monkeypatch):
+    import src.agents.nodes as nodes_module
+
+    chat_ollama = MagicMock()
+    monkeypatch.setattr(nodes_module.config, "llm_provider", "ollama")
+    monkeypatch.setattr(nodes_module.config, "llm_max_tokens", 4096)
+    monkeypatch.setattr("langchain_ollama.ChatOllama", chat_ollama)
+
+    nodes_module._build_llm()
+
+    assert chat_ollama.call_args.kwargs["num_predict"] == 4096
+
+
 def _result(content: str, score: float = 0.9, meta: dict[str, Any] | None = None) -> RetrievalResult:
     """快捷构造检索结果 dict"""
     return {
@@ -407,7 +442,7 @@ class TestUnderstandAndPlanSingleRoundTrip:
         calls: list[Any] = []
 
         class _MergedLLM:
-            def invoke(self, messages):
+            def invoke(self, messages, **kwargs):
                 calls.append(messages)
                 response = MagicMock()
                 response.content = json.dumps({
@@ -438,7 +473,7 @@ class TestUnderstandAndPlanSingleRoundTrip:
         prompts: list[str] = []
 
         class _RetryPlanLLM:
-            def invoke(self, messages):
+            def invoke(self, messages, **kwargs):
                 prompts.append(messages[-1].content)
                 response = MagicMock()
                 response.content = json.dumps([
@@ -471,7 +506,7 @@ class TestUnderstandAndPlanSingleRoundTrip:
 
     def test_merged_json_missing_plan_falls_back_to_first_allowed_source(self, monkeypatch):
         class _NoPlanLLM:
-            def invoke(self, messages):
+            def invoke(self, messages, **kwargs):
                 response = MagicMock()
                 response.content = json.dumps({
                     "intent": "产品咨询",
@@ -490,6 +525,69 @@ class TestUnderstandAndPlanSingleRoundTrip:
         assert raw_plan, "计划缺失时必须回退到角色首个允许数据源"
         assert raw_plan[0][PLAN_SOURCE] == "product_search"
         assert raw_plan[0][PLAN_QUERY] == "改写查询"
+
+    def test_merged_call_limits_output_budget(self, monkeypatch):
+        """ISSUE-14：理解+计划合并调用限定小输出预算（OpenAI 兼容后端）。"""
+        from types import SimpleNamespace
+
+        seen: list[dict] = []
+
+        class _BudgetRecordingLLM:
+            def invoke(self, messages, **kwargs):
+                seen.append(kwargs)
+                response = MagicMock()
+                response.content = json.dumps({
+                    "intent": "产品咨询",
+                    "query_type": "product_inquiry",
+                    "entities": {},
+                    "rewritten_query": "改写查询",
+                    "ambiguity": [],
+                    "retrieval_plan": [
+                        {PLAN_SOURCE: SOURCE_PRODUCT, PLAN_QUERY: "改写查询", PLAN_TOP_K: 3}
+                    ],
+                })
+                return response
+
+        monkeypatch.setattr("src.agents.nodes.llm", _BudgetRecordingLLM())
+        monkeypatch.setattr(
+            "src.agents.nodes.config",
+            SimpleNamespace(
+                llm=SimpleNamespace(provider="openai", plan_max_tokens=1024)
+            ),
+        )
+
+        query_understand(self._first_pass_state())
+
+        assert seen == [{"max_tokens": 1024}]
+
+    def test_retry_branch_limits_output_budget(self, monkeypatch):
+        from types import SimpleNamespace
+
+        seen: list[dict] = []
+
+        class _BudgetRecordingLLM:
+            def invoke(self, messages, **kwargs):
+                seen.append(kwargs)
+                response = MagicMock()
+                response.content = json.dumps([
+                    {PLAN_SOURCE: SOURCE_PRODUCT, PLAN_QUERY: "扩展查询", PLAN_TOP_K: 3}
+                ])
+                return response
+
+        monkeypatch.setattr("src.agents.nodes.llm", _BudgetRecordingLLM())
+        monkeypatch.setattr(
+            "src.agents.nodes.config",
+            SimpleNamespace(
+                llm=SimpleNamespace(provider="openai", plan_max_tokens=1024)
+            ),
+        )
+        state = self._first_pass_state(
+            **{STATE_RETRIEVAL_ATTEMPTS: 1, STATE_RETRIEVAL_RESULTS: []}
+        )
+
+        query_understand(state)
+
+        assert seen == [{"max_tokens": 1024}]
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -1897,7 +1995,7 @@ class TestCompiledGraphRerankerStatus:
         class _StubLLM:
             """ISSUE-11 合并调用：首轮返回理解+计划；重试轮（含"生成检索计划"）返回计划数组。"""
 
-            def invoke(self, messages):
+            def invoke(self, messages, **kwargs):
                 prompt = messages[-1].content
                 if "请分析以下行业业务查询" in prompt:
                     return _StubResponse(json.dumps({
