@@ -102,6 +102,9 @@ STATE_RERANKER_STATUS: Final = "reranker_status"  # "applied" | "unavailable" | 
 # 由 _traced_node 并入 intermediate_steps 的 metadata，落审计后可按请求区分
 # prefill 与 completion 开销
 STATE_LLM_USAGE: Final = "llm_usage"
+# ISSUE-25：每轮 reason 的验证快照（轮次 + failure_kind + issues）。
+# 审计只保存最终 verification 时无法区分"验证器误判"与"真实无支撑"
+STATE_VERIFICATION_ATTEMPTS: Final = "verification_attempts"
 STATE_QUERY_SANITIZED: Final = "query_sanitized"  # bool: query was sanitized due to injection
 MAX_QUERY_LENGTH: Final = 500  # 用户查询最大字符数，超出截断
 MAX_PROMPT_TOKENS: Final = 4000  # prompt 安全 token 上限（模型上下文的 ~70%）
