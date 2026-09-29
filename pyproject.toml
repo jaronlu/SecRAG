@@ -36,6 +36,7 @@ dependencies = [
     "jieba>=0.42.1",
     "rank-bm25>=0.2.2",
     "langfuse>=4.15.6,<5",
+    "flagembedding>=1.4.2",
 ]
 
 [project.optional-dependencies]

@@ -235,7 +235,16 @@ class TestGradeAndFilter:
         result = grade_and_filter(state)
         assert result == {}
 
-    def test_sorts_by_score_desc(self):
+    def test_sorts_by_score_desc(self, monkeypatch):
+        """未启用重排时按原始分降序；本用例固定 reranker 不可用。
+
+        BGE reranker 可用时语义重排合法地改变顺序（见 rerank 相关用例），
+        该环境差异不得影响本用例验证的阈值过滤/降序排序逻辑。
+        """
+        monkeypatch.setattr(
+            "src.agents.nodes._try_rerank_candidates",
+            lambda query, candidates: (candidates, "unavailable"),
+        )
         r1 = _result("a", score=0.7)
         r2 = _result("b", score=0.9)
         r3 = _result("c", score=0.65)
