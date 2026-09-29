@@ -20,6 +20,7 @@ from src.schemas.constants import (
     STATE_USER_ROLE,
 )
 from src.schemas.typed_dicts import RetrievalPlanStep
+from src.tools.market_data import market_data_available
 from src.tools.rerank import reranker_available
 from src.tools import (
     calculator,
@@ -188,12 +189,14 @@ def get_tools_for_role(
     """Return tools visible to the ReAct agent for the given role."""
     allowed_sources = set(ROLE_ALLOWED_SOURCES.get(user_role, []))
     excluded_sources = excluded_retrieval_sources or set()
-    # ISSUE-10：reranker 未配置时摘除 rerank_tool——恒失败工具反复进入
-    # 工具清单只会浪费 LLM 轮次；生效（安装 FlagEmbedding + 模型本地化）
-    # 后经 reranker_available() 自动恢复暴露
+    # ISSUE-10/ISSUE-19：数据源未配置的工具摘除出白名单——恒失败工具反复
+    # 进入工具清单只会浪费 LLM 轮次；reranker 生效（安装 FlagEmbedding +
+    # 模型本地化）或行情数据就绪（本地表入库 / 安装 baostock）后自动恢复
     non_retrieval_whitelist: set[str] = set(_NON_RETRIEVAL_TOOL_WHITELIST)
     if not reranker_available():
         non_retrieval_whitelist.discard(rerank_tool.name)
+    if not market_data_available():
+        non_retrieval_whitelist.discard(market_data_tool.name)
     return [
         tool_item
         for tool_item in tools

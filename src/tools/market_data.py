@@ -18,6 +18,44 @@ _FIELD_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _STOCK_CODE_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 
+def _table_has_rows(conn: sqlite3.Connection, table: str) -> bool:
+    """行情表是否有数据；表名按白名单分派到字面量 SQL（杜绝标识符注入）。"""
+    if table == "market_history":
+        return conn.execute("SELECT 1 FROM market_history LIMIT 1").fetchone() is not None
+    if table == "market_snapshot":
+        return conn.execute("SELECT 1 FROM market_snapshot LIMIT 1").fetchone() is not None
+    return False
+
+
+def market_data_available(db_path: str | Path = DEFAULT_DB_PATH) -> bool:
+    """行情数据源是否已配置（ISSUE-19）。
+
+    可用 = baostock 可导入（在线源）或本地行情表存在且至少有一行数据。
+    供工具注册表决定是否向 LLM 暴露 market_data_tool：两者皆无时
+    每次调用必然 RuntimeError 并触发熔断，只会浪费 ReAct 轮次。
+    """
+    try:
+        import_module("baostock")
+        return True
+    except ImportError:
+        pass
+
+    try:
+        with sqlite3.connect(
+            f"file:{Path(db_path)}?mode=ro", timeout=2, uri=True
+        ) as conn:
+            for table in ("market_history", "market_snapshot"):
+                present = conn.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                    (table,),
+                ).fetchone()
+                if present and _table_has_rows(conn, table):
+                    return True
+    except sqlite3.Error:
+        return False
+    return False
+
+
 def _default_dates(start_date: str, end_date: str) -> tuple[str, str]:
     end = end_date or date.today().isoformat()
     start = start_date or (date.fromisoformat(end) - timedelta(days=30)).isoformat()
