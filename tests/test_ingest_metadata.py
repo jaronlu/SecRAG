@@ -351,6 +351,55 @@ def test_ingest_document_skips_unchanged_file(monkeypatch, tmp_path):
     assert second_action == "skipped"
 
 
+def test_chunker_version_bump_forces_reingest(monkeypatch, tmp_path):
+    """ISSUE-21：切分语义变化必须让未变化文档重新入库，而不是被 skipped 跳过。"""
+    file_path = tmp_path / "stable.csv"
+    file_path.write_text("code,year\n600519,2026\n", encoding="utf-8")
+    registry = DocumentRegistryStore(tmp_path / "registry.db")
+    run_id = "run-1"
+    metadata = {
+        META_DOC_TYPE: DOC_TYPE_FINANCIAL_DATA,
+        META_DOC_ID: "dataset:manual:stable-id",
+        META_TITLE: "stable",
+    }
+
+    monkeypatch.setattr(pipeline, "load_sample_metadata", lambda _: metadata)
+    monkeypatch.setattr(pipeline, "get_embedding_model", lambda _: _fake_embedding_model())
+    monkeypatch.setattr(pipeline, "upsert_chunks", lambda **_: None)
+    monkeypatch.setattr(pipeline, "list_chunk_ids_by_doc_id", lambda **_: [])
+    monkeypatch.setattr(pipeline, "delete_chunk_ids", lambda **_: None)
+    monkeypatch.setattr(
+        pipeline,
+        "load_documents",
+        lambda _: [Document(page_content="code: 600519", metadata={})],
+    )
+    registry.start_run(
+        run_id, tmp_path.as_uri(), full_scan=False, started_at="2026-07-07T00:00:00Z"
+    )
+
+    monkeypatch.setattr(pipeline, "CHUNKER_VERSION", "secrag-chunker-v1")
+    first_action = ingest_document(
+        file_path,
+        DOC_TYPE_FINANCIAL_DATA,
+        registry_store=registry,
+        run_id=run_id,
+        root_dir=tmp_path,
+        persist_directory=str(tmp_path / "chroma"),
+    )
+    monkeypatch.setattr(pipeline, "CHUNKER_VERSION", "secrag-chunker-v2")
+    second_action = ingest_document(
+        file_path,
+        DOC_TYPE_FINANCIAL_DATA,
+        registry_store=registry,
+        run_id=run_id,
+        root_dir=tmp_path,
+        persist_directory=str(tmp_path / "chroma"),
+    )
+
+    assert first_action == "created"
+    assert second_action == "replaced"
+
+
 def test_manifest_metadata_is_applied_before_chunking(monkeypatch, tmp_path):
     file_path = tmp_path / "stable.csv"
     file_path.write_text("code,year\n600519,2026\n", encoding="utf-8")
