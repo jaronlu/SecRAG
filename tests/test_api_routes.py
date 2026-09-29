@@ -5,6 +5,7 @@ GET /health、GET /metrics 等接口。直接调用 health_check() 无法发现�
 必须走完整 HTTP 栈。
 """
 
+import asyncio
 import json
 
 import pytest
@@ -15,6 +16,7 @@ from src.api.main import app
 from src.schemas.constants import (
     API_ROUTE_ASSISTANT_QA,
     API_ROUTE_ASSISTANT_QA_STREAM,
+    API_ROUTE_ASSISTANT_THREADS,
     ROLE_TECHNICAL,
     STATE_CITATIONS,
     STATE_CONFIDENCE,
@@ -323,3 +325,94 @@ def test_qa_stream_emits_answer_delta_for_reason_tokens(qa_client, monkeypatch):
     assert answer["answer"] == "货币基金风险等级为低。"
     # 非 reason 节点的 token 不得出现在任何 delta 中
     assert "SHOULD_NOT_LEAK" not in "".join(deltas)
+
+
+# ══════════════════════════════════════════════════════════════════════
+# ISSUE-18：async 路由内的同步 SQLite/Chroma 调用必须移出事件循环
+# ══════════════════════════════════════════════════════════════════════
+
+
+def _running_loop_probe() -> bool:
+    """在事件循环线程内返回 True；asyncio.to_thread 工作线程内抛 RuntimeError。"""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return False
+    return True
+
+
+class _LoopRecordingStore:
+    """记录每次调用是否阻塞事件循环的会话存储替身。"""
+
+    def __init__(self):
+        self.flags: list[bool] = []
+
+    def _probe(self) -> None:
+        self.flags.append(_running_loop_probe())
+
+    def ensure_thread_for_qa(self, **kwargs):
+        self._probe()
+        return {"thread_id": "thread-x", "turn_count": 0}
+
+    def list_threads(self, user_id=None, limit=None):
+        self._probe()
+        return []
+
+    def create_thread(self, **kwargs):
+        self._probe()
+        return {"thread_id": "thread-x", "title": "t", "created_at": "now"}
+
+    def list_messages(self, thread_id=None, user_id=None):
+        self._probe()
+        return []
+
+    def soft_delete_thread(self, thread_id=None, user_id=None):
+        self._probe()
+
+
+def test_conversation_routes_offload_sync_io(qa_client, monkeypatch):
+    """ISSUE-18：会话 CRUD 不得在事件循环内执行同步 SQLite 调用。"""
+    store = _LoopRecordingStore()
+    monkeypatch.setattr("src.api.main._get_conversation_store", lambda: store)
+
+    assert qa_client.get(API_ROUTE_ASSISTANT_THREADS).status_code == 200
+    assert qa_client.post(API_ROUTE_ASSISTANT_THREADS, json={"title": "t"}).status_code == 200
+    assert qa_client.get(f"{API_ROUTE_ASSISTANT_THREADS}/thread-x/messages").status_code == 200
+    assert qa_client.delete(f"{API_ROUTE_ASSISTANT_THREADS}/thread-x").status_code == 204
+
+    assert store.flags == [False, False, False, False]
+
+
+def test_qa_routes_offload_thread_ensure(qa_client, monkeypatch):
+    store = _LoopRecordingStore()
+    monkeypatch.setattr("src.api.main._get_conversation_store", lambda: store)
+    monkeypatch.setattr("src.api.main._get_agent_app", lambda: _StreamingAgentApp())
+
+    with qa_client.stream(
+        "POST", API_ROUTE_ASSISTANT_QA_STREAM, json={"query": "货币基金风险"}
+    ) as res:
+        assert res.status_code == 200
+
+    assert store.flags == [False]
+
+
+def test_health_probe_offloads_chroma_count(client, monkeypatch):
+    """ISSUE-18：health 的 Chroma count() 探针不得阻塞事件循环。"""
+    from types import SimpleNamespace
+
+    flags: list[bool] = []
+
+    class _FakeEngine:
+        def __init__(self):
+            flags.append(_running_loop_probe())
+            self.collection = SimpleNamespace(count=lambda: 42)
+
+    monkeypatch.setattr(
+        "src.retrieval.vector_retriever.ChromaVectorRetriever", _FakeEngine
+    )
+
+    res = client.get("/health")
+
+    assert res.status_code == 200
+    assert res.json()["chroma"] == {"status": "ok", "doc_count": 42}
+    assert flags == [False]

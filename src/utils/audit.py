@@ -6,6 +6,8 @@
 
 import json
 import sqlite3
+
+from src.utils.sqlite_support import connect_sqlite
 import time
 import uuid
 from datetime import datetime, timezone
@@ -169,14 +171,17 @@ class AuditLogger:
 class SQLiteAuditStore:
     """SQLite-backed audit store for queryable compliance trace records."""
 
+    # ISSUE-18：已应用 DDL 的库路径（进程级守卫，避免每操作重放 DDL）
+    _schema_applied_paths: set[str] = set()
+
     def __init__(self, db_path: str | Path = AUDIT_DB_PATH):
         self.db_path = Path(db_path)
 
     def insert(self, entry: AuditEntry) -> None:
         payload = self._to_payload(entry)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(str(self.db_path), timeout=5) as conn:
-            self._ensure_schema(conn)
+        with connect_sqlite(self.db_path) as conn:
+            self._schema_ready(conn)
             conn.execute(
                 """
                 INSERT OR REPLACE INTO audit_entries (
@@ -206,8 +211,8 @@ class SQLiteAuditStore:
             )
 
     def get_by_request_id(self, request_id: str) -> AuditTrail | None:
-        with sqlite3.connect(str(self.db_path), timeout=5) as conn:
-            self._ensure_schema(conn)
+        with connect_sqlite(self.db_path) as conn:
+            self._schema_ready(conn)
             row = conn.execute(
                 "SELECT payload_json FROM audit_entries WHERE request_id = ?",
                 (request_id,),
@@ -216,8 +221,16 @@ class SQLiteAuditStore:
             return None
         return cast(AuditTrail, json.loads(row[0]))
 
+    def _schema_ready(self, conn: sqlite3.Connection) -> None:
+        """同一库路径进程内只应用一次 DDL（ISSUE-18），委托给 _ensure_schema。"""
+        schema_key = str(self.db_path)
+        if schema_key in SQLiteAuditStore._schema_applied_paths:
+            return
+        self._ensure_schema(conn)
+        SQLiteAuditStore._schema_applied_paths.add(schema_key)
+
     def _ensure_schema(self, conn: sqlite3.Connection) -> None:
-        conn.execute(
+        conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS audit_entries (
                 request_id TEXT PRIMARY KEY,
@@ -229,17 +242,14 @@ class SQLiteAuditStore:
                 compliance_passed INTEGER,
                 confidence TEXT NOT NULL,
                 payload_json TEXT NOT NULL
-            )
+            );
+            CREATE INDEX IF NOT EXISTS idx_audit_entries_timestamp
+                ON audit_entries(timestamp);
+            CREATE INDEX IF NOT EXISTS idx_audit_entries_user_role
+                ON audit_entries(user_role);
+            CREATE INDEX IF NOT EXISTS idx_audit_entries_compliance
+                ON audit_entries(compliance_passed);
             """
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_audit_entries_timestamp ON audit_entries(timestamp)"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_audit_entries_user_role ON audit_entries(user_role)"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_audit_entries_compliance ON audit_entries(compliance_passed)"
         )
 
     def _to_payload(self, entry: AuditEntry) -> AuditTrail:

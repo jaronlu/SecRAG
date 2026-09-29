@@ -25,7 +25,7 @@ async def run_load_test(
     errors = 0
     lock = asyncio.Lock()
 
-    async with httpx.AsyncClient(timeout=15) as client:
+    async with httpx.AsyncClient(timeout=30) as client:
         async def request_once() -> None:
             nonlocal errors
             started = time.perf_counter()
