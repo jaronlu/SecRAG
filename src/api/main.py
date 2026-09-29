@@ -1,11 +1,13 @@
 import asyncio
 import json
 import logging
+import threading
 import time
 import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException
@@ -59,8 +61,69 @@ from src.utils.metrics import get_metrics
 
 # 追踪日志记录器（结构化 JSON，可对接 ELK / Loki）
 audit_logger = logging.getLogger("secrag.audit")
+warmup_logger = logging.getLogger("secrag.warmup")
 
-app = FastAPI(title="机构内部投研知识平台", version="0.1.0")
+
+def _warmup_retrieval_stack() -> None:
+    """启动预热（ISSUE-16）：图编译、向量引擎、embedding 模型、BM25 全索引。
+
+    冷启动开销（torch import、jieba 全量分词 10-30s、embedding 权重加载）
+    此前全部落在重启后的首个请求上；预热在 lifespan 启动时的后台线程执行。
+    每步独立容错：单步失败只记日志，不影响服务可用性。
+    """
+    started = time.perf_counter()
+
+    def _step(name: str, fn) -> None:
+        step_started = time.perf_counter()
+        try:
+            fn()
+        except Exception as exc:
+            warmup_logger.warning("warmup %s failed: %s: %s", name, type(exc).__name__, exc)
+            return
+        warmup_logger.info(
+            "warmup %s ok in %.1f ms", name, (time.perf_counter() - step_started) * 1000
+        )
+
+    _step("agent_graph", lambda: _get_agent_app())
+
+    def _warm_vector_and_bm25() -> None:
+        from src.retrieval.bm25_retriever import BM25Retriever
+        from src.retrieval.vector_retriever import ChromaVectorRetriever
+
+        engine = ChromaVectorRetriever()
+        BM25Retriever(engine).warmup()
+
+    _step("vector_and_bm25", _warm_vector_and_bm25)
+
+    def _warm_embedding_model() -> None:
+        from src.ingestion.embedder import get_embedding_model
+
+        get_embedding_model(config.embedding.model)
+
+    _step("embedding_model", _warm_embedding_model)
+
+    def _warm_reranker() -> None:
+        from src.tools.rerank import RerankService, reranker_available
+
+        if not reranker_available():
+            return
+        # 与 grade_and_filter 相同的调用面：预热一次真实 forward
+        RerankService().rerank("预热", [{"content": "预热", "score": 0.0}], top_k=1)
+
+    _step("reranker", _warm_reranker)
+
+    warmup_logger.info("warmup finished in %.1f ms", (time.perf_counter() - started) * 1000)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """启动时后台预热检索栈（ISSUE-16），关闭时放弃残留预热任务。"""
+    warmup_task = asyncio.create_task(asyncio.to_thread(_warmup_retrieval_stack))
+    yield
+    warmup_task.cancel()
+
+
+app = FastAPI(title="机构内部投研知识平台", version="0.1.0", lifespan=lifespan)
 app.include_router(ingestion_router)
 
 app.add_middleware(
@@ -279,15 +342,21 @@ async def search_knowledge_base(
 # ══════════════════════════════════════════════════════════════════════
 
 agent_app = None  # 懒加载，首次请求时构建
+_agent_app_lock = threading.Lock()
 
 
 def _get_agent_app():
-    """懒加载 Agent Graph（避免启动时 import 链触发 ChromaDB 连接）"""
+    """懒加载 Agent Graph（避免启动时 import 链触发 ChromaDB 连接）。
+
+    双检锁：lifespan 预热线程与首个请求可能并发进入。
+    """
     global agent_app
     if agent_app is None:
-        from src.agents.graph import build_agent_with_checkpoint
+        with _agent_app_lock:
+            if agent_app is None:
+                from src.agents.graph import build_agent_with_checkpoint
 
-        agent_app = build_agent_with_checkpoint()
+                agent_app = build_agent_with_checkpoint()
     return agent_app
 
 
@@ -723,12 +792,16 @@ async def assistant_qa_stream(
                 # 此时每项为 (namespace, mode, data) 三元组：外层图 namespace 为
                 # 空元组，子图内非空。
                 async with asyncio.timeout(config.api_request_timeout_seconds):
-                    async for namespace, mode, data in agent.astream(
+                    async for stream_item in agent.astream(
                         initial_state,
                         runnable_config,
                         stream_mode=["updates", "messages"],
                         subgraphs=True,
                     ):
+                        # 多模式 + subgraphs 的产出契约：(namespace, mode, data)
+                        namespace, mode, data = cast(
+                            "tuple[tuple[str, ...], str, Any]", stream_item
+                        )
                         if mode == "messages":
                             message_chunk, chunk_metadata = data
                             # 只外发 reason 节点的生成 token；query_understand/planner
