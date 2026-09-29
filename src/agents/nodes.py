@@ -568,6 +568,12 @@ def query_understand(state: AssistantState) -> dict[str, Any]:
     歧义检测与检索计划；计划原文写入 STATE_RETRIEVAL_PLAN_RAW，由 planner
     节点统一规范化。多跳重试轮只补计划（见 _plan_only_llm_call）。
     """
+    # ISSUE-17：请求已超时——协同取消检查点，不再发起 LLM 调用。
+    # wait_for 超时杀不掉图线程；多跳回环会再次进入本节点，
+    # 返回空计划让图在有限轮次内收敛到 no_results 终态
+    if _request_deadline_exceeded(state):
+        return {STATE_RETRIEVAL_PLAN_RAW: []}
+
     if state.get(STATE_RETRIEVAL_ATTEMPTS, 0) > 0:
         return _plan_only_llm_call(state)
 

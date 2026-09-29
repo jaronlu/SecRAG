@@ -701,8 +701,10 @@ async def assistant_qa(
         )
     finally:
         reset_current_trace(trace_token)
-        # 504 路径：to_thread 中的图线程不可取消、可能继续产生晚到 span；
-        # finish 只结束根 span、不等待子 span（_RequestTrace 晚到事件容忍）
+        # 504 路径：to_thread 中的图线程不可强制取消，但 STATE_REQUEST_DEADLINE
+        # 协同取消检查点（call_reason_model / 工具执行 / 合并规划节点）保证
+        # 超时后不再发起新的 LLM 轮次，在有限步内收敛；finish 只结束根 span、
+        # 不等待子 span（_RequestTrace 晚到事件容忍）
         trace.finish(status=trace_status, error_type=error_type)
 
 

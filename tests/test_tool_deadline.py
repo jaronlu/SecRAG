@@ -8,8 +8,12 @@ from langgraph.prebuilt.tool_node import ToolCallRequest
 
 import src.agents.nodes as nodes
 from src.agents.nodes import authorize_reason_tool_call
+from src.agents.state import AssistantState
 from src.schemas.constants import (
+    STATE_ORIGINAL_QUERY,
     STATE_REQUEST_DEADLINE,
+    STATE_RETRIEVAL_PLAN_RAW,
+    STATE_USER_ROLE,
     TOOL_TIMEOUT_SECONDS,
 )
 
@@ -61,3 +65,42 @@ def test_request_deadline_blocks_tool_execution(monkeypatch):
     assert isinstance(result, ToolMessage)
     assert "超时" in result.content
     assert result.status == "error"
+
+
+class _ForbiddenLLM:
+    def invoke(self, messages, **kwargs):  # pragma: no cover - 不应被调用
+        raise AssertionError("超时后不得再发起 LLM 调用")
+
+
+def test_request_deadline_blocks_merged_plan_llm_call(monkeypatch):
+    """ISSUE-17：超时后合并节点（首轮理解+计划）不再调用 LLM。
+
+    wait_for 超时无法杀掉图线程，靠 STATE_REQUEST_DEADLINE 协同取消；
+    重规划回环进入 query_understand 是 call_reason_model 之外的 LLM 调用点，
+    必须同样设防。
+    """
+    monkeypatch.setattr(nodes, "llm", _ForbiddenLLM())
+    state = cast(AssistantState, {
+        STATE_ORIGINAL_QUERY: "货币基金风险等级",
+        STATE_USER_ROLE: "operations",
+        STATE_REQUEST_DEADLINE: time.monotonic() - 1,
+    })
+
+    result = nodes.query_understand(state)
+
+    assert result == {STATE_RETRIEVAL_PLAN_RAW: []}
+
+
+def test_request_deadline_blocks_retry_plan_llm_call(monkeypatch):
+    """ISSUE-17：超时后多跳重试轮的补计划调用同样被协同取消。"""
+    monkeypatch.setattr(nodes, "llm", _ForbiddenLLM())
+    state = cast(AssistantState, {
+        STATE_ORIGINAL_QUERY: "货币基金风险等级",
+        STATE_USER_ROLE: "operations",
+        STATE_REQUEST_DEADLINE: time.monotonic() - 1,
+        "retrieval_attempts": 1,
+    })
+
+    result = nodes.query_understand(state)
+
+    assert result == {STATE_RETRIEVAL_PLAN_RAW: []}
