@@ -1669,6 +1669,13 @@ class TestShouldRetryRetrieval:
         state = _state(**{STATE_RETRIEVAL_RESULTS: [_result("x", score=0.9)]})
         assert should_retry_retrieval(state) == "retrieve"
 
+    def test_two_usable_results_continue_without_replanning(self):
+        """ISSUE-12：已有 2 条可用结果即视为检索充分，不再强制多跑一轮 planner。"""
+        state = _state(**{
+            STATE_RETRIEVAL_RESULTS: [_result("x", score=0.9), _result("y", score=0.8)]
+        })
+        assert should_retry_retrieval(state) == "continue"
+
     def test_hops_exhausted_without_results_short_circuits(self):
         """检索轮次耗尽仍 0 结果：短路返回"未找到资料"，不进入无证据推理（ISSUE-3）。"""
         state = _state(**{STATE_RETRIEVAL_RESULTS: [], STATE_RETRIEVAL_ATTEMPTS: DEFAULT_MAX_HOPS})

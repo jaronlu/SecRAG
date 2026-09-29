@@ -335,6 +335,10 @@ GRADE_TOP_K = 10
 CONFIDENCE_HIGH_THRESHOLD = 0.75
 CONFIDENCE_MEDIUM_THRESHOLD = 0.5
 CONFIDENCE_HIGH_MIN_RESULTS = 3
+# ISSUE-12：多跳回环触发阈值——可用结果达到该数量即不再强制重新规划。
+# 与 CONFIDENCE_HIGH_MIN_RESULTS（置信度评级所需的证据数）是两个决策：
+# 检索充分性关注延迟（每多一跳 +3.5-10.4s），置信度评级关注引用质量
+RETRIEVAL_SUFFICIENT_RESULTS = 2
 RETRIEVAL_MIN_SCORE = 0.6
 # RRF 融合常数（issues.md 一.5）：rrf_fuse 与 grade_and_filter 的未融合结果
 # 等值折算必须共用同一个 k，否则两处分数不可比
