@@ -28,6 +28,13 @@ class LLMConfig(BaseModel):
     temperature: float
     timeout: float = 30.0
     api_key: SecretStr = SecretStr("")
+    # ISSUE-14：显式重试与输出预算。langchain-openai 默认 max_retries=2 会把
+    # 单 invoke 最坏耗时放大到 3 × timeout（90s）；1 次重试封顶 2 × timeout。
+    max_retries: int = 1
+    max_tokens: int = 4096
+    # 理解+计划合并调用的输出预算（ISSUE-11/14）：JSON 体积小，超预算截断
+    # 走既有 JSONDecodeError 回退路径
+    plan_max_tokens: int = 1024
 
 
 class EmbeddingConfig(BaseModel):
@@ -68,6 +75,10 @@ class Settings(BaseSettings):
     llm_model: str = OLLAMA_DEFAULT_MODEL
     llm_temperature: float = LLM_DEFAULT_TEMPERATURE
     llm_timeout_seconds: float = 30.0
+    # ISSUE-14：重试次数与输出 token 预算（两个 provider 共用）
+    llm_max_retries: int = 1
+    llm_max_tokens: int = 4096
+    llm_plan_max_tokens: int = 1024
 
     # OpenAI-compatible 配置（llm_provider = "openai" 时生效）
     openai_api_base: str = OPENAI_DEFAULT_API_BASE
@@ -138,6 +149,9 @@ class Settings(BaseSettings):
                 temperature=self.llm_temperature,
                 timeout=self.llm_timeout_seconds,
                 api_key=SecretStr(self.openai_api_key),
+                max_retries=self.llm_max_retries,
+                max_tokens=self.llm_max_tokens,
+                plan_max_tokens=self.llm_plan_max_tokens,
             )
         return LLMConfig(
             provider=LLM_PROVIDER_OLLAMA,
@@ -145,6 +159,9 @@ class Settings(BaseSettings):
             model=self.llm_model,
             temperature=self.llm_temperature,
             timeout=self.llm_timeout_seconds,
+            max_retries=self.llm_max_retries,
+            max_tokens=self.llm_max_tokens,
+            plan_max_tokens=self.llm_plan_max_tokens,
         )
 
     @property
