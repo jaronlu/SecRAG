@@ -56,11 +56,14 @@ from src.schemas.constants import (
     CONFIDENCE_LOW,
     CONFIDENCE_MEDIUM,
     DEFAULT_MAX_HOPS,
+    DOC_TYPE_ANNOUNCEMENT,
+    DOC_TYPE_RESEARCH_REPORT,
     MAX_TOOL_ITERATIONS,
     MAX_QUERY_LENGTH,
     META_CHUNK_ID,
     META_ALLOWED_ROLES,
     META_DATE_DAY,
+    META_DOC_TYPE,
     META_PERMISSION_LEVEL,
     META_SOURCE,
     META_TITLE,
@@ -312,6 +315,69 @@ class TestGradeAndFilter:
         result = grade_and_filter(state)
 
         assert result[STATE_RERANKER_STATUS].startswith("error:")
+
+
+class TestPrimarySourcePriority:
+    """ISSUE-22：同一问题命中一手来源（公告/财报原文）时优先于研报转述。"""
+
+    def test_primary_source_promoted_over_research_transcript(self):
+        transcript = _result(
+            "券商：营收922.78亿元",
+            score=0.95,
+            meta={META_TITLE: "跟踪报告", META_DOC_TYPE: DOC_TYPE_RESEARCH_REPORT},
+        )
+        primary = _result(
+            "公司营业总收入922.78亿元",
+            score=0.80,
+            meta={META_TITLE: "半年度报告", META_DOC_TYPE: DOC_TYPE_ANNOUNCEMENT},
+        )
+        state = _state(**{STATE_RETRIEVAL_RESULTS: [transcript, primary]})
+
+        result = grade_and_filter(state)
+
+        doc_types = [r[RR_METADATA][META_DOC_TYPE] for r in result[STATE_RETRIEVAL_RESULTS]]
+        assert doc_types == [DOC_TYPE_ANNOUNCEMENT, DOC_TYPE_RESEARCH_REPORT]
+
+    def test_order_unchanged_without_both_groups(self):
+        results = [
+            _result("a", score=0.9, meta={META_DOC_TYPE: DOC_TYPE_RESEARCH_REPORT}),
+            _result("b", score=0.8, meta={META_DOC_TYPE: DOC_TYPE_RESEARCH_REPORT}),
+        ]
+        state = _state(**{STATE_RETRIEVAL_RESULTS: results})
+
+        result = grade_and_filter(state)
+
+        assert [r[RR_CONTENT] for r in result[STATE_RETRIEVAL_RESULTS]] == ["a", "b"]
+
+
+class TestReasonPromptCaliberRules:
+    """ISSUE-22：回答必须标明口径全称，且证据需标注来源权威性。"""
+
+    def test_prompt_requires_full_caliber_name_and_marks_authority(self):
+        from src.agents.nodes import _build_reason_system_prompt
+
+        state = _state(
+            **{
+                STATE_ORIGINAL_QUERY: "贵州茅台2026年上半年营业收入是多少",
+                STATE_RETRIEVAL_RESULTS: [
+                    _result(
+                        "上半年，公司营业总收入 922.78亿元。",
+                        meta={META_TITLE: "半年度报告", META_DOC_TYPE: DOC_TYPE_ANNOUNCEMENT},
+                    ),
+                    _result(
+                        "营收922.78亿元。",
+                        meta={META_TITLE: "公司跟踪报告", META_DOC_TYPE: DOC_TYPE_RESEARCH_REPORT},
+                    ),
+                ],
+            }
+        )
+
+        prompt = _build_reason_system_prompt(state)
+
+        assert "口径" in prompt
+        assert "营业总收入" in prompt
+        assert "一手来源" in prompt
+        assert "研报转述" in prompt
 
 
 def test_planner_injects_stock_code_filter_for_report_search():

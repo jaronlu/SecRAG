@@ -24,6 +24,10 @@ from src.schemas.constants import (
     CONFIDENCE_LOW,
     CONFIDENCE_MEDIUM,
     DEFAULT_TOP_K,
+    DOC_TYPE_ANNOUNCEMENT,
+    DOC_TYPE_FINANCIAL_DATA,
+    DOC_TYPE_MEETING_MINUTES,
+    DOC_TYPE_RESEARCH_REPORT,
     GRADE_TOP_K,
     LLM_PROVIDER_OPENAI,
     MAX_TOOL_ITERATIONS,
@@ -39,6 +43,7 @@ from src.schemas.constants import (
     META_CHUNK_ID,
     META_DATE,
     META_DATE_DAY,
+    META_DOC_TYPE,
     META_RRF_SCORE,
     META_SOURCE,
     META_STOCK_CODE,
@@ -855,6 +860,41 @@ def _try_rerank_candidates(
         return candidates, f"error:{exc}"
 
 
+# ISSUE-22：一手来源（公告/财报原文）优先于研报转述。公告与研报同属
+# report_search，必须在 doc_type 层面区分，否则同一数字的口径会被转述带偏。
+PRIMARY_SOURCE_DOC_TYPES = frozenset({DOC_TYPE_ANNOUNCEMENT, DOC_TYPE_FINANCIAL_DATA})
+TRANSCRIPT_SOURCE_DOC_TYPES = frozenset({DOC_TYPE_RESEARCH_REPORT, DOC_TYPE_MEETING_MINUTES})
+
+
+def _doc_type_of(result: RetrievalResult) -> str:
+    return str(result.get(RR_METADATA, {}).get(META_DOC_TYPE, ""))
+
+
+def _source_authority_label(doc_type: object) -> str:
+    """证据的来源权威性标记，供模型在一手来源与转述冲突时取前者（ISSUE-22）。"""
+    if doc_type in PRIMARY_SOURCE_DOC_TYPES:
+        return "（一手来源）"
+    if doc_type in TRANSCRIPT_SOURCE_DOC_TYPES:
+        return "（研报转述）"
+    return ""
+
+
+def _prioritize_primary_sources(results: list[RetrievalResult]) -> list[RetrievalResult]:
+    """把一手来源提到转述之前（ISSUE-22）。
+
+    只在候选池同时含一手来源与转述时重排；两组各自保持原有相关度顺序，
+    其余 doc_type 的结果紧随一手来源之后，相对顺序不变。
+    """
+    primary = [result for result in results if _doc_type_of(result) in PRIMARY_SOURCE_DOC_TYPES]
+    transcripts = [
+        result for result in results if _doc_type_of(result) in TRANSCRIPT_SOURCE_DOC_TYPES
+    ]
+    if not primary or not transcripts:
+        return results
+    primary_ids = {id(result) for result in primary}
+    return primary + [result for result in results if id(result) not in primary_ids]
+
+
 def _comparable_retrieval_scores(results: list[RetrievalResult]) -> dict[int, float]:
     """给候选池计算同量纲排序分，供 grade_and_filter 统一排序。
 
@@ -933,7 +973,8 @@ def grade_and_filter(state: AssistantState) -> dict[str, Any]:
         or state.get(STATE_ORIGINAL_QUERY, "")
     )
     reranked, reranker_status = _try_rerank_candidates(rerank_query, candidates)
-    filtered = reranked[:GRADE_TOP_K]
+    # ISSUE-22：一手来源（公告/财报原文）优先于研报转述后再截断
+    filtered = _prioritize_primary_sources(reranked)[:GRADE_TOP_K]
 
     return {
         STATE_RETRIEVAL_RESULTS: filtered + denied,
@@ -968,7 +1009,8 @@ def _build_reason_system_prompt(state: AssistantState) -> str:
         metadata = result[RR_METADATA]
         metadata_evidence = _format_evidence_metadata(metadata)
         safe_content = _harden_context(result[RR_CONTENT])
-        context_part = f"[来源{index + 1}] {metadata.get(META_TITLE, '未知')}\n{safe_content}"
+        authority = _source_authority_label(metadata.get(META_DOC_TYPE))
+        context_part = f"[来源{index + 1}] {metadata.get(META_TITLE, '未知')}{authority}\n{safe_content}"
         if metadata_evidence:
             context_part += f"\n{metadata_evidence}"
         part_tokens = _estimate_tokens(context_part)
@@ -1011,6 +1053,11 @@ def _build_reason_system_prompt(state: AssistantState) -> str:
 只有当前轮存在文档检索结果时，回答才允许并必须附对应的数字编号引用，例如 [来源1]；
 必须把编号替换为上方检索结果的实际序号，禁止原样输出 [来源N]。纯工具回答不得编造文档引用。
 数字必须来自检索结果或成功的工具输出，禁止编造。
+财务数字必须标明口径全称，且不得跨口径套用：「营业总收入」与「营业收入」、
+「归母净利润」与「扣非归母净利润」、「净利润」与「归母净利润」是不同口径，
+同一数字不得在两个口径之间互换，也不得简写成含义更宽的口径。
+同一事实同时命中「一手来源」与「研报转述」时，以一手来源为准；转述的用词
+（如含混的"营收"）不得被当作口径全称使用。
 纯工具回答只能复述成功工具输出中实际存在的字段和值。不得补充工具未返回的字段含义、
 数据来源、更新频率、覆盖范围、趋势判断或后续能力；优先直接使用字段名和值，保持简洁。
 回答正文必须使用结构化 Markdown：
