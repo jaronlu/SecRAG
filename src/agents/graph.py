@@ -36,9 +36,9 @@ from src.agents.state import AssistantState
 from src.agents.tools import tools
 from src.config import config
 from src.schemas.constants import (
-    CONFIDENCE_HIGH_MIN_RESULTS,
     DEFAULT_MAX_HOPS,
     MAX_REASON_ATTEMPTS,
+    RETRIEVAL_SUFFICIENT_RESULTS,
     STATE_AMBIGUITY,
     STATE_COMPLIANCE,
     STATE_INTERMEDIATE_STEPS,
@@ -196,6 +196,10 @@ def should_retry_retrieval(
 
     重试轮次耗尽仍无任何可用结果时走 no_results 短路（ISSUE-3）：
     不再进入 reason 让模型无证据作答，直接返回"未找到资料"。
+
+    回环触发阈值用 RETRIEVAL_SUFFICIENT_RESULTS（ISSUE-12）而非
+    CONFIDENCE_HIGH_MIN_RESULTS：已有 2 条可用结果即不再强制重新规划，
+    避免为置信度评级硬凑证据数而多烧一轮 planner。
     """
     attempts = state.get(STATE_RETRIEVAL_ATTEMPTS, 0)
     results = state.get(STATE_RETRIEVAL_RESULTS, [])
@@ -207,7 +211,7 @@ def should_retry_retrieval(
 
     if not results:
         return "retrieve"
-    if len(usable) < CONFIDENCE_HIGH_MIN_RESULTS:
+    if len(usable) < RETRIEVAL_SUFFICIENT_RESULTS:
         return "retrieve"
     return "continue"
 
