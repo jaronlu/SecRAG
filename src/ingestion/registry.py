@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import sqlite3
+
+from src.utils.sqlite_support import connect_sqlite
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -126,7 +128,7 @@ class DocumentRegistryStore:
         self._init_schema()
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.db_path, timeout=30)
+        connection = connect_sqlite(self.db_path, timeout=30)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         return connection

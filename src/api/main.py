@@ -173,12 +173,16 @@ async def health_check():
     import time
 
     status = {"status": "ok", "timestamp": time.time()}
-    try:
+
+    def _probe_chroma() -> dict[str, Any]:
+        # ISSUE-18：Chroma 连接与 count() 是同步 IO，移入线程池避免阻塞事件循环
         from src.retrieval.vector_retriever import ChromaVectorRetriever
 
         engine = ChromaVectorRetriever()
-        count = engine.collection.count()
-        status["chroma"] = {"status": "ok", "doc_count": count}
+        return {"status": "ok", "doc_count": engine.collection.count()}
+
+    try:
+        status["chroma"] = await asyncio.to_thread(_probe_chroma)
     except Exception as exc:
         status["chroma"] = {"status": "error", "error": str(exc)[:200]}
 
@@ -385,7 +389,12 @@ async def list_assistant_threads(
     user: AuthenticatedUser = Depends(authenticate_user),
 ):
     """列出当前用户的活跃会话（issues.md 一.3：前端会话列表契约）。"""
-    threads = _get_conversation_store().list_threads(user_id=user.user_id, limit=limit)
+    # ISSUE-18：同步 SQLite 调用移入线程池，避免阻塞事件循环
+    threads = await asyncio.to_thread(
+        _get_conversation_store().list_threads,
+        user_id=user.user_id,
+        limit=limit,
+    )
     return {
         "threads": [
             ConversationThreadResponse(
@@ -403,7 +412,8 @@ async def create_assistant_thread(
     request: ConversationThreadCreate,
     user: AuthenticatedUser = Depends(authenticate_user),
 ):
-    thread = _get_conversation_store().create_thread(
+    thread = await asyncio.to_thread(
+        _get_conversation_store().create_thread,
         user_id=user.user_id,
         user_role=user.role,
         client_id=request.client_id,
@@ -423,7 +433,8 @@ async def get_assistant_thread_messages(
     user: AuthenticatedUser = Depends(authenticate_user),
 ):
     try:
-        messages = _get_conversation_store().list_messages(
+        messages = await asyncio.to_thread(
+            _get_conversation_store().list_messages,
             thread_id=thread_id,
             user_id=user.user_id,
         )
@@ -441,7 +452,8 @@ async def delete_assistant_thread(
     user: AuthenticatedUser = Depends(authenticate_user),
 ):
     try:
-        _get_conversation_store().soft_delete_thread(
+        await asyncio.to_thread(
+            _get_conversation_store().soft_delete_thread,
             thread_id=thread_id,
             user_id=user.user_id,
         )
@@ -556,7 +568,8 @@ async def assistant_qa(
             headers={"Retry-After": "60"},
         )
     try:
-        thread = _get_conversation_store().ensure_thread_for_qa(
+        thread = await asyncio.to_thread(
+            _get_conversation_store().ensure_thread_for_qa,
             thread_id=request.thread_id,
             user_id=user.user_id,
             user_role=user.role,
@@ -744,7 +757,9 @@ async def assistant_qa_stream(
 
     async def event_generator():
         try:
-            thread = _get_conversation_store().ensure_thread_for_qa(
+            # ISSUE-18：同步 SQLite 调用移入线程池
+            thread = await asyncio.to_thread(
+                _get_conversation_store().ensure_thread_for_qa,
                 thread_id=request.thread_id,
                 user_id=user.user_id,
                 user_role=user.role,

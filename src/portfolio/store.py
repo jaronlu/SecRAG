@@ -12,6 +12,8 @@ database path is injected by the caller, keeping this layer free of config.
 from __future__ import annotations
 
 import sqlite3
+
+from src.utils.sqlite_support import connect_sqlite
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -70,7 +72,7 @@ class SQLitePortfolioStore:
 
         now = utc_now()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(str(self.db_path), timeout=5) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             self._ensure_schema(conn)
             existing = self._find_any_row(
@@ -132,7 +134,7 @@ class SQLitePortfolioStore:
 
     def get_position(self, *, position_id: str, user_id: str) -> PortfolioPositionDict:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(str(self.db_path), timeout=5) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             self._ensure_schema(conn)
             row = self._find_row(conn, position_id=position_id, user_id=user_id)
@@ -158,7 +160,7 @@ class SQLitePortfolioStore:
         where = " AND ".join(clauses)
 
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(str(self.db_path), timeout=5) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             self._ensure_schema(conn)
             rows = conn.execute(
@@ -212,7 +214,7 @@ class SQLitePortfolioStore:
         params.append(utc_now())
         params.extend([position_id, user_id])
 
-        with sqlite3.connect(str(self.db_path), timeout=5) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             self._ensure_schema(conn)
             self._find_row(conn, position_id=position_id, user_id=user_id)
@@ -228,7 +230,7 @@ class SQLitePortfolioStore:
     def remove_position(self, *, position_id: str, user_id: str) -> PortfolioPositionDict:
         """Soft-delete a position and return its final state."""
         now = utc_now()
-        with sqlite3.connect(str(self.db_path), timeout=5) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             self._ensure_schema(conn)
             row = self._find_row(conn, position_id=position_id, user_id=user_id)

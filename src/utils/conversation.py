@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
+
+from src.utils.sqlite_support import connect_sqlite
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -45,6 +47,9 @@ def utc_now() -> str:
 
 
 class SQLiteConversationStore:
+    # ISSUE-18：已应用 DDL 的库路径（进程级）；测试以 tmp_path 隔离互不影响
+    _schema_applied_paths: set[str] = set()
+
     def __init__(self, db_path: str | Path):
         self.db_path = Path(db_path)
 
@@ -59,7 +64,7 @@ class SQLiteConversationStore:
         thread_id = str(uuid.uuid4())
         now = utc_now()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(str(self.db_path), timeout=5) as conn:
+        with connect_sqlite(self.db_path) as conn:
             self._ensure_schema(conn)
             conn.execute(
                 """
@@ -106,7 +111,7 @@ class SQLiteConversationStore:
 
     def get_thread_for_user(self, *, thread_id: str, user_id: str) -> ConversationThreadDict:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(str(self.db_path), timeout=5) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             self._ensure_schema(conn)
             row = conn.execute(
@@ -125,7 +130,7 @@ class SQLiteConversationStore:
     ) -> list[ConversationThreadDict]:
         """列出当前用户的活跃会话，按最近更新排序（issues.md 一.3 会话列表契约）。"""
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(str(self.db_path), timeout=5) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             self._ensure_schema(conn)
             rows = conn.execute(
@@ -143,7 +148,7 @@ class SQLiteConversationStore:
 
     def soft_delete_thread(self, *, thread_id: str, user_id: str) -> None:
         deleted_at = utc_now()
-        with sqlite3.connect(str(self.db_path), timeout=5) as conn:
+        with connect_sqlite(self.db_path) as conn:
             self._ensure_schema(conn)
             row = conn.execute(
                 """
@@ -174,7 +179,7 @@ class SQLiteConversationStore:
         self, *, thread_id: str, user_id: str, limit: int = 100
     ) -> list[ConversationMessageDict]:
         self.get_thread_for_user(thread_id=thread_id, user_id=user_id)
-        with sqlite3.connect(str(self.db_path), timeout=5) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             self._ensure_schema(conn)
             rows = conn.execute(
@@ -208,7 +213,7 @@ class SQLiteConversationStore:
         self, *, thread_id: str, user_id: str, limit: int = 5
     ) -> list[ConversationTurnDict]:
         self.get_thread_for_user(thread_id=thread_id, user_id=user_id)
-        with sqlite3.connect(str(self.db_path), timeout=5) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             self._ensure_schema(conn)
             rows = conn.execute(
@@ -240,7 +245,7 @@ class SQLiteConversationStore:
 
         无引用查询（citations_json 为空数组）视为检索未命中，用于发现知识库缺口。
         """
-        with sqlite3.connect(str(self.db_path), timeout=5) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             self._ensure_schema(conn)
             # 最近 N 天的查询（created_at 是 ISO 字符串，用日期字符串比较）
@@ -289,7 +294,7 @@ class SQLiteConversationStore:
         created_at = utc_now()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with sqlite3.connect(str(self.db_path), timeout=5) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             self._ensure_schema(conn)
             thread = conn.execute(
@@ -397,7 +402,7 @@ class SQLiteConversationStore:
             )
 
     def mark_outbox_processed(self, request_id: str) -> None:
-        with sqlite3.connect(str(self.db_path), timeout=5) as conn:
+        with connect_sqlite(self.db_path) as conn:
             self._ensure_schema(conn)
             cursor = conn.execute(
                 """
@@ -411,7 +416,7 @@ class SQLiteConversationStore:
                 raise LookupError(f"audit outbox event not found: {request_id}")
 
     def mark_outbox_failed(self, request_id: str, error: str) -> None:
-        with sqlite3.connect(str(self.db_path), timeout=5) as conn:
+        with connect_sqlite(self.db_path) as conn:
             self._ensure_schema(conn)
             conn.execute(
                 """
@@ -423,7 +428,7 @@ class SQLiteConversationStore:
             )
 
     def get_outbox_status(self, request_id: str) -> str | None:
-        with sqlite3.connect(str(self.db_path), timeout=5) as conn:
+        with connect_sqlite(self.db_path) as conn:
             self._ensure_schema(conn)
             row = conn.execute(
                 "SELECT status FROM audit_outbox WHERE request_id = ?", (request_id,)
@@ -431,8 +436,22 @@ class SQLiteConversationStore:
         return str(row[0]) if row else None
 
     def _ensure_schema(self, conn: sqlite3.Connection) -> None:
-        conn.executescript(
-            """
+        """确保库表就绪；同一库路径进程内只应用一次 DDL（ISSUE-18）。
+
+        每操作重放 8 条 DDL 是纯开销（每请求约 36 条 DDL 的主要来源）；
+        CREATE TABLE IF NOT EXISTS 幂等，进程级守卫不影响多实例正确性。
+        """
+        schema_key = str(self.db_path)
+        if schema_key in SQLiteConversationStore._schema_applied_paths:
+            return
+        apply_conversation_schema(conn)
+        SQLiteConversationStore._schema_applied_paths.add(schema_key)
+
+
+def apply_conversation_schema(conn: sqlite3.Connection) -> None:
+    """创建会话库表结构（幂等，模块级函数便于进程内守卫计数）。"""
+    conn.executescript(
+        """
             CREATE TABLE IF NOT EXISTS conversation_threads (
                 thread_id TEXT PRIMARY KEY,
                 user_id TEXT NOT NULL,
@@ -488,4 +507,4 @@ class SQLiteConversationStore:
             CREATE INDEX IF NOT EXISTS idx_outbox_status_created
                 ON audit_outbox(status, created_at);
             """
-        )
+    )
