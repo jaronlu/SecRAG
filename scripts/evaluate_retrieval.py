@@ -135,6 +135,29 @@ def _has_permission_denied(results: Sequence[RetrievalResult]) -> bool:
     return any(bool(result.get(RR_DENIED)) for result in results)
 
 
+def _permission_outcome_correct(
+    results: Sequence[RetrievalResult],
+    relevant_doc_ids: set[str],
+    expected_denied: bool,
+) -> bool:
+    """权限判定是否正确（设计 §2：应允许与应拒绝用例 100% 正确）。
+
+    正例按"相关内容是否可访问"判定：top-k 混入一条被正确拒绝的越权行不算
+    失败——用户拿到了有权看的内容，权限决策本身是对的；语料含机密文档时
+    这种混合结果很常见，按整批 any(denied) 判会让准入指标永远无法达标。
+    相关行根本没被召回时不计权限失败（召回损失由 recall 指标承担）。
+    负例按"是否出现拒绝"判定。
+    """
+    if relevant_doc_ids:
+        relevant_rows = [
+            result
+            for result in results
+            if str(result.get(RR_METADATA, {}).get(META_CHUNK_ID, "")) in relevant_doc_ids
+        ]
+        return not any(bool(result.get(RR_DENIED)) for result in relevant_rows)
+    return _has_permission_denied(results) == expected_denied
+
+
 def _average(values: list[float]) -> float:
     return sum(values) / len(values) if values else 0.0
 
@@ -185,7 +208,9 @@ def evaluate_retrieval(dataset_path: str | Path) -> dict[str, float]:
             coverage = 1.0 if expect_permission_denied == actual_permission_denied else 0.0
 
         permission_block_accuracy = (
-            1.0 if actual_permission_denied == expect_permission_denied else 0.0
+            1.0
+            if _permission_outcome_correct(results, relevant_doc_ids, expect_permission_denied)
+            else 0.0
         )
 
         metrics["coverage"].append(coverage)

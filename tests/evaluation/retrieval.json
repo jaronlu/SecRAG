@@ -1,0 +1,1300 @@
+[
+  {
+    "query": "对半年度报告内容存在异议或无法保证其真实、准确、",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "32ee3bab9575c60e1ef790a8"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "esktop/00- projects/lang",
+    "user_role": "technical",
+    "source": "faq_search",
+    "relevant_chunk_ids": [
+      "64a4d7cf6e3d5bfb11f4cf7e"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "增利理财产品（虚构）。产品类型：固定收益类理财产",
+    "user_role": "advisor",
+    "source": "product_search",
+    "relevant_chunk_ids": [
+      "1d0e9385a93930fb8982e91a"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "，确保将适当的产品或服务销售或提供给适合的业务者",
+    "user_role": "institutional_sales",
+    "source": "regulation_search",
+    "relevant_chunk_ids": [
+      "8e1b7321fc96b6b03f952693"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "察：示例新能源板块季度回顾（虚构） 本报告为内部",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "5228b8d79d9b8b553579f03d"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "委、国家能源局等印发《“十五 五”碳达峰行动方案",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "049e2bf7ebdc85c4bb81c96a"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "- projects/Awesome/Aweso",
+    "user_role": "technical",
+    "source": "faq_search",
+    "relevant_chunk_ids": [
+      "a2bb42c106dabc83e7f72d65"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "50.SZ） 业绩维持快速增长，回购彰显发展信心",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "2d3178b4f5a3325afb9c2e1e"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "广阔领域，深化换电网络布局，积极构建 零碳生态，",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "76044b2949603649555a2f4c"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": " AI A （185k⭐ ，Pyt CrewAI",
+    "user_role": "technical",
+    "source": "faq_search",
+    "relevant_chunk_ids": [
+      "b7b51b17d0b3efafc102b07f"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "-1.11pct。公司 2026Q2 营收 14",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "ccacb12844d5dae61bc8a883"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "披露 日期 披露 索引 自有 及自 筹资 金 自",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "0d5869eeef849e5634ed625b"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "stapi tiangolo/fastapi P",
+    "user_role": "technical",
+    "source": "faq_search",
+    "relevant_chunk_ids": [
+      "c942edcba0ffffd86e961ed9"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "非净利约0.09 元/Wh，环比相对稳定。 公司",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "c8362feb9bdd7139c9968a0a"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "了明 确的同意意见。具体情况详见公司于 2026",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "819ab91722b03441e1b37fe4"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "签名、参数类型、返回值 ⾯试准备：被问到框架原理",
+    "user_role": "technical",
+    "source": "faq_search",
+    "relevant_chunk_ids": [
+      "d6088f976d132fe78ca4076c"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "的15%实施现金分红，向全 体股东每 10 股派",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "a44a112f6b15d2fe22e4cbee"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "股东会对董事会的授权，本着积极回报股东、与股东共",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "1b9f8bd7252dfbbe6e750525"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": " \"安全中心\" → \"重置密码\"，输入原密码及短",
+    "user_role": "operations",
+    "source": "faq_search",
+    "relevant_chunk_ids": [
+      "eca151d4477582a315445154"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "45.8% 23.5% 15.7% 净利润(百万",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "6b59e22fd3e8f9771c9f1cb2"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "容详见公司于 2026 年 1 月 9 日刊 登",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "3204ba05104468cc226f0786"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "次问答拆成 Planner、Retriever、",
+    "user_role": "technical",
+    "source": "faq_search",
+    "relevant_chunk_ids": [
+      "f55974ff84e362b120362849"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "预测 注：摊薄每股收益按最新总股本计算 优于大市",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "676bd0df3421de6cc4579671"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "1 年-5 年 是 否 1,902,640 连带",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "bd5c43b60810a06d703442c6"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "实龙头领 先优势》 ——2026-04-22 《",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "84edeeb23a58598e32f995f2"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "新能 源有 限公 司 宜昌 邦普 时代 新能 源",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "a0adf09562b1c311cd26625b"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "整理；注： 2024-2026H1 毛利率数据采",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "4a4e1f130095e1207326971c"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "5 年年度股东会审议通过《关于增发公司 H 股股",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "7159e341ae761ab712351e7e"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "684763 固定资产 142344 17613",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "4f9aa02ef70f730a917f378b"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "司 债券（第 二期）(2) 投资者适当性安排 “",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "d768014f1ad84f9843eff48f"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "801 682819 少数股东权益 26526 ",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "31078168c9abb8630c1d6e97"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "产 一年内到期的非流动资产 20,473 15,",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "7e8d146e08e2b824a169aed3"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "率 1.4% 2.0% 2.6% P/E 34.",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "f63f83feacaf3fe00a8aa830"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": ",644 99,281 114,782 投资活动",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "626b6bf08bc137fb4e53e54d"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "收入 132982 营业成本 205517 营业",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "318ad60786d714bf170c9691"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "23% 权益性融资 17% 负债净变化 22% ",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "4aaa016ef11a2fedfde84dca"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "益项目除“未分配利润”外，其他项目采用发生日的即",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "cf8af209764737ce85f18558"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "591 264307 303512 41288 ",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "a8f4b6243195a074fabf466b"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "款组合 1：应收并表内关联方 • 其他应收款组合",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "86a7ab28b2e789caa47b7e49"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "2345) (110880) (52131) (",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "b2d0ebeab38768a12747aaf8"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "本能够可靠计量时， 计入固定资产成本；不符合固定",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "2581e945fe8ed9e3ab6bf582"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "601 178339 22890 26751 9",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "4aab3f151928f14081a16ba4"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "锁条件，则本公司按照事先约定的价格回购股票。向职",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "6376a9305e4942b25d660b59"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "6928 88154 90711 92633 免",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "1a4df64b6e4bb84a40b07383"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "会被分类为经营租赁的，本公司自租赁变更生效日开始",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "816d8a96ef91045d5206df8d"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "或行业指数） 相对同期相关证券市场代表性指数的涨",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "ed1ddff29a69cf4af0332dab"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "，超过 200 万港币部分利润按照 16.5%征",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "f5d1692b8b590971bed7232c"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": " 375,468 按预期信用损失一般模型计提坏账",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "e2f20fcb2b8371dc4338d61d"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "。本报告所载的 信息、资料、建议及推测仅反映我公",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "4bd37977426f1ada1cc8137f"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "221 138,113 414,387 47,5",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "d866644deb1fc925c6b094d5"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "的投资目标和财务状况自行判断是否采用本报告所载内",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "ada3ad7b48e6974df7019298"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "1 545,144 524,131 53,293",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "edd23396aa342519265850ff"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "素进行分析，形成证券估值、投资评级等投资分析意见",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "da2d35f47011259492909e89"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "2,859 649,947 643,658 11",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "e4598d6045570c6f9a3fc245"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "财富管理带动中收增 长 ◼ 走势比较 20% 1",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "b9b9015e71bc973a99b89a35"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "千元。其中，归属于母公司股东的其他综合收益的税后",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "44af6a01f86ef0af850c9cab"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": ",838 2,640,342 5,425,469",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "d767fc50db66ad0cfa1ce064"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "，较年初 +1.8%。贷款端企业贷款是主要增量来",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "2aa114c8ec841b05415e2ce2"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "金等价物并对其进行监控，以满足本公司 经营需要，",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "269868ba1b89c75f45934282"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "善>>-- 2021-04-21 <<平安银行年",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "2e5d6cf560ec64d8400ed8c1"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "司 合营企业 商飞时代（上海）航空有限公司 合营",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "09551e2230f0242e20526d4c"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "息负债平均付息率 1.42%，同比-37bp、较",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "63046c8c9753c262814b532c"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "收入 132.14 亿元，同比+3.7%。代理及",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "87eb7c00a717f86f3c0b8a38"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": " 载、误导性陈述或重大遗漏，并承担个别和连带的法",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "98520a089219216e08fef50e"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "%，拨贷比 2.30%， 均较年初小幅变动，风险",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "d04003bde221caf9bcb00c17"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "。 提升“三大能力”—— 投资能力：建立全球化、",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "cb71118c4bd691ac8a3e900e"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "企稳及 ROE 水平修复，预计公司 2026-2",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "e08fd997eb853691133503a2"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "管政策。 2.4.2 资本充足率 （货币单位：人",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "552670e547fba2cd1a019990"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "37 资料来源：携宁，太平洋证券，注：摊薄每股收",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "290f143ce50698bf737fd381"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": ",884 2.30% 生息资产总计 4,950,",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "c6a3228bf425ac1227a78588"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "-11.94% 3.36% 3.14% 3.78",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "5a835894c85f9d47e010de5d"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "中的“五、承诺及或有负债 5. 质押资产”。 ",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "c11a49910a2d751aff319029"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": ".00 37,538.12 38,342.82 ",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "ab77fb1451a55ce7d04eca66"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "实反映资产质量。2026 年 6 月末，不良贷款",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "d947a03588caad1d08e6ceeb"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "5 58,007.98 生息资产增速 3.35%",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "88d8c4a67bc1edf57cca2d10"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "球基金、互认基金、海外私募产品，满足客户海外资产",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "02242275a8724ccc80cbd441"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "485.03 3,565,645.56 3,72",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "7d9ddec72ce391c443825d38"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "生态建设，2026 年上半年，非金融债券承销业务",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "e2e6d19f5461ffcf8c2cff4e"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "77.00 6,137,565.85 6,434",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "cbc46535311663bf34b93636"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "4 亿元，以成熟物业抵押为主，平均抵押率 58.",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "89d72923c79d1a520aac196b"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "59% 220.05% 219.67% 股东权益",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "b1e169cae7d1dc966267fd87"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "的专业委员会）及高级管理层进行汇报。 综合考虑利",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "e9e872d1c382063c7e2925d0"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "本率 2.14% 1.67% 1.39% 1.3",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "46121cef8e6bd3ba72e99d3a"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "局核准吴雷鸣先生本行副行长的任职资格；2026 ",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "be8e86e7f35cf012091a1575"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": " 10.07% 9.16% 8.93% 8.85",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "a27a647014bf845816ced340"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "额。 4.4.2 员工情况 截至报告期末，本集团",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "b7da4399f1682328b556cc25"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "00 指数-5%与 5%之间； 看淡：预计未来 ",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "dcdf3262f349a31a3b487102"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": " 25 日在《中国证券报》《证券时报》《上海证券",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "92e83ffa4e16885fe40eefb2"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "司（以下简称“我公司”或“太平洋证券”）具备中国",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "397568ea775317c85f1f658b"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "2026 年 3 月 9 日，赎回款到账日为 2",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "dd4188021f2dbd0b005ca17e"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "员在此保证，本研究报告中关于任何发行商或证券所 ",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "f6142cc9fbf752e0c5c6ea36"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "042 (19,868) (66) 30,108",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "b1efa4c9497a6a5cfddf5058"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "上半年收入增速放缓，利润增速转负： 公司 202",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "45f54f21963a50992e02b61d"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "0% ， 扣 非 归 母 净 利 润 为 185",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "612bf0c87ca1fa1952cadc0a"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "驱动的市场化改革，一系列举措密集落地。上半年飞天",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "be3720a62a16647c4016489a"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "年合计分红 650 亿元（2026 年 6 月底",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "e268a0c0b4b69e57925bfe6c"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "亿股)： 12.50 流通市值(亿元)： 15,",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "4409c70c9f5cd1c545d9f1f8"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "7 2,851 24,936 (1,518) (",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "6f417c9c3386f2c8b33a5792"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "2 元/股。当前股价对应 PE 分别为 19.7",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "5d7ec6d9ad5edc700c99ad9a"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "至决定重新开始向债券持 有人全额派息前，本行将不",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "530d2accbb5f86cc20961f63"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "与对外发布审批，任何结论不得对外引用或转发。 草",
+    "user_role": "compliance",
+    "source": "report_search",
+    "relevant_chunk_ids": [
+      "0890bd2ee1ac212d626a638b"
+    ],
+    "expected_permission_denied": false,
+    "denial_kind": "none"
+  },
+  {
+    "query": "我是用来测试的文档，我没有什么实际意义。",
+    "user_role": "advisor",
+    "source": "faq_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "52e4d9101d608f44a75ca71a",
+    "expected_permission_denied": true,
+    "denial_kind": "source"
+  },
+  {
+    "query": " \"安全中心\" → \"重置密码\"，输入原密码及短",
+    "user_role": "advisor",
+    "source": "faq_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "eca151d4477582a315445154",
+    "expected_permission_denied": true,
+    "denial_kind": "source"
+  },
+  {
+    "query": "次问答拆成 Planner、Retriever、",
+    "user_role": "advisor",
+    "source": "faq_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "f55974ff84e362b120362849",
+    "expected_permission_denied": true,
+    "denial_kind": "source"
+  },
+  {
+    "query": "esktop/00- projects/lang",
+    "user_role": "advisor",
+    "source": "faq_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "64a4d7cf6e3d5bfb11f4cf7e",
+    "expected_permission_denied": true,
+    "denial_kind": "source"
+  },
+  {
+    "query": "- projects/Awesome/Aweso",
+    "user_role": "advisor",
+    "source": "faq_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "a2bb42c106dabc83e7f72d65",
+    "expected_permission_denied": true,
+    "denial_kind": "source"
+  },
+  {
+    "query": " AI A （185k⭐ ，Pyt CrewAI",
+    "user_role": "advisor",
+    "source": "faq_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "b7b51b17d0b3efafc102b07f",
+    "expected_permission_denied": true,
+    "denial_kind": "source"
+  },
+  {
+    "query": "我是用来测试的文档，我没有什么实际意义。",
+    "user_role": "institutional_sales",
+    "source": "faq_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "52e4d9101d608f44a75ca71a",
+    "expected_permission_denied": true,
+    "denial_kind": "source"
+  },
+  {
+    "query": " \"安全中心\" → \"重置密码\"，输入原密码及短",
+    "user_role": "institutional_sales",
+    "source": "faq_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "eca151d4477582a315445154",
+    "expected_permission_denied": true,
+    "denial_kind": "source"
+  },
+  {
+    "query": "次问答拆成 Planner、Retriever、",
+    "user_role": "institutional_sales",
+    "source": "faq_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "f55974ff84e362b120362849",
+    "expected_permission_denied": true,
+    "denial_kind": "source"
+  },
+  {
+    "query": "esktop/00- projects/lang",
+    "user_role": "institutional_sales",
+    "source": "faq_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "64a4d7cf6e3d5bfb11f4cf7e",
+    "expected_permission_denied": true,
+    "denial_kind": "source"
+  },
+  {
+    "query": "- projects/Awesome/Aweso",
+    "user_role": "institutional_sales",
+    "source": "faq_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "a2bb42c106dabc83e7f72d65",
+    "expected_permission_denied": true,
+    "denial_kind": "source"
+  },
+  {
+    "query": " AI A （185k⭐ ，Pyt CrewAI",
+    "user_role": "institutional_sales",
+    "source": "faq_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "b7b51b17d0b3efafc102b07f",
+    "expected_permission_denied": true,
+    "denial_kind": "source"
+  },
+  {
+    "query": "与对外发布审批，任何结论不得对外引用或转发。 草",
+    "user_role": "advisor",
+    "source": "report_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "0890bd2ee1ac212d626a638b",
+    "expected_permission_denied": true,
+    "denial_kind": "permission_level"
+  },
+  {
+    "query": "与对外发布审批，任何结论不得对外引用或转发。 草",
+    "user_role": "institutional_sales",
+    "source": "report_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "0890bd2ee1ac212d626a638b",
+    "expected_permission_denied": true,
+    "denial_kind": "permission_level"
+  },
+  {
+    "query": "我是用来测试的文档，我没有什么实际意义。",
+    "user_role": "compliance",
+    "source": "faq_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "52e4d9101d608f44a75ca71a",
+    "expected_permission_denied": true,
+    "denial_kind": "allowed_roles"
+  },
+  {
+    "query": "我是用来测试的文档，我没有什么实际意义。",
+    "user_role": "operations",
+    "source": "faq_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "52e4d9101d608f44a75ca71a",
+    "expected_permission_denied": true,
+    "denial_kind": "allowed_roles"
+  },
+  {
+    "query": " 载、误导性陈述或重大遗漏，并承担个别和连带的法",
+    "user_role": "operations",
+    "source": "report_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "98520a089219216e08fef50e",
+    "expected_permission_denied": true,
+    "denial_kind": "allowed_roles"
+  },
+  {
+    "query": " 载、误导性陈述或重大遗漏，并承担个别和连带的法",
+    "user_role": "technical",
+    "source": "report_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "98520a089219216e08fef50e",
+    "expected_permission_denied": true,
+    "denial_kind": "allowed_roles"
+  },
+  {
+    "query": "、本报告涉及未来计划等前瞻性陈述不构成本行对投资",
+    "user_role": "operations",
+    "source": "report_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "02bc1743199fb654c2db51dc",
+    "expected_permission_denied": true,
+    "denial_kind": "allowed_roles"
+  },
+  {
+    "query": "、本报告涉及未来计划等前瞻性陈述不构成本行对投资",
+    "user_role": "technical",
+    "source": "report_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "02bc1743199fb654c2db51dc",
+    "expected_permission_denied": true,
+    "denial_kind": "allowed_roles"
+  },
+  {
+    "query": "理”。 7、本行经本次董事会审议通过的中期利润分",
+    "user_role": "operations",
+    "source": "report_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "c1d79016301f7d8b17557c96",
+    "expected_permission_denied": true,
+    "denial_kind": "allowed_roles"
+  },
+  {
+    "query": "理”。 7、本行经本次董事会审议通过的中期利润分",
+    "user_role": "technical",
+    "source": "report_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "c1d79016301f7d8b17557c96",
+    "expected_permission_denied": true,
+    "denial_kind": "allowed_roles"
+  },
+  {
+    "query": ".................... 2 备",
+    "user_role": "operations",
+    "source": "report_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "a4df379c3d1189f52d0c843b",
+    "expected_permission_denied": true,
+    "denial_kind": "allowed_roles"
+  },
+  {
+    "query": ".................... 2 备",
+    "user_role": "technical",
+    "source": "report_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "a4df379c3d1189f52d0c843b",
+    "expected_permission_denied": true,
+    "denial_kind": "allowed_roles"
+  },
+  {
+    "query": ".................... 5 第",
+    "user_role": "operations",
+    "source": "report_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "b8ca0ec5d5d0986e3d67b4f0",
+    "expected_permission_denied": true,
+    "denial_kind": "allowed_roles"
+  },
+  {
+    "query": ".................... 5 第",
+    "user_role": "technical",
+    "source": "report_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "b8ca0ec5d5d0986e3d67b4f0",
+    "expected_permission_denied": true,
+    "denial_kind": "allowed_roles"
+  },
+  {
+    "query": "................. 17 3.2",
+    "user_role": "operations",
+    "source": "report_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "522800659605f6146506430a",
+    "expected_permission_denied": true,
+    "denial_kind": "allowed_roles"
+  },
+  {
+    "query": "................. 17 3.2",
+    "user_role": "technical",
+    "source": "report_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "522800659605f6146506430a",
+    "expected_permission_denied": true,
+    "denial_kind": "allowed_roles"
+  },
+  {
+    "query": ".............. 46 3.5 风险",
+    "user_role": "operations",
+    "source": "report_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "77448cc13f7e96a8807737ff",
+    "expected_permission_denied": true,
+    "denial_kind": "allowed_roles"
+  },
+  {
+    "query": ".............. 46 3.5 风险",
+    "user_role": "technical",
+    "source": "report_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "77448cc13f7e96a8807737ff",
+    "expected_permission_denied": true,
+    "denial_kind": "allowed_roles"
+  },
+  {
+    "query": "量回报双提升”行动方案贯彻落实情况 ......",
+    "user_role": "operations",
+    "source": "report_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "4f6b79080f4a6f68092b2ac3",
+    "expected_permission_denied": true,
+    "denial_kind": "allowed_roles"
+  },
+  {
+    "query": "量回报双提升”行动方案贯彻落实情况 ......",
+    "user_role": "technical",
+    "source": "report_search",
+    "relevant_chunk_ids": [],
+    "chunk_id": "4f6b79080f4a6f68092b2ac3",
+    "expected_permission_denied": true,
+    "denial_kind": "allowed_roles"
+  }
+]

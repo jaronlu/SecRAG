@@ -164,6 +164,63 @@ def test_permission_only_samples_do_not_lower_retrieval_metrics(monkeypatch, tmp
     assert summary["mrr"] == 1.0
 
 
+def test_positive_with_one_denied_cohit_keeps_permission_accuracy(monkeypatch, tmp_path):
+    """设计 §2 判的是"应允许/应拒绝"是否正确：正例拿到相关内容即算允许成功。
+
+    语料中存在机密文档时，advisor 的 top-k 可能带进一条被正确拒绝的越权行；
+    把它算成权限失败会让准入指标在含机密文档的语料上永远无法达标。
+    """
+    class FakeHybridRetriever:
+        def __init__(self, user_role: str, data_permissions: list[str]):
+            pass
+
+        def retrieve(self, plan):
+            return [
+                {RR_METADATA: {META_CHUNK_ID: "chunk-9"}},
+                {RR_DENIED: True, RR_METADATA: {"permission_denied": True}},
+            ]
+
+    monkeypatch.setattr(eval_script, "HybridRetriever", FakeHybridRetriever)
+    dataset_path = _write_dataset(tmp_path, [
+        {
+            "query": "产品风险",
+            "user_role": ROLE_ADVISOR,
+            "source": SOURCE_PRODUCT,
+            "relevant_chunk_ids": ["chunk-9"],
+        },
+    ])
+
+    summary = eval_script.evaluate_retrieval(dataset_path)
+
+    assert summary["permission_block_accuracy"] == 1.0
+
+
+def test_positive_whose_relevant_row_is_denied_fails_permission(monkeypatch, tmp_path):
+    class FakeHybridRetriever:
+        def __init__(self, user_role: str, data_permissions: list[str]):
+            pass
+
+        def retrieve(self, plan):
+            return [
+                {RR_METADATA: {META_CHUNK_ID: "chunk-1"}},
+                {RR_DENIED: True, RR_METADATA: {META_CHUNK_ID: "chunk-2"}},
+            ]
+
+    monkeypatch.setattr(eval_script, "HybridRetriever", FakeHybridRetriever)
+    dataset_path = _write_dataset(tmp_path, [
+        {
+            "query": "机密研报",
+            "user_role": ROLE_ADVISOR,
+            "source": SOURCE_PRODUCT,
+            "relevant_chunk_ids": ["chunk-2"],
+        },
+    ])
+
+    summary = eval_script.evaluate_retrieval(dataset_path)
+
+    assert summary["permission_block_accuracy"] == 0.0
+
+
 def test_evaluate_retrieval_requires_plan_or_source_hint(tmp_path):
     dataset_path = _write_dataset(tmp_path, [{
         "query": "缺少计划",

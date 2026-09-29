@@ -152,8 +152,10 @@ class SourceVerifier:
 class NumberVerifier:
     # 答案中的引用编号 [来源N] 不是业务数字
     _CITATION_MARKER_RE = re.compile(r"\[来源[^\]]*\]")
-    # Markdown 有序列表的序号（行首 "1." / "2、"）不是业务数字
-    _LIST_MARKER_RE = re.compile(r"(?m)^\s*\d+[.、)]\s*")
+    # Markdown 有序列表的序号（行首 "1." / "2、"）不是业务数字。
+    # "N." 只有在后随字符不是数字时才是序号——"1.7%" 的 "1." 是小数整数部分，
+    # 剥掉它会把真实数字 "1.7%" 错拆成不存在的 "7%"（ISSUE-13 类误判残留）
+    _LIST_MARKER_RE = re.compile(r"(?m)^\s*(?:\d+\.(?!\d)\s*|\d+[、)]\s*)")
     # 数字复合词（日期 2024-04-26、区间 10-20）：把连字符两侧数字合并成一个 token，
     # 两侧（答案与证据）同规则归一化，避免 "04"、"26" 这类成分被单独校验。
     # 用 lookaround 而非 \b：中文语境下 \b 在 CJK 字符旁不成立

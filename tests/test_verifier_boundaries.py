@@ -62,6 +62,20 @@ class TestNumberVerifier:
         )
         assert result["passed"] is True
 
+    def test_line_initial_decimal_is_not_a_list_marker(self):
+        """ISSUE-13 残留：行首小数 "1.7%" 不得被当成有序列表序号 "1." 剥掉。
+
+        剥掉后答案只剩 "7%"，证据里只有 "1.7%"，同值异写兜底也救不回来，
+        于是真实有据的答案被误判为编造数字。
+        """
+        verifier = NumberVerifier()
+        result = verifier.verify(
+            answer="1.7%。其中：零售金融业务。",
+            retrieval_results=[_result("零售金融业务收入占比 1.7%。", "s", "c1")],
+            tool_calls=[],
+        )
+        assert result["passed"] is True
+
     def test_boundary_years_not_confused(self):
         """答案数字不得命中证据中更长数字的子串（如 20 命中 2024）。"""
         verifier = NumberVerifier()

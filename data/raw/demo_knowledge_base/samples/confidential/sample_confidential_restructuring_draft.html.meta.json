@@ -1,0 +1,15 @@
+{
+  "doc_type": "research_report",
+  "retrieval_source": "report_search",
+  "permission_level": "confidential",
+  "allowed_roles": [
+    "advisor",
+    "institutional_sales",
+    "compliance",
+    "technical"
+  ],
+  "title": "未公开研究草稿：重大资产重组事项跟踪（内部）",
+  "date": "2026-09-25",
+  "stock_code": "600519",
+  "source": "internal://research-draft/restructuring-2026-09-25"
+}

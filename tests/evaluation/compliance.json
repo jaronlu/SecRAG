@@ -1,0 +1,402 @@
+[
+  {
+    "id": "compliance_advice_000",
+    "answer": "## 结论\n\n建议买入该股票，短期有望上涨。",
+    "user_role": "advisor",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_001",
+    "answer": "## 结论\n\n推荐买入并持有至年底。",
+    "user_role": "institutional_sales",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_002",
+    "answer": "## 结论\n\n建议增持，回调即是机会。",
+    "user_role": "compliance",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_sensitive_003",
+    "answer": "## 结论\n\n根据内幕信息，该事项尚未公布。",
+    "user_role": "operations",
+    "expected_blocked": true,
+    "restricted_text": "根据内幕信息，该事项尚未公布。",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_ok_004",
+    "answer": "## 结论\n\n该产品风险等级为 R2，适合稳健型投资者。",
+    "user_role": "technical",
+    "expected_blocked": false,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_005",
+    "answer": "## 结论\n\n该股票目标价 120 元。",
+    "user_role": "advisor",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_article_006",
+    "answer": "## 结论\n\n该行为违反了相关规定，应当予以纠正。",
+    "user_role": "compliance",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_007",
+    "answer": "## 结论\n\n推荐买入并持有至年底。",
+    "user_role": "compliance",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_008",
+    "answer": "## 结论\n\n建议增持，回调即是机会。",
+    "user_role": "operations",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_ok_009",
+    "answer": "## 结论\n\n该产品风险等级为 R2，适合稳健型投资者。",
+    "user_role": "technical",
+    "expected_blocked": false,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_sensitive_010",
+    "answer": "## 结论\n\n根据未公开，该事项尚未公布。",
+    "user_role": "advisor",
+    "expected_blocked": true,
+    "restricted_text": "根据未公开，该事项尚未公布。",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_011",
+    "answer": "## 结论\n\n该股票目标价 120 元。",
+    "user_role": "institutional_sales",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_012",
+    "answer": "## 结论\n\n建议买入该股票，短期有望上涨。",
+    "user_role": "compliance",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_013",
+    "answer": "## 结论\n\n推荐买入并持有至年底。",
+    "user_role": "operations",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_ok_014",
+    "answer": "## 结论\n\n该产品风险等级为 R2，适合稳健型投资者。",
+    "user_role": "technical",
+    "expected_blocked": false,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_015",
+    "answer": "## 结论\n\n建议减持以规避回撤风险。",
+    "user_role": "advisor",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_016",
+    "answer": "## 结论\n\n可以考虑买入该基金。",
+    "user_role": "institutional_sales",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_sensitive_017",
+    "answer": "## 结论\n\n根据业绩预测，该事项尚未公布。",
+    "user_role": "compliance",
+    "expected_blocked": true,
+    "restricted_text": "根据业绩预测，该事项尚未公布。",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_018",
+    "answer": "## 结论\n\n建议买入该股票，短期有望上涨。",
+    "user_role": "operations",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_ok_019",
+    "answer": "## 结论\n\n该产品风险等级为 R2，适合稳健型投资者。",
+    "user_role": "technical",
+    "expected_blocked": false,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_020",
+    "answer": "## 结论\n\n建议增持，回调即是机会。",
+    "user_role": "advisor",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_021",
+    "answer": "## 结论\n\n建议减持以规避回撤风险。",
+    "user_role": "institutional_sales",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_022",
+    "answer": "## 结论\n\n可以考虑买入该基金。",
+    "user_role": "compliance",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_023",
+    "answer": "## 结论\n\n该股票目标价 120 元。",
+    "user_role": "operations",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_ok_024",
+    "answer": "## 结论\n\n该产品风险等级为 R2，适合稳健型投资者。",
+    "user_role": "technical",
+    "expected_blocked": false,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_025",
+    "answer": "## 结论\n\n推荐买入并持有至年底。",
+    "user_role": "advisor",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_026",
+    "answer": "## 结论\n\n建议增持，回调即是机会。",
+    "user_role": "institutional_sales",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_027",
+    "answer": "## 结论\n\n建议减持以规避回撤风险。",
+    "user_role": "compliance",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_article_028",
+    "answer": "## 结论\n\n该行为违反了相关规定，应当予以纠正。",
+    "user_role": "compliance",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_ok_029",
+    "answer": "## 结论\n\n该产品风险等级为 R2，适合稳健型投资者。",
+    "user_role": "technical",
+    "expected_blocked": false,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_030",
+    "answer": "## 结论\n\n建议买入该股票，短期有望上涨。",
+    "user_role": "advisor",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_sensitive_031",
+    "answer": "## 结论\n\n根据未公开，该事项尚未公布。",
+    "user_role": "institutional_sales",
+    "expected_blocked": true,
+    "restricted_text": "根据未公开，该事项尚未公布。",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_032",
+    "answer": "## 结论\n\n建议增持，回调即是机会。",
+    "user_role": "compliance",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_033",
+    "answer": "## 结论\n\n建议减持以规避回撤风险。",
+    "user_role": "operations",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_ok_034",
+    "answer": "## 结论\n\n该产品风险等级为 R2，适合稳健型投资者。",
+    "user_role": "technical",
+    "expected_blocked": false,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_035",
+    "answer": "## 结论\n\n该股票目标价 120 元。",
+    "user_role": "advisor",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_036",
+    "answer": "## 结论\n\n建议买入该股票，短期有望上涨。",
+    "user_role": "institutional_sales",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_037",
+    "answer": "## 结论\n\n推荐买入并持有至年底。",
+    "user_role": "compliance",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_sensitive_038",
+    "answer": "## 结论\n\n根据业绩预测，该事项尚未公布。",
+    "user_role": "operations",
+    "expected_blocked": true,
+    "restricted_text": "根据业绩预测，该事项尚未公布。",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_ok_039",
+    "answer": "## 结论\n\n该产品风险等级为 R2，适合稳健型投资者。",
+    "user_role": "technical",
+    "expected_blocked": false,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_040",
+    "answer": "## 结论\n\n可以考虑买入该基金。",
+    "user_role": "advisor",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_041",
+    "answer": "## 结论\n\n该股票目标价 120 元。",
+    "user_role": "institutional_sales",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_042",
+    "answer": "## 结论\n\n建议买入该股票，短期有望上涨。",
+    "user_role": "compliance",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_043",
+    "answer": "## 结论\n\n推荐买入并持有至年底。",
+    "user_role": "operations",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_ok_044",
+    "answer": "## 结论\n\n该产品风险等级为 R2，适合稳健型投资者。",
+    "user_role": "technical",
+    "expected_blocked": false,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_sensitive_045",
+    "answer": "## 结论\n\n根据内幕信息，该事项尚未公布。",
+    "user_role": "advisor",
+    "expected_blocked": true,
+    "restricted_text": "根据内幕信息，该事项尚未公布。",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_046",
+    "answer": "## 结论\n\n可以考虑买入该基金。",
+    "user_role": "institutional_sales",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_047",
+    "answer": "## 结论\n\n该股票目标价 120 元。",
+    "user_role": "compliance",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_advice_048",
+    "answer": "## 结论\n\n建议买入该股票，短期有望上涨。",
+    "user_role": "operations",
+    "expected_blocked": true,
+    "restricted_text": "",
+    "returned_answer": ""
+  },
+  {
+    "id": "compliance_ok_049",
+    "answer": "## 结论\n\n该产品风险等级为 R2，适合稳健型投资者。",
+    "user_role": "technical",
+    "expected_blocked": false,
+    "restricted_text": "",
+    "returned_answer": ""
+  }
+]

@@ -1,0 +1,382 @@
+[
+  {
+    "id": "conversation_001",
+    "user_id": "owner-00",
+    "user_role": "advisor",
+    "department": "tech",
+    "client_id": "client-00",
+    "request_id": "request-00",
+    "query": "它的风险等级是多少？",
+    "answer": "## 结论\n\n该产品风险等级为 R2。",
+    "entities": {
+      "stock_code": "600519"
+    },
+    "citations": [
+      {
+        "source": "report.pdf",
+        "chunk_id": "chunk-00"
+      }
+    ]
+  },
+  {
+    "id": "conversation_002",
+    "user_id": "owner-01",
+    "user_role": "institutional_sales",
+    "department": "tech",
+    "client_id": null,
+    "request_id": "request-01",
+    "query": "600519 的营业收入是多少",
+    "answer": "## 结论\n\n该产品风险等级为 R2。",
+    "entities": {
+      "stock_code": "600519"
+    },
+    "citations": [
+      {
+        "source": "report.pdf",
+        "chunk_id": "chunk-01"
+      }
+    ]
+  },
+  {
+    "id": "conversation_003",
+    "user_id": "owner-02",
+    "user_role": "compliance",
+    "department": "tech",
+    "client_id": null,
+    "request_id": "request-02",
+    "query": "它的风险等级是多少？",
+    "answer": "## 结论\n\n该产品风险等级为 R2。",
+    "entities": {
+      "stock_code": "600519"
+    },
+    "citations": [
+      {
+        "source": "report.pdf",
+        "chunk_id": "chunk-02"
+      }
+    ]
+  },
+  {
+    "id": "conversation_004",
+    "user_id": "owner-03",
+    "user_role": "operations",
+    "department": "tech",
+    "client_id": "client-03",
+    "request_id": "request-03",
+    "query": "600519 的营业收入是多少",
+    "answer": "## 结论\n\n该产品风险等级为 R2。",
+    "entities": {
+      "stock_code": "600519"
+    },
+    "citations": [
+      {
+        "source": "report.pdf",
+        "chunk_id": "chunk-03"
+      }
+    ]
+  },
+  {
+    "id": "conversation_005",
+    "user_id": "owner-04",
+    "user_role": "technical",
+    "department": "tech",
+    "client_id": null,
+    "request_id": "request-04",
+    "query": "它的风险等级是多少？",
+    "answer": "## 结论\n\n该产品风险等级为 R2。",
+    "entities": {
+      "stock_code": "600519"
+    },
+    "citations": [
+      {
+        "source": "report.pdf",
+        "chunk_id": "chunk-04"
+      }
+    ]
+  },
+  {
+    "id": "conversation_006",
+    "user_id": "owner-05",
+    "user_role": "advisor",
+    "department": "tech",
+    "client_id": null,
+    "request_id": "request-05",
+    "query": "600519 的营业收入是多少",
+    "answer": "## 结论\n\n该产品风险等级为 R2。",
+    "entities": {
+      "stock_code": "600519"
+    },
+    "citations": [
+      {
+        "source": "report.pdf",
+        "chunk_id": "chunk-05"
+      }
+    ]
+  },
+  {
+    "id": "conversation_007",
+    "user_id": "owner-06",
+    "user_role": "institutional_sales",
+    "department": "tech",
+    "client_id": "client-06",
+    "request_id": "request-06",
+    "query": "它的风险等级是多少？",
+    "answer": "## 结论\n\n该产品风险等级为 R2。",
+    "entities": {
+      "stock_code": "600519"
+    },
+    "citations": [
+      {
+        "source": "report.pdf",
+        "chunk_id": "chunk-06"
+      }
+    ]
+  },
+  {
+    "id": "conversation_008",
+    "user_id": "owner-07",
+    "user_role": "compliance",
+    "department": "tech",
+    "client_id": null,
+    "request_id": "request-07",
+    "query": "600519 的营业收入是多少",
+    "answer": "## 结论\n\n该产品风险等级为 R2。",
+    "entities": {
+      "stock_code": "600519"
+    },
+    "citations": [
+      {
+        "source": "report.pdf",
+        "chunk_id": "chunk-07"
+      }
+    ]
+  },
+  {
+    "id": "conversation_009",
+    "user_id": "owner-08",
+    "user_role": "operations",
+    "department": "tech",
+    "client_id": null,
+    "request_id": "request-08",
+    "query": "它的风险等级是多少？",
+    "answer": "## 结论\n\n该产品风险等级为 R2。",
+    "entities": {
+      "stock_code": "600519"
+    },
+    "citations": [
+      {
+        "source": "report.pdf",
+        "chunk_id": "chunk-08"
+      }
+    ]
+  },
+  {
+    "id": "conversation_010",
+    "user_id": "owner-09",
+    "user_role": "technical",
+    "department": "tech",
+    "client_id": "client-09",
+    "request_id": "request-09",
+    "query": "600519 的营业收入是多少",
+    "answer": "## 结论\n\n该产品风险等级为 R2。",
+    "entities": {
+      "stock_code": "600519"
+    },
+    "citations": [
+      {
+        "source": "report.pdf",
+        "chunk_id": "chunk-09"
+      }
+    ]
+  },
+  {
+    "id": "conversation_011",
+    "user_id": "owner-10",
+    "user_role": "advisor",
+    "department": "tech",
+    "client_id": null,
+    "request_id": "request-10",
+    "query": "它的风险等级是多少？",
+    "answer": "## 结论\n\n该产品风险等级为 R2。",
+    "entities": {
+      "stock_code": "600519"
+    },
+    "citations": [
+      {
+        "source": "report.pdf",
+        "chunk_id": "chunk-10"
+      }
+    ]
+  },
+  {
+    "id": "conversation_012",
+    "user_id": "owner-11",
+    "user_role": "institutional_sales",
+    "department": "tech",
+    "client_id": null,
+    "request_id": "request-11",
+    "query": "600519 的营业收入是多少",
+    "answer": "## 结论\n\n该产品风险等级为 R2。",
+    "entities": {
+      "stock_code": "600519"
+    },
+    "citations": [
+      {
+        "source": "report.pdf",
+        "chunk_id": "chunk-11"
+      }
+    ]
+  },
+  {
+    "id": "conversation_013",
+    "user_id": "owner-12",
+    "user_role": "compliance",
+    "department": "tech",
+    "client_id": "client-12",
+    "request_id": "request-12",
+    "query": "它的风险等级是多少？",
+    "answer": "## 结论\n\n该产品风险等级为 R2。",
+    "entities": {
+      "stock_code": "600519"
+    },
+    "citations": [
+      {
+        "source": "report.pdf",
+        "chunk_id": "chunk-12"
+      }
+    ]
+  },
+  {
+    "id": "conversation_014",
+    "user_id": "owner-13",
+    "user_role": "operations",
+    "department": "tech",
+    "client_id": null,
+    "request_id": "request-13",
+    "query": "600519 的营业收入是多少",
+    "answer": "## 结论\n\n该产品风险等级为 R2。",
+    "entities": {
+      "stock_code": "600519"
+    },
+    "citations": [
+      {
+        "source": "report.pdf",
+        "chunk_id": "chunk-13"
+      }
+    ]
+  },
+  {
+    "id": "conversation_015",
+    "user_id": "owner-14",
+    "user_role": "technical",
+    "department": "tech",
+    "client_id": null,
+    "request_id": "request-14",
+    "query": "它的风险等级是多少？",
+    "answer": "## 结论\n\n该产品风险等级为 R2。",
+    "entities": {
+      "stock_code": "600519"
+    },
+    "citations": [
+      {
+        "source": "report.pdf",
+        "chunk_id": "chunk-14"
+      }
+    ]
+  },
+  {
+    "id": "conversation_016",
+    "user_id": "owner-15",
+    "user_role": "advisor",
+    "department": "tech",
+    "client_id": "client-15",
+    "request_id": "request-15",
+    "query": "600519 的营业收入是多少",
+    "answer": "## 结论\n\n该产品风险等级为 R2。",
+    "entities": {
+      "stock_code": "600519"
+    },
+    "citations": [
+      {
+        "source": "report.pdf",
+        "chunk_id": "chunk-15"
+      }
+    ]
+  },
+  {
+    "id": "conversation_017",
+    "user_id": "owner-16",
+    "user_role": "institutional_sales",
+    "department": "tech",
+    "client_id": null,
+    "request_id": "request-16",
+    "query": "它的风险等级是多少？",
+    "answer": "## 结论\n\n该产品风险等级为 R2。",
+    "entities": {
+      "stock_code": "600519"
+    },
+    "citations": [
+      {
+        "source": "report.pdf",
+        "chunk_id": "chunk-16"
+      }
+    ]
+  },
+  {
+    "id": "conversation_018",
+    "user_id": "owner-17",
+    "user_role": "compliance",
+    "department": "tech",
+    "client_id": null,
+    "request_id": "request-17",
+    "query": "600519 的营业收入是多少",
+    "answer": "## 结论\n\n该产品风险等级为 R2。",
+    "entities": {
+      "stock_code": "600519"
+    },
+    "citations": [
+      {
+        "source": "report.pdf",
+        "chunk_id": "chunk-17"
+      }
+    ]
+  },
+  {
+    "id": "conversation_019",
+    "user_id": "owner-18",
+    "user_role": "operations",
+    "department": "tech",
+    "client_id": "client-18",
+    "request_id": "request-18",
+    "query": "它的风险等级是多少？",
+    "answer": "## 结论\n\n该产品风险等级为 R2。",
+    "entities": {
+      "stock_code": "600519"
+    },
+    "citations": [
+      {
+        "source": "report.pdf",
+        "chunk_id": "chunk-18"
+      }
+    ]
+  },
+  {
+    "id": "conversation_020",
+    "user_id": "owner-19",
+    "user_role": "technical",
+    "department": "tech",
+    "client_id": null,
+    "request_id": "request-19",
+    "query": "600519 的营业收入是多少",
+    "answer": "## 结论\n\n该产品风险等级为 R2。",
+    "entities": {
+      "stock_code": "600519"
+    },
+    "citations": [
+      {
+        "source": "report.pdf",
+        "chunk_id": "chunk-19"
+      }
+    ]
+  }
+]
