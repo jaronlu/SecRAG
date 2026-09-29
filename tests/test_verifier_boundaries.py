@@ -256,3 +256,123 @@ class TestFailureKindClassification:
 
         assert result["passed"] is False
         assert result["failure_kind"] == "facts"
+
+
+class TestCaliberVerifier:
+    """ISSUE-22：口径标签必须与数值成对校验，营业总收入不得标成营业收入。"""
+
+    def _result_with_title(self, content: str, title: str, chunk_id: str) -> RetrievalResult:
+        return {
+            RR_CONTENT: content,
+            RR_METADATA: {META_SOURCE: "ar.pdf", META_CHUNK_ID: chunk_id, "title": title},
+            RR_SCORE: 0.9,
+        }
+
+    def test_total_revenue_labeled_as_operating_revenue_is_rejected(self):
+        from src.utils.verifier import CaliberVerifier
+
+        result = CaliberVerifier().verify(
+            answer="2026 年上半年营业收入 922.78 亿元。",
+            retrieval_results=[
+                self._result_with_title(
+                    "上半年，公司营业总收入 922.78亿元，同比增长1.3%。", "半年报", "c1"
+                )
+            ],
+            tool_calls=[],
+        )
+
+        assert result["passed"] is False
+        assert any("口径" in issue for issue in result["issues"])
+
+    def test_matching_caliber_pair_passes(self):
+        from src.utils.verifier import CaliberVerifier
+
+        result = CaliberVerifier().verify(
+            answer="2026 年上半年营业总收入 922.78 亿元。",
+            retrieval_results=[
+                self._result_with_title(
+                    "上半年，公司营业总收入 922.78亿元，同比增长1.3%。", "半年报", "c1"
+                )
+            ],
+            tool_calls=[],
+        )
+
+        assert result["passed"] is True
+
+    def test_alias_labels_are_the_same_caliber(self):
+        from src.utils.verifier import CaliberVerifier
+
+        result = CaliberVerifier().verify(
+            answer="归母净利润 445.17 亿元。",
+            retrieval_results=[
+                self._result_with_title(
+                    "归属于上市公司股东的净利润 445.17亿元。", "半年报", "c1"
+                )
+            ],
+            tool_calls=[],
+        )
+
+        assert result["passed"] is True
+
+    def test_deducted_profit_is_not_interchangeable_with_attributable_profit(self):
+        from src.utils.verifier import CaliberVerifier
+
+        result = CaliberVerifier().verify(
+            answer="扣非归母净利润 445.17 亿元。",
+            retrieval_results=[
+                self._result_with_title(
+                    "归母净利润 445.17亿元，扣非归母净利润 444.64亿元。", "半年报", "c1"
+                )
+            ],
+            tool_calls=[],
+        )
+
+        assert result["passed"] is False
+
+    def test_unit_converted_value_is_accepted(self):
+        from src.utils.verifier import CaliberVerifier
+
+        result = CaliberVerifier().verify(
+            answer="营业收入 907.03 亿元。",
+            retrieval_results=[
+                self._result_with_title("营业收入 90,703,260,964.48 元。", "半年报", "c1")
+            ],
+            tool_calls=[],
+        )
+
+        assert result["passed"] is True
+
+    def test_fabricated_caliber_is_rejected(self):
+        from src.utils.verifier import CaliberVerifier
+
+        result = CaliberVerifier().verify(
+            answer="营业总收入 445.17 亿元。",
+            retrieval_results=[
+                self._result_with_title("归母净利润 445.17亿元。", "半年报", "c1")
+            ],
+            tool_calls=[],
+        )
+
+        assert result["passed"] is False
+
+    def test_answers_without_caliber_labels_are_not_checked(self):
+        from src.utils.verifier import CaliberVerifier
+
+        result = CaliberVerifier().verify(
+            answer="该产品风险等级为 R2。",
+            retrieval_results=[self._result_with_title("风险等级 R2。", "说明书", "c1")],
+            tool_calls=[],
+        )
+
+        assert result["passed"] is True
+
+    def test_comprehensive_verifier_reports_caliber_failure_as_facts(self):
+        from src.utils.verifier import ComprehensiveVerifier
+
+        results = [self._result_with_title("营业总收入 922.78亿元。", "半年报", "c1")]
+
+        result = ComprehensiveVerifier().verify("营业收入 922.78 亿元。", [], results, [])
+
+        assert result["passed"] is False
+        assert result["failure_kind"] == "facts"
+        assert "caliber_verification" in result["checks"]

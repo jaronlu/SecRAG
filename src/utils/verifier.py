@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 
@@ -265,6 +265,194 @@ class ConsistencyVerifier:
         return {"passed": not issues, "issues": issues}
 
 
+# ══════════════════════════════════════════════════════════════════════
+# ISSUE-22：口径标签与数值的成对校验
+# ══════════════════════════════════════════════════════════════════════
+
+# 口径别名 → 规范口径。同一口径的不同写法必须归一到同一个键，否则
+# "归母净利润"与"归属于上市公司股东的净利润"会被误判成口径混用。
+CALIBER_ALIASES: dict[str, str] = {
+    "营业总收入": "total_operating_revenue",
+    "营业收入": "operating_revenue",
+    "归属于上市公司股东的净利润": "net_profit_attributable",
+    "归母净利润": "net_profit_attributable",
+    "扣除非经常性损益的净利润": "net_profit_deducted",
+    "扣非归母净利润": "net_profit_deducted",
+    "净利润": "net_profit",
+    "营业利润": "operating_profit",
+    "利润总额": "total_profit",
+    "基本每股收益": "eps_basic",
+    "摊薄每股收益": "eps_diluted",
+    "每股收益": "eps",
+    "毛利率": "gross_margin",
+    "净利率": "net_margin",
+}
+# 长标签优先匹配："营业总收入" 不得被 "营业收入" 抢先切走，
+# "扣非归母净利润" 不得被 "归母净利润" 抢先切走
+_CALIBER_LABEL_RE = re.compile(
+    "|".join(re.escape(label) for label in sorted(CALIBER_ALIASES, key=len, reverse=True))
+)
+# 金额单位 → 基准量纲倍数；长单位在前，避免 "百万元" 被 "万元" 抢先匹配
+_UNIT_SCALES: dict[str, float] = {
+    "百亿元": 1e10,
+    "千万元": 1e7,
+    "十亿元": 1e9,
+    "百万元": 1e6,
+    "亿元": 1e8,
+    "万元": 1e4,
+    "亿": 1e8,
+    "万": 1e4,
+    "元": 1.0,
+    "%": 1.0,
+    "倍": 1.0,
+}
+_UNIT_ALTERNATION = "|".join(
+    re.escape(unit) for unit in sorted(_UNIT_SCALES, key=len, reverse=True)
+)
+_NUMBER_AND_UNIT_RE = re.compile(rf"\s*(-?\d[\d,]*(?:\.\d+)?)\s*({_UNIT_ALTERNATION})?")
+# 口径标签与数值的绑定窗口（字符数）：够覆盖"营业收入（元）"这类写法
+_CALIBER_WINDOW = 16
+# 相对容差：覆盖"907.03 亿元"与"90,703,260,964.48 元"这类单位换算的舍入误差，
+# 又不会把 445.17 与 444.64（相差 0.12%）判成同一个值
+_CALIBER_RELATIVE_TOLERANCE = 5e-4
+_UNIT_FAMILIES = {"%": "ratio", "倍": "multiple"}
+
+
+def _unit_family(unit: str) -> str:
+    return _UNIT_FAMILIES.get(unit, "currency")
+
+
+@dataclass(frozen=True)
+class _CaliberPair:
+    """一处"口径标签 + 数值"绑定。"""
+
+    label: str
+    caliber: str
+    raw_number: str
+    raw_value: float
+    scaled_value: float
+    unit: str
+
+
+class CaliberVerifier:
+    """口径标签与数值的成对校验（ISSUE-22）。
+
+    08-evaluation §2 要求结构化数字精确率 100%：数字取自证据但口径标错
+    （例如把营业总收入写成营业收入）同样是错误答案，必须拦截。
+
+    两类问题会判失败：
+    1. 同一数值在答案中被绑定到与证据不同的口径（口径混用）；
+    2. 答案使用了证据中从未出现的口径标签（凭空引入口径）。
+
+    只在答案出现已知口径标签时生效；无口径标签的答案（产品、规则、FAQ）
+    不受影响。
+    """
+
+    def verify(
+        self,
+        answer: str,
+        retrieval_results: list[RetrievalResult],
+        tool_calls: list[ToolCallDict],
+    ) -> dict:
+        answer_pairs = self._extract_pairs(answer)
+        if not answer_pairs:
+            return {"passed": True, "issues": [], "pairs_checked": 0}
+
+        evidence_text = "\n".join(
+            filter(
+                None,
+                (
+                    result.get(RR_CONTENT, "")
+                    for result in retrieval_results
+                    if not result.get(RR_DENIED)
+                ),
+            )
+        )
+        tool_text = "\n".join(
+            str(call.get("output", "")) for call in tool_calls if call.get("success", False)
+        )
+        evidence_pairs = self._extract_pairs(f"{evidence_text}\n{tool_text}")
+
+        issues: list[str] = []
+        for pair in answer_pairs:
+            if not self._label_present(pair, evidence_text, tool_text):
+                issues.append(f"口径标签未在证据中出现: {pair.label}")
+                continue
+            if any(
+                candidate.caliber == pair.caliber and self._equivalent(pair, candidate)
+                for candidate in evidence_pairs
+            ):
+                continue
+            conflicting = sorted({
+                candidate.label
+                for candidate in evidence_pairs
+                if candidate.caliber != pair.caliber and self._equivalent(pair, candidate)
+            })
+            if conflicting:
+                issues.append(
+                    f"口径与数值不匹配: {pair.label}={pair.raw_number}{pair.unit} "
+                    f"在证据中对应 {'、'.join(conflicting)}"
+                )
+            else:
+                issues.append(
+                    f"口径与数值未在证据中成对出现: {pair.label}={pair.raw_number}{pair.unit}"
+                )
+        return {"passed": not issues, "issues": issues, "pairs_checked": len(answer_pairs)}
+
+    def _extract_pairs(self, text: str) -> list[_CaliberPair]:
+        pairs: list[_CaliberPair] = []
+        for match in _CALIBER_LABEL_RE.finditer(text):
+            label = match.group(0)
+            window = text[match.end() : match.end() + _CALIBER_WINDOW]
+            number_match = _NUMBER_AND_UNIT_RE.search(window)
+            if number_match is None:
+                continue
+            raw_number = number_match.group(1)
+            unit = number_match.group(2) or ""
+            try:
+                raw_value = float(raw_number.replace(",", ""))
+            except ValueError:
+                continue
+            pairs.append(
+                _CaliberPair(
+                    label=label,
+                    caliber=CALIBER_ALIASES[label],
+                    raw_number=raw_number,
+                    raw_value=raw_value,
+                    scaled_value=raw_value * _UNIT_SCALES.get(unit, 1.0),
+                    unit=unit,
+                )
+            )
+        return pairs
+
+    @staticmethod
+    def _label_present(pair: _CaliberPair, *texts: str) -> bool:
+        """证据中是否出现过该口径的任一同义写法（含全称与简称）。"""
+        aliases = [alias for alias, caliber in CALIBER_ALIASES.items() if caliber == pair.caliber]
+        return any(alias in text for text in texts for alias in aliases)
+
+    @staticmethod
+    def _equivalent(left: _CaliberPair, right: _CaliberPair) -> bool:
+        """数值等价判定：单位族必须一致，量纲换算后或原值在容差内相等。"""
+        if left.unit and right.unit and _unit_family(left.unit) != _unit_family(right.unit):
+            return False
+        if CaliberVerifier._close(left.scaled_value, right.scaled_value):
+            return True
+        # 任一侧未写单位时，原值相同即视为同一数值（"922.78" ≡ "922.78亿元"）
+        if not left.unit or not right.unit:
+            return CaliberVerifier._close(left.raw_value, right.raw_value)
+        return False
+
+    @staticmethod
+    def _close(left: float, right: float) -> bool:
+        if left == right:
+            return True
+        scale = max(abs(left), abs(right))
+        if scale == 0:
+            return False
+        return abs(left - right) / scale <= _CALIBER_RELATIVE_TOLERANCE
+
+
 class HallucinationDetector:
     # 中文功能词/虚词：不承载业务事实，句子比对时从两侧剔除，
     # 降低同义改写（语序、措辞）造成的覆盖率噪声（ISSUE-13）。
@@ -385,6 +573,7 @@ class ComprehensiveVerifier:
     def __init__(self):
         self.source_verifier = SourceVerifier()
         self.number_verifier = NumberVerifier()
+        self.caliber_verifier = CaliberVerifier()
         self.consistency_verifier = ConsistencyVerifier()
         self.hallucination_detector = HallucinationDetector()
 
@@ -400,6 +589,9 @@ class ComprehensiveVerifier:
                 answer, citations, retrieval_results
             ),
             "number_verification": self.number_verifier.verify(
+                answer, retrieval_results, tool_calls
+            ),
+            "caliber_verification": self.caliber_verifier.verify(
                 answer, retrieval_results, tool_calls
             ),
             "consistency_verification": self.consistency_verifier.verify(answer, citations),
