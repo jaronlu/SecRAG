@@ -47,7 +47,10 @@ from src.utils.dates import parse_date_day
 
 SUPPORTED_SUFFIXES = {".pdf", ".docx", ".doc", ".html", ".htm", ".csv", ".xlsx", ".xls"}
 PARSER_VERSION = "secrag-loader-v1"
-CHUNKER_VERSION = "secrag-chunker-v1"
+# v2：解析元素先聚合再按设计尺寸切分（ISSUE-21）。切分语义变化必须升版，
+# 否则 registry 的 _should_skip 会按旧 chunker_version 跳过未变化文档，
+# 让旧的碎片 chunk 继续留在索引里。
+CHUNKER_VERSION = "secrag-chunker-v2"
 URL_HASH_PREFIX_LEN = 16
 
 
