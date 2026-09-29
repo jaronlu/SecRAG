@@ -89,6 +89,9 @@ STATE_QUERY_TYPE: Final = "query_type"
 STATE_RETRIEVAL_ATTEMPTS: Final = "retrieval_attempts"
 STATE_REASON_ATTEMPTS: Final = "reason_attempts"
 STATE_RETRIEVAL_PLAN: Final = "retrieval_plan"
+# ISSUE-11：query_understand（合并 LLM 调用）产出的未规范化计划原文，
+# 由 planner 节点做权限/过滤器规范化后写入 STATE_RETRIEVAL_PLAN
+STATE_RETRIEVAL_PLAN_RAW: Final = "retrieval_plan_raw"
 STATE_RETRIEVAL_RESULTS: Final = "retrieval_results"
 STATE_RETRIEVAL_TOTAL_CHUNKS: Final = "retrieval_total_chunks"
 STATE_RETRIEVAL_FILTERED_CHUNKS: Final = "retrieval_filtered_chunks"

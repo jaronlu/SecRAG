@@ -34,6 +34,7 @@ from src.agents.nodes import (
     record_tool_results,
     retrieve,
     sanitize_query,
+    query_understand,
     verify,
 )
 from src.agents.state import AssistantState
@@ -105,6 +106,7 @@ from src.schemas.constants import (
     STATE_RETRIEVAL_FILTERED_CHUNKS,
     STATE_RERANKER_STATUS,
     STATE_RETRIEVAL_PLAN,
+    STATE_RETRIEVAL_PLAN_RAW,
     STATE_RETRIEVAL_RESULTS,
     STATE_RETRIEVAL_TOTAL_CHUNKS,
     STATE_REWRITTEN_QUERY,
@@ -277,39 +279,40 @@ class TestGradeAndFilter:
         assert result[STATE_RERANKER_STATUS].startswith("error:")
 
 
-def test_planner_injects_stock_code_filter_for_report_search(monkeypatch):
-    response = MagicMock()
-    response.content = json.dumps([
-        {PLAN_SOURCE: SOURCE_REPORT, PLAN_QUERY: "贵州茅台研报", PLAN_TOP_K: 5}
-    ])
+def test_planner_injects_stock_code_filter_for_report_search():
+    """ISSUE-11：planner 不再调用 LLM，只规范化 query_understand 产出的原始计划。"""
 
-    class FakeLLM:
+    class _ForbiddenLLM:
         def invoke(self, messages):
-            return response
+            raise AssertionError("planner 不得再发起 LLM 调用")
 
-    monkeypatch.setattr("src.agents.nodes.llm", FakeLLM())
-    state = _state(**{
-        STATE_USER_ROLE: ROLE_ADVISOR,
-        STATE_ORIGINAL_QUERY: "贵州茅台评级",
-        STATE_REWRITTEN_QUERY: "贵州茅台600519研报评级",
-        STATE_INTENT: "研报观点",
-        STATE_QUERY_TYPE: "report_inquiry",
-        STATE_ENTITIES: {"stock_code": "600519.SH"},
-    })
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr("src.agents.nodes.llm", _ForbiddenLLM())
+    try:
+        state = _state(**{
+            STATE_USER_ROLE: ROLE_ADVISOR,
+            STATE_ORIGINAL_QUERY: "贵州茅台评级",
+            STATE_REWRITTEN_QUERY: "贵州茅台600519研报评级",
+            STATE_INTENT: "研报观点",
+            STATE_QUERY_TYPE: "report_inquiry",
+            STATE_ENTITIES: {"stock_code": "600519.SH"},
+            STATE_RETRIEVAL_PLAN_RAW: [
+                {PLAN_SOURCE: SOURCE_REPORT, PLAN_QUERY: "贵州茅台研报", PLAN_TOP_K: 5}
+            ],
+        })
 
-    result = planner(state)
+        result = planner(state)
+    finally:
+        monkeypatch.undo()
 
     assert result[STATE_RETRIEVAL_PLAN][0][PLAN_FILTERS] == {"stock_code": "600519"}
 
 
-def _planner_llm_response(steps: list[dict]) -> Any:
-    response = MagicMock()
-    response.content = json.dumps(steps)
-    return type("FakeLLM", (), {"invoke": lambda self, messages: response})()
-
-
 class TestPlannerDateFilters:
-    """标题年份（报告期）≠ 发布日期：时间范围不得变成 report_search 硬过滤（ISSUE-2）。"""
+    """标题年份（报告期）≠ 发布日期：时间范围不得变成 report_search 硬过滤（ISSUE-2）。
+
+    ISSUE-11 后 planner 只做规范化：原始计划来自 state 的 retrieval_plan_raw。
+    """
 
     def _state(self, **overrides: Any) -> AssistantState:
         return _state(**{
@@ -325,18 +328,15 @@ class TestPlannerDateFilters:
             **overrides,
         })
 
-    def test_report_search_gets_no_publish_date_filter(self, monkeypatch):
-        monkeypatch.setattr(
-            "src.agents.nodes.llm",
-            _planner_llm_response(
-                [
-                    {PLAN_SOURCE: SOURCE_REPORT, PLAN_QUERY: "贵州茅台2025年研报", PLAN_TOP_K: 5},
-                    {PLAN_SOURCE: SOURCE_PRODUCT, PLAN_QUERY: "贵州茅台", PLAN_TOP_K: 3},
-                ]
-            ),
-        )
+    def test_report_search_gets_no_publish_date_filter(self):
+        state = self._state(**{
+            STATE_RETRIEVAL_PLAN_RAW: [
+                {PLAN_SOURCE: SOURCE_REPORT, PLAN_QUERY: "贵州茅台2025年研报", PLAN_TOP_K: 5},
+                {PLAN_SOURCE: SOURCE_PRODUCT, PLAN_QUERY: "贵州茅台", PLAN_TOP_K: 3},
+            ]
+        })
 
-        result = planner(self._state())
+        result = planner(state)
 
         plan = result[STATE_RETRIEVAL_PLAN]
         assert plan[0][PLAN_SOURCE] == SOURCE_REPORT
@@ -350,11 +350,12 @@ class TestPlannerDateFilters:
             ]
         }
 
-    def test_retry_after_empty_round_drops_date_filters_for_all_sources(self, monkeypatch):
-        monkeypatch.setattr(
-            "src.agents.nodes.llm",
-            _planner_llm_response(
-                [
+    def test_retry_after_empty_round_drops_date_filters_for_all_sources(self):
+        state = self._state(
+            **{
+                STATE_RETRIEVAL_ATTEMPTS: 1,
+                STATE_RETRIEVAL_RESULTS: [],
+                STATE_RETRIEVAL_PLAN_RAW: [
                     {
                         PLAN_SOURCE: SOURCE_PRODUCT,
                         PLAN_QUERY: "贵州茅台",
@@ -362,11 +363,8 @@ class TestPlannerDateFilters:
                         PLAN_FILTERS: {"product_type": "fund", META_DATE_DAY: {"$gte": 20250101}},
                     },
                     {PLAN_SOURCE: SOURCE_REPORT, PLAN_QUERY: "贵州茅台研报", PLAN_TOP_K: 5},
-                ]
-            ),
-        )
-        state = self._state(
-            **{STATE_RETRIEVAL_ATTEMPTS: 1, STATE_RETRIEVAL_RESULTS: []},
+                ],
+            },
         )
 
         result = planner(state)
@@ -376,17 +374,14 @@ class TestPlannerDateFilters:
         assert plan[0][PLAN_FILTERS] == {"product_type": "fund"}
         assert plan[1].get(PLAN_FILTERS) == {"stock_code": "600519"}
 
-    def test_retry_with_usable_results_keeps_date_filters(self, monkeypatch):
-        monkeypatch.setattr(
-            "src.agents.nodes.llm",
-            _planner_llm_response(
-                [{PLAN_SOURCE: SOURCE_PRODUCT, PLAN_QUERY: "贵州茅台", PLAN_TOP_K: 3}]
-            ),
-        )
+    def test_retry_with_usable_results_keeps_date_filters(self):
         state = self._state(
             **{
                 STATE_RETRIEVAL_ATTEMPTS: 1,
                 STATE_RETRIEVAL_RESULTS: [_result("已有可用结果", score=0.8)],
+                STATE_RETRIEVAL_PLAN_RAW: [
+                    {PLAN_SOURCE: SOURCE_PRODUCT, PLAN_QUERY: "贵州茅台", PLAN_TOP_K: 3}
+                ],
             },
         )
 
@@ -395,6 +390,106 @@ class TestPlannerDateFilters:
         plan = result[STATE_RETRIEVAL_PLAN]
         assert plan
         assert {META_DATE_DAY: {"$gte": 20250101}} in plan[0][PLAN_FILTERS]["$and"]
+
+
+class TestUnderstandAndPlanSingleRoundTrip:
+    """ISSUE-11：query_understand 单次 LLM 往返同时产出理解结果与原始检索计划。"""
+
+    def _first_pass_state(self, **overrides: Any) -> AssistantState:
+        return _state(**{
+            STATE_USER_ROLE: ROLE_ADVISOR,
+            STATE_DEPARTMENT: "wealth",
+            STATE_ORIGINAL_QUERY: "XX货币市场基金的风险等级是什么？",
+            **overrides,
+        })
+
+    def test_single_llm_call_produces_understanding_and_raw_plan(self, monkeypatch):
+        calls: list[Any] = []
+
+        class _MergedLLM:
+            def invoke(self, messages):
+                calls.append(messages)
+                response = MagicMock()
+                response.content = json.dumps({
+                    "intent": "产品咨询",
+                    "query_type": "product_inquiry",
+                    "entities": {"product_name": "XX货币市场基金", "time_range": {"start": "", "end": ""}},
+                    "rewritten_query": "XX货币市场基金 风险等级",
+                    "ambiguity": [],
+                    "retrieval_plan": [
+                        {PLAN_SOURCE: SOURCE_PRODUCT, PLAN_QUERY: "XX货币市场基金 风险等级", PLAN_TOP_K: 3}
+                    ],
+                })
+                return response
+
+        monkeypatch.setattr("src.agents.nodes.llm", _MergedLLM())
+
+        result = query_understand(self._first_pass_state())
+
+        assert len(calls) == 1, "理解与计划必须合并为一次 LLM 往返"
+        assert result[STATE_INTENT] == "产品咨询"
+        assert result[STATE_REWRITTEN_QUERY] == "XX货币市场基金 风险等级"
+        assert result[STATE_AMBIGUITY] == []
+        raw_plan = result[STATE_RETRIEVAL_PLAN_RAW]
+        assert raw_plan[0][PLAN_SOURCE] == SOURCE_PRODUCT
+
+    def test_retry_pass_only_asks_for_plan_and_keeps_understanding(self, monkeypatch):
+        """多跳重试轮进入合并节点时只补计划，不再重问理解；实体扩展提示保留。"""
+        prompts: list[str] = []
+
+        class _RetryPlanLLM:
+            def invoke(self, messages):
+                prompts.append(messages[-1].content)
+                response = MagicMock()
+                response.content = json.dumps([
+                    {PLAN_SOURCE: SOURCE_PRODUCT, PLAN_QUERY: "扩展查询", PLAN_TOP_K: 3}
+                ])
+                return response
+
+        monkeypatch.setattr("src.agents.nodes.llm", _RetryPlanLLM())
+        state = self._first_pass_state(
+            **{
+                STATE_RETRIEVAL_ATTEMPTS: 1,
+                STATE_RETRIEVAL_RESULTS: [
+                    _result("已有结果", meta={META_TITLE: "XX货币市场基金2024年报"}, score=0.8)
+                ],
+                STATE_REWRITTEN_QUERY: "XX货币市场基金 风险等级",
+            }
+        )
+
+        result = query_understand(state)
+
+        assert len(prompts) == 1
+        assert "生成检索计划" in prompts[0]
+        assert "XX货币市场基金2024年报" in prompts[0], "重试轮须注入已检索实体"
+        # 理解字段不在重试轮返回中：state 既有值不被覆盖
+        assert STATE_AMBIGUITY not in result
+        assert STATE_INTENT not in result
+        assert result[STATE_RETRIEVAL_PLAN_RAW] == [
+            {PLAN_SOURCE: SOURCE_PRODUCT, PLAN_QUERY: "扩展查询", PLAN_TOP_K: 3}
+        ]
+
+    def test_merged_json_missing_plan_falls_back_to_first_allowed_source(self, monkeypatch):
+        class _NoPlanLLM:
+            def invoke(self, messages):
+                response = MagicMock()
+                response.content = json.dumps({
+                    "intent": "产品咨询",
+                    "query_type": "product_inquiry",
+                    "entities": {},
+                    "rewritten_query": "改写查询",
+                    "ambiguity": [],
+                })
+                return response
+
+        monkeypatch.setattr("src.agents.nodes.llm", _NoPlanLLM())
+
+        result = query_understand(self._first_pass_state())
+
+        raw_plan = result[STATE_RETRIEVAL_PLAN_RAW]
+        assert raw_plan, "计划缺失时必须回退到角色首个允许数据源"
+        assert raw_plan[0][PLAN_SOURCE] == "product_search"
+        assert raw_plan[0][PLAN_QUERY] == "改写查询"
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -1533,6 +1628,14 @@ class TestAuditLog:
 
 
 class TestShouldRetryRetrieval:
+    def test_retry_branch_routes_to_merged_understand_node(self):
+        """ISSUE-11：多跳重规划直接回到合并节点（理解+计划一次往返），
+        不再单独经过 planner——LLM 往返数从 2 降到 1。"""
+        compiled = build_agent_graph().compile()
+        edges = {(edge.source, edge.target) for edge in compiled.get_graph().edges}
+        assert ("grade_and_filter", "query_understand") in edges
+        assert ("grade_and_filter", "planner") not in edges
+
     def test_empty_results(self):
         assert should_retry_retrieval(_state()) == "retrieve"
 
@@ -1761,21 +1864,24 @@ class TestCompiledGraphRerankerStatus:
                 self.content = content
 
         class _StubLLM:
-            """query_understand 返回理解 JSON；planner（含"检索计划"）返回计划数组。"""
+            """ISSUE-11 合并调用：首轮返回理解+计划；重试轮（含"生成检索计划"）返回计划数组。"""
 
             def invoke(self, messages):
                 prompt = messages[-1].content
-                if "检索计划" in prompt:
-                    return _StubResponse(json.dumps([
-                        {PLAN_SOURCE: SOURCE_FAQ, PLAN_QUERY: "货币基金 风险等级", PLAN_TOP_K: 5}
-                    ]))
-                return _StubResponse(json.dumps({
-                    "intent": "FAQ",
-                    "query_type": "faq_inquiry",
-                    "entities": {},
-                    "rewritten_query": "货币基金的风险等级",
-                    "ambiguity": [],
-                }))
+                if "请分析以下行业业务查询" in prompt:
+                    return _StubResponse(json.dumps({
+                        "intent": "FAQ",
+                        "query_type": "faq_inquiry",
+                        "entities": {},
+                        "rewritten_query": "货币基金的风险等级",
+                        "ambiguity": [],
+                        "retrieval_plan": [
+                            {PLAN_SOURCE: SOURCE_FAQ, PLAN_QUERY: "货币基金 风险等级", PLAN_TOP_K: 5}
+                        ],
+                    }))
+                return _StubResponse(json.dumps([
+                    {PLAN_SOURCE: SOURCE_FAQ, PLAN_QUERY: "货币基金 风险等级", PLAN_TOP_K: 5}
+                ]))
 
         class _StubReasonModel:
             def invoke(self, messages):

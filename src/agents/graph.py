@@ -369,13 +369,14 @@ def build_agent_graph() -> StateGraph[AssistantState]:
     graph.add_edge("retrieve", "grade_and_filter")
 
     # 条件路由：检索不足则重新规划并补充检索（最多 DEFAULT_MAX_HOPS 次）；
+    # 重规划回到合并节点（ISSUE-11：理解+计划一次往返，重试轮只补计划）；
     # 耗尽仍无可用结果则短路返回"未找到资料"（ISSUE-3）
     graph.add_conditional_edges(
         "grade_and_filter",
         should_retry_retrieval,
         {
             "continue": "reason",
-            "retrieve": "planner",
+            "retrieve": "query_understand",
             "denied": "permission_denied_response",
             "no_results": "no_results_response",
         },

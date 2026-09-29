@@ -1,4 +1,4 @@
-from typing import Annotated, Optional, Sequence, TypedDict
+from typing import Annotated, Any, Optional, Sequence, TypedDict
 
 from langchain_core.messages import BaseMessage
 from langgraph.graph import add_messages
@@ -51,8 +51,11 @@ class AssistantState(TypedDict):
     pii_detected: list[dict[str, str]]  # STATE_PII_DETECTED；detect_pii 结果 [{type, match, position}]
     language: str  # STATE_LANGUAGE；detect_language 结果（zh/en/mixed）
 
-    # 检索计划 — STATE_RETRIEVAL_PLAN / STATE_RETRIEVAL_ATTEMPTS
+    # 检索计划 — STATE_RETRIEVAL_PLAN / STATE_RETRIEVAL_PLAN_RAW / STATE_RETRIEVAL_ATTEMPTS
+    # retrieval_plan_raw 是 query_understand 合并 LLM 调用（ISSUE-11）产出的
+    # 未规范化计划（LLM 原始 dict，不可信）；planner 节点规范化后写 retrieval_plan
     retrieval_plan: list[RetrievalPlanStep]
+    retrieval_plan_raw: list[dict[str, Any]]
     retrieval_attempts: int  # 多跳检索计数器（impl-04 使用）
 
     # 检索结果 — STATE_RETRIEVAL_RESULTS；顺序节点显式累加或替换

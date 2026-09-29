@@ -88,6 +88,7 @@ from src.schemas.constants import (
     STATE_RETRIEVAL_FILTERED_CHUNKS,
     STATE_RERANKER_STATUS,
     STATE_RETRIEVAL_PLAN,
+    STATE_RETRIEVAL_PLAN_RAW,
     STATE_RETRIEVAL_RESULTS,
     STATE_RETRIEVAL_TOTAL_CHUNKS,
     STATE_REWRITTEN_QUERY,
@@ -465,12 +466,89 @@ def resolve_followup_query(state: AssistantState) -> dict[str, Any]:
 
 
 # ══════════════════════════════════════════════════════════════════════
-# 4.2 Query Understand — 意图分类、实体抽取、查询重写、歧义检测
+# 4.2 Query Understand + Plan — 意图/实体/重写/歧义 与 检索计划 一次往返（ISSUE-11）
 # ══════════════════════════════════════════════════════════════════════
 
 
+def _fallback_raw_plan(allowed_sources: list[str], query: str) -> list[dict[str, Any]]:
+    """LLM 未返回合法计划时退化为单源检索，保证流程继续。"""
+    return (
+        [{PLAN_SOURCE: allowed_sources[0], PLAN_QUERY: query, PLAN_TOP_K: 3}]
+        if allowed_sources
+        else []
+    )
+
+
+def _plan_only_llm_call(state: AssistantState) -> dict[str, Any]:
+    """多跳重试轮的合并节点分支：只补检索计划，不重问查询理解（ISSUE-11）。
+
+    理解字段沿用首轮结果；实体扩展与 0 召回放宽提示保留（P1-3 / ISSUE-2）。
+    """
+    allowed_sources = ROLE_ALLOWED_SOURCES.get(state[STATE_USER_ROLE], [])
+    original_query = state.get(STATE_ORIGINAL_QUERY, "")
+    rewritten_query = state.get(STATE_REWRITTEN_QUERY) or original_query
+
+    entities = _extract_entities_from_results(state.get(STATE_RETRIEVAL_RESULTS, []))
+    entity_context = ""
+    if entities:
+        entity_context = f"\n【已检索到的实体】{', '.join(entities)}\n请基于这些实体扩展查询，寻找关联信息，不要重复相同查询。"
+    # ISSUE-2: 0 召回放宽重试——上一轮没有任何可用结果时，去掉日期硬过滤
+    # 并提示 LLM 放宽计划
+    empty_round_hint = (
+        "\n【上一轮结果】检索 0 条可用结果：请放宽条件——不要依赖元数据过滤，"
+        "改用更宽泛的语义查询和同义表述。\n"
+        if _retrying_after_empty_retrieval(state)
+        else ""
+    )
+
+    prompt = f"""根据以下查询理解结果，生成检索计划：
+
+【原始查询】{original_query}
+【重写查询】{rewritten_query}
+【意图】{state.get(STATE_INTENT, "unknown")}
+【查询类型】{state.get(STATE_QUERY_TYPE, "unknown")}
+【实体】{json.dumps(state.get(STATE_ENTITIES, {}), ensure_ascii=False)}
+【用户角色】{state[STATE_USER_ROLE]}{entity_context}{empty_round_hint}
+
+可用数据源（基于角色权限）：
+- product_search: 理财产品说明书、产品合同、风险揭示书
+- regulation_search: 规则法规、内部制度、处罚案例
+- report_search: 研报摘要、晨会纪要、策略周报
+- faq_search: 常见问题解答、操作流程
+
+请以 JSON 数组返回检索计划，只使用当前角色允许的数据源：
+[
+  {{"source": "product_search", "query": "...", "top_k": 5, "filters": {{"product_type": "fund"}}}},
+  {{"source": "regulation_search", "query": "...", "top_k": 3, "filters": {{"source": "csrc"}}}},
+  {{"source": "report_search", "query": "...", "top_k": 5}}
+]
+
+只返回 JSON 数组。"""
+
+    response = llm.invoke([HumanMessage(content=prompt)])
+    try:
+        raw = response.content
+        if not isinstance(raw, str):
+            raw = str(raw)
+        parsed_plan = json.loads(raw)
+    except json.JSONDecodeError:
+        parsed_plan = _fallback_raw_plan(allowed_sources, rewritten_query)
+
+    if not isinstance(parsed_plan, list):
+        parsed_plan = []
+    return {STATE_RETRIEVAL_PLAN_RAW: parsed_plan}
+
+
 def query_understand(state: AssistantState) -> dict[str, Any]:
-    """查询理解：意图分类、实体抽取、查询重写、歧义检测"""
+    """查询理解与检索计划合并节点（ISSUE-11）：一次 LLM 往返产出两者。
+
+    首轮（retrieval_attempts == 0）同时完成意图分类、实体抽取、查询重写、
+    歧义检测与检索计划；计划原文写入 STATE_RETRIEVAL_PLAN_RAW，由 planner
+    节点统一规范化。多跳重试轮只补计划（见 _plan_only_llm_call）。
+    """
+    if state.get(STATE_RETRIEVAL_ATTEMPTS, 0) > 0:
+        return _plan_only_llm_call(state)
+
     # 优先使用"指代消解后的查询"，否则回退到原始查询
     effective_query = state.get(STATE_RESOLVED_QUERY) or state[STATE_ORIGINAL_QUERY]
     # P1-5: 查询消毒（截断 + 注入检测）
@@ -495,18 +573,24 @@ def query_understand(state: AssistantState) -> dict[str, Any]:
     from src.utils.i18n import detect_language
 
     language = detect_language(safe_query)
-    prompt = f"""请分析以下行业业务查询：
+    allowed_sources = ROLE_ALLOWED_SOURCES.get(state[STATE_USER_ROLE], [])
+    prompt = f"""请分析以下行业业务查询，并同时给出该查询的检索计划：
 
 【用户查询】{safe_query}
 【用户角色】{state[STATE_USER_ROLE]}
 【用户部门】{state[STATE_DEPARTMENT]}
 
-请以 JSON 格式返回：{{
+第一部分为查询理解，第二部分为检索计划，二者合并放在同一个 JSON 对象中返回：
+{{
   "intent": "产品咨询 | 交易规则 | 法规咨询 | 研报观点 | 规则审查 | FAQ | 技术支持",
   "query_type": "product_inquiry | rule_inquiry | regulation_inquiry | report_inquiry | faq_inquiry | technical_inquiry",
   "entities": {{"product_name": "", "product_type": "", "stock_code": "", "regulation_name": "", "client_segment": "", "time_range": {{"start": "", "end": ""}}}},
   "rewritten_query": "优化后的结构化查询",
-  "ambiguity": []
+  "ambiguity": [],
+  "retrieval_plan": [
+    {{"source": "product_search", "query": "...", "top_k": 5, "filters": {{"product_type": "fund"}}}},
+    {{"source": "report_search", "query": "...", "top_k": 5}}
+  ]
 }}
 
 ambiguity 填写规则（严格遵守）：
@@ -515,7 +599,16 @@ ambiguity 填写规则（严格遵守）：
 - 只有指向特定产品但未指定产品名、或涉及具体时间但未给时间范围等情况，才视为歧义
 - 绝大多数查询 ambiguity 应为空数组 []
 time_range 说明：如果查询涉及时间范围（如"最近3个月"、"2024年"、"去年"），填入 ISO 日期 start/end；否则留空字符串。
-只返回 JSON，不要其他内容。"""
+
+retrieval_plan 填写规则：
+- 只使用当前角色允许的数据源：
+  - product_search: 理财产品说明书、产品合同、风险揭示书
+  - regulation_search: 规则法规、内部制度、处罚案例
+  - report_search: 研报摘要、晨会纪要、策略周报
+  - faq_search: 常见问题解答、操作流程
+- 数组元素含 source / query / top_k，可选 filters；query 使用重写后的查询语义
+
+只返回一个 JSON 对象，不要其他内容。"""
 
     response = llm.invoke([HumanMessage(content=prompt)])
     try:
@@ -525,13 +618,7 @@ time_range 说明：如果查询涉及时间范围（如"最近3个月"、"2024�
         result = json.loads(raw)
     except json.JSONDecodeError:
         # LLM 未按格式返回 JSON 时，不阻断流程，用默认值兜底
-        result = {
-            "intent": "unknown",
-            "query_type": "unknown",
-            "entities": {},
-            "rewritten_query": safe_query,
-            "ambiguity": [],
-        }
+        result = None
 
     # issues.md 二.5：合法 JSON 不一定是正确对象（如 [] 或 null），
     # 运行时逐字段校验类型，不符合契约的字段回退默认值
@@ -559,13 +646,20 @@ time_range 说明：如果查询涉及时间范围（如"最近3个月"、"2024�
     intent = result.get("intent")
     query_type = result.get("query_type")
     rewritten = result.get("rewritten_query")
+    rewritten_query = rewritten if isinstance(rewritten, str) and rewritten else safe_query
+
+    # 计划部分：缺失或非法时回退到角色首个允许数据源的单源计划
+    raw_plan = result.get("retrieval_plan")
+    if not isinstance(raw_plan, list):
+        raw_plan = _fallback_raw_plan(allowed_sources, rewritten_query)
 
     return {
         STATE_INTENT: intent if isinstance(intent, str) and intent else "unknown",
         STATE_QUERY_TYPE: query_type if isinstance(query_type, str) and query_type else "unknown",
         STATE_ENTITIES: clean_entities,
-        STATE_REWRITTEN_QUERY: rewritten if isinstance(rewritten, str) and rewritten else safe_query,
+        STATE_REWRITTEN_QUERY: rewritten_query,
         STATE_AMBIGUITY: ambiguity,
+        STATE_RETRIEVAL_PLAN_RAW: raw_plan,
         STATE_QUERY_SANITIZED: injection_detected,
         STATE_PII_DETECTED: pii_findings,
         STATE_LANGUAGE: language,
@@ -573,7 +667,7 @@ time_range 说明：如果查询涉及时间范围（如"最近3个月"、"2024�
 
 
 # ══════════════════════════════════════════════════════════════════════
-# 4.3 Planner — 根据角色权限生成多源检索计划
+# 4.3 Planner — 规范化原始检索计划（不调用 LLM）
 # ══════════════════════════════════════════════════════════════════════
 
 
@@ -624,83 +718,20 @@ def clarify(state: AssistantState) -> dict[str, Any]:
 
 
 def planner(state: AssistantState) -> dict[str, Any]:
-    """检索计划生成：根据意图、角色、查询类型生成多步检索计划。
+    """规范化 query_understand 产出的原始检索计划（ISSUE-11 后不再调用 LLM）。
 
-    P1-3: 多跳检索时（retrieval_attempts > 0），从已有结果中提取实体，
-    用实体扩展查询，避免重复相同查询。
+    职责：按角色权限过滤 source、研报补股票代码过滤、合并时间范围过滤器、
+    0 召回重试时剥离 date_day 硬过滤。
     """
-    # 先查当前角色允许访问的数据源，作为后续计划的权限边界
     allowed_sources = ROLE_ALLOWED_SOURCES.get(state[STATE_USER_ROLE], [])
-
-    # P1-3: 多跳检索时提取已有结果中的实体用于查询扩展
-    retrieval_attempts = state.get(STATE_RETRIEVAL_ATTEMPTS, 0)
-    entity_context = ""
-    if retrieval_attempts > 0:
-        entities = _extract_entities_from_results(state.get(STATE_RETRIEVAL_RESULTS, []))
-        if entities:
-            entity_context = f"\n【已检索到的实体】{', '.join(entities)}\n请基于这些实体扩展查询，寻找关联信息，不要重复相同查询。"
-    # ISSUE-2: 0 召回放宽重试——上一轮没有任何可用结果时，去掉日期硬过滤
-    # 并提示 LLM 放宽计划
-    relax_date_filters = _retrying_after_empty_retrieval(state)
-    empty_round_hint = (
-        "\n【上一轮结果】检索 0 条可用结果：请放宽条件——不要依赖元数据过滤，"
-        "改用更宽泛的语义查询和同义表述。\n"
-        if relax_date_filters
-        else ""
-    )
-
-    prompt = f"""根据以下查询理解结果，生成检索计划：
-
-【原始查询】{state[STATE_ORIGINAL_QUERY]}
-【重写查询】{state[STATE_REWRITTEN_QUERY]}
-【意图】{state[STATE_INTENT]}
-【查询类型】{state[STATE_QUERY_TYPE]}
-【实体】{json.dumps(state[STATE_ENTITIES], ensure_ascii=False)}
-【用户角色】{state[STATE_USER_ROLE]}{entity_context}{empty_round_hint}
-
-可用数据源（基于角色权限）：
-- product_search: 理财产品说明书、产品合同、风险揭示书
-- regulation_search: 规则法规、内部制度、处罚案例
-- report_search: 研报摘要、晨会纪要、策略周报
-- faq_search: 常见问题解答、操作流程
-
-请以 JSON 数组返回检索计划，只使用当前角色允许的数据源：
-[
-  {{"source": "product_search", "query": "...", "top_k": 5, "filters": {{"product_type": "fund"}}}},
-  {{"source": "regulation_search", "query": "...", "top_k": 3, "filters": {{"source": "csrc"}}}},
-  {{"source": "report_search", "query": "...", "top_k": 5}}
-]
-
-只返回 JSON 数组。"""
-
-    response = llm.invoke([HumanMessage(content=prompt)])
-    try:
-        raw = response.content
-        if not isinstance(raw, str):
-            raw = str(raw)
-        parsed_plan = json.loads(raw)
-    except json.JSONDecodeError:
-        # LLM 未返回合法 JSON 时，退化为单源检索，保证流程继续
-        parsed_plan = (
-            [
-                {
-                    PLAN_SOURCE: allowed_sources[0],
-                    PLAN_QUERY: state[STATE_REWRITTEN_QUERY],
-                    PLAN_TOP_K: 3,
-                }
-            ]
-            if allowed_sources
-            else []
-        )
-
-    # 按角色权限过滤：去掉 LLM 可能越权生成的 source
-    raw_steps = parsed_plan if isinstance(parsed_plan, list) else []
-    filtered_plan: list[RetrievalPlanStep] = []
-    # P1-2: 从 entities 中提取时间范围，转为 ChromaDB 过滤器
-    time_filters = _time_range_to_filters(state.get(STATE_ENTITIES, {}).get("time_range"))
+    raw_steps = state.get(STATE_RETRIEVAL_PLAN_RAW, [])
     # ISSUE-2: 研报的发布日期通常晚于报告期（如 2025 年报研报 2026 年才发布），
     # 查询里的年份是报告期语义，映射为发布日期硬过滤必然漏检。因此 report_search
     # 一律不做 date_day 硬过滤，日期语义保留在查询文本里参与语义召回。
+    relax_date_filters = _retrying_after_empty_retrieval(state)
+    # P1-2: 从 entities 中提取时间范围，转为 ChromaDB 过滤器
+    time_filters = _time_range_to_filters(state.get(STATE_ENTITIES, {}).get("time_range"))
+    filtered_plan: list[RetrievalPlanStep] = []
     for raw_step in raw_steps:
         step = _normalize_plan_step(raw_step, state[STATE_REWRITTEN_QUERY])
         if step is not None and step.get(PLAN_SOURCE) in allowed_sources:
