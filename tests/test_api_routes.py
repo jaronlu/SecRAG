@@ -95,19 +95,83 @@ class _SlowAgentApp:
 
 
 class _StreamingAgentApp:
-    """按 stream_mode="updates" 产出节点更新的事件源替身。"""
+    """按 stream_mode=["updates","messages"] + subgraphs=True 契约产出的事件源替身。
 
-    async def astream(self, initial_state, config=None, stream_mode="updates"):
-        yield {"query_understand": {STATE_INTENT: "FAQ"}}
-        yield {"planner": {STATE_RETRIEVAL_PLAN: []}}
-        yield {
-            "compose": {
-                STATE_FINAL_ANSWER: "货币基金风险等级为低。",
-                STATE_TERMINAL: True,
-                STATE_CITATIONS: [{"source": "a.pdf"}],
-                STATE_CONFIDENCE: "high",
-            }
-        }
+    ISSUE-9 前 stream_mode="updates" 的产出是裸 dict；ISSUE-9 起 API 层以
+    subgraphs=True + 双模式拉流，每项为 (namespace, mode, data) 三元组。
+    """
+
+    async def astream(
+        self, initial_state, config=None, stream_mode="updates", subgraphs=False
+    ):
+        assert stream_mode == ["updates", "messages"]
+        assert subgraphs is True
+        yield ((), "updates", {"query_understand": {STATE_INTENT: "FAQ"}})
+        yield ((), "updates", {"planner": {STATE_RETRIEVAL_PLAN: []}})
+        yield (
+            (),
+            "updates",
+            {
+                "compose": {
+                    STATE_FINAL_ANSWER: "货币基金风险等级为低。",
+                    STATE_TERMINAL: True,
+                    STATE_CITATIONS: [{"source": "a.pdf"}],
+                    STATE_CONFIDENCE: "high",
+                }
+            },
+        )
+
+
+class _MessageChunk:
+    """AIMessageChunk 形状替身：只携带流式文本内容。"""
+
+    def __init__(self, content: str):
+        self.content = content
+
+
+class _TokenStreamingAgentApp:
+    """模拟 reason 子图内 LLM token 流 + 外层节点 updates 的混合事件流。
+
+    契约与 langgraph ``astream(subgraphs=True, stream_mode=["updates","messages"])``
+    实测一致：子图内 item 的 namespace 非空、外层为空元组；
+    messages 项为 (message_chunk, metadata)，metadata.langgraph_node 标明来源节点。
+    """
+
+    async def astream(
+        self, initial_state, config=None, stream_mode="updates", subgraphs=False
+    ):
+        yield ((), "updates", {"query_understand": {STATE_INTENT: "FAQ"}})
+        # 子图内部节点更新：namespace 非空，不得外发为 progress
+        yield (("reason:abc",), "updates", {"call_reason_model": {}})
+        # reason 子图 LLM token：只允许 call_reason_model 来源外发
+        yield (
+            ("reason:abc",),
+            "messages",
+            (_MessageChunk("货币基金"), {"langgraph_node": "call_reason_model"}),
+        )
+        yield (
+            ("reason:abc",),
+            "messages",
+            (_MessageChunk("风险等级为低。"), {"langgraph_node": "call_reason_model"}),
+        )
+        # 其他节点的 LLM token（query_understand/planner 的 JSON 输出）不得外发
+        yield (
+            (),
+            "messages",
+            (_MessageChunk("SHOULD_NOT_LEAK"), {"langgraph_node": "query_understand"}),
+        )
+        yield (
+            (),
+            "updates",
+            {
+                "compose": {
+                    STATE_FINAL_ANSWER: "货币基金风险等级为低。",
+                    STATE_TERMINAL: True,
+                    STATE_CITATIONS: [{"source": "a.pdf"}],
+                    STATE_CONFIDENCE: "high",
+                }
+            },
+        )
 
 
 @pytest.fixture()
@@ -213,3 +277,49 @@ def test_qa_stream_emits_terminal_event_protocol(qa_client, monkeypatch):
     assert answer["confidence"] == "high"
     assert answer["thread_id"]
     assert answer["turn_id"]
+
+
+def _parse_sse_events(res) -> list[tuple[str, dict]]:
+    events = []
+    current_event = None
+    for line in res.iter_lines():
+        if line.startswith("event: "):
+            current_event = line[len("event: "):]
+        elif line.startswith("data: ") and current_event:
+            events.append((current_event, json.loads(line[len("data: "):])))
+            current_event = None
+    return events
+
+
+def test_qa_stream_emits_answer_delta_for_reason_tokens(qa_client, monkeypatch):
+    """ISSUE-9：reason 节点 LLM token 以 answer_delta 事件先行流出，
+    既有 progress/answer/done 事件保持兼容；非 reason 节点的 token 不外发。"""
+    monkeypatch.setattr("src.api.main._get_agent_app", lambda: _TokenStreamingAgentApp())
+
+    with qa_client.stream(
+        "POST", API_ROUTE_ASSISTANT_QA_STREAM, json={"query": "货币基金风险"}
+    ) as res:
+        assert res.status_code == 200
+        events = _parse_sse_events(res)
+
+    names = [name for name, _ in events]
+    assert names[-1] == "done"
+    assert "answer" in names
+
+    deltas = [data.get("delta") for name, data in events if name == "answer_delta"]
+    assert deltas == ["货币基金", "风险等级为低。"]
+    # answer_delta 全部先于 answer 终态事件
+    assert names.index("answer_delta") < names.index("answer")
+    for name, data in events:
+        assert data["type"] == name
+
+    # 既有 progress 契约不受影响：外层节点仍发 progress，子图内部节点不发
+    progress_nodes = [data.get("node") for name, data in events if name == "progress"]
+    assert "query_understand" in progress_nodes
+    assert "call_reason_model" not in progress_nodes
+
+    # 终态 answer 事件承载完整文本（前端以终态为准覆盖流式内容）
+    answer = next(data for name, data in events if name == "answer")
+    assert answer["answer"] == "货币基金风险等级为低。"
+    # 非 reason 节点的 token 不得出现在任何 delta 中
+    assert "SHOULD_NOT_LEAK" not in "".join(deltas)

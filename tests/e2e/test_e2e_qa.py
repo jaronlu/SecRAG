@@ -88,22 +88,28 @@ def test_tc016_qa_full_chain_happy_path(run_agent_graph, isolated_stores, fake_l
 
 
 class _StreamingAgentApp:
-    """按 stream_mode="updates" 产出节点更新的 Agent 替身。"""
+    """按 stream_mode=["updates","messages"] + subgraphs=True 契约产出的 Agent 替身。"""
 
-    async def astream(self, initial_state, config=None, stream_mode="updates"):
-        yield {"query_understand": {"intent": "产品咨询"}}
-        yield {"planner": {"retrieval_plan": []}}
-        yield {"retrieve": {"retrieval_results": [1]}}
-        yield {"grade_and_filter": {"retrieval_results": [1]}}
-        yield {"reason": {"final_answer": "x"}}
-        yield {
-            "compose": {
-                "final_answer": "货币基金风险等级为低。",
-                "terminal": True,
-                "citations": [{"source": "a.pdf"}],
-                "confidence": "high",
-            }
-        }
+    async def astream(
+        self, initial_state, config=None, stream_mode="updates", subgraphs=False
+    ):
+        yield ((), "updates", {"query_understand": {"intent": "产品咨询"}})
+        yield ((), "updates", {"planner": {"retrieval_plan": []}})
+        yield ((), "updates", {"retrieve": {"retrieval_results": [1]}})
+        yield ((), "updates", {"grade_and_filter": {"retrieval_results": [1]}})
+        yield ((), "updates", {"reason": {"final_answer": "x"}})
+        yield (
+            (),
+            "updates",
+            {
+                "compose": {
+                    "final_answer": "货币基金风险等级为低。",
+                    "terminal": True,
+                    "citations": [{"source": "a.pdf"}],
+                    "confidence": "high",
+                }
+            },
+        )
 
 
 @pytest.fixture()
@@ -170,13 +176,19 @@ def test_sse_terminal_answer_follows_final_answer_not_node_name(sse_client, monk
     新增的拒答/澄清路径按契约产出 final_answer + terminal 即自动发送 answer 事件。"""
 
     class _NewTerminalPathAgent:
-        async def astream(self, initial_state, config=None, stream_mode="updates"):
-            yield {
-                "custom_refusal_path": {
-                    "final_answer": "权限不足，无法回答该问题。",
-                    "terminal": True,
-                }
-            }
+        async def astream(
+            self, initial_state, config=None, stream_mode="updates", subgraphs=False
+        ):
+            yield (
+                (),
+                "updates",
+                {
+                    "custom_refusal_path": {
+                        "final_answer": "权限不足，无法回答该问题。",
+                        "terminal": True,
+                    }
+                },
+            )
 
     monkeypatch.setattr("src.api.main._get_agent_app", lambda: _NewTerminalPathAgent())
 

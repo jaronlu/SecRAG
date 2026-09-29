@@ -645,12 +645,15 @@ async def assistant_qa_stream(
     """P2-1: 流式输出端点——SSE 逐事件返回 Agent 执行进度和最终回答。
 
     事件协议（issues.md 一.3：event 名与 JSON 内 type 字段一致，前端按同一契约解析）：
-    - event: progress, data: {"type": "progress", "node": "...", "status": "done"}
-    - event: answer,   data: {"type": "answer", "answer": "...", "citations": [...],
-                       "confidence": "...", "thread_id": "...", "turn_id": "..."}
-    - event: error,    data: {"type": "error", "detail": "..."}
-    - event: done,     data: {"type": "done"}
+    - event: progress,     data: {"type": "progress", "node": "...", "status": "done"}
+    - event: answer_delta, data: {"type": "answer_delta", "delta": "..."}
+    - event: answer,       data: {"type": "answer", "answer": "...", "citations": [...],
+                           "confidence": "...", "thread_id": "...", "turn_id": "..."}
+    - event: error,        data: {"type": "error", "detail": "..."}
+    - event: done,         data: {"type": "done"}
 
+    answer_delta 携带 reason 节点 LLM 的 token 级增量（ISSUE-9），先于 answer 终态
+    事件流出；answer 事件仍承载完整终态文本，前端以其为准覆盖已流出的增量。
     answer 事件来自统一终态：compose（正常回答/验证失败/合规拦截）、
     clarify（澄清）、permission_denied_response（权限拒绝）——
     后两者不经过 compose，直接产出 final_answer。
@@ -714,13 +717,38 @@ async def assistant_qa_stream(
             from src.agents.graph import CLIENT_PROGRESS_NODES
 
             try:
-                # 流式获取每个节点的状态更新；整条流受请求级总超时约束
-                #（issues.md 一.8：SSE 此前没有总超时包装）
+                # 流式获取节点状态更新与 reason 节点 LLM token；整条流受请求级
+                # 总超时约束（issues.md 一.8：SSE 此前没有总超时包装）。
+                # subgraphs=True 才能透出 reason 子图内的 token（ISSUE-9），
+                # 此时每项为 (namespace, mode, data) 三元组：外层图 namespace 为
+                # 空元组，子图内非空。
                 async with asyncio.timeout(config.api_request_timeout_seconds):
-                    async for state_update in agent.astream(
-                        initial_state, runnable_config, stream_mode="updates"
+                    async for namespace, mode, data in agent.astream(
+                        initial_state,
+                        runnable_config,
+                        stream_mode=["updates", "messages"],
+                        subgraphs=True,
                     ):
-                        for node_name, node_output in state_update.items():
+                        if mode == "messages":
+                            message_chunk, chunk_metadata = data
+                            # 只外发 reason 节点的生成 token；query_understand/planner
+                            # 的 JSON 输出与工具调用轮次的中间文本不得进入回答流
+                            if chunk_metadata.get("langgraph_node") != "call_reason_model":
+                                continue
+                            text = message_chunk.content
+                            if not (isinstance(text, str) and text):
+                                continue
+                            delta_data = json.dumps(
+                                {"type": "answer_delta", "delta": text},
+                                ensure_ascii=False,
+                            )
+                            yield f"event: answer_delta\ndata: {delta_data}\n\n"
+                            continue
+
+                        # updates：子图内部节点不外发进度，只转发外层图节点
+                        if namespace:
+                            continue
+                        for node_name, node_output in data.items():
                             if not isinstance(node_output, dict):
                                 continue
                             # 只发送图模块声明的客户端可见节点进度，避免事件过多

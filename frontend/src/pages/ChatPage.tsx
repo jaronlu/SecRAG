@@ -101,6 +101,13 @@ export default function ChatPage() {
         await streamQuestion(input.trim(), currentThreadId, (event: StreamEvent) => {
           if (event.type === 'progress' && event.node) {
             setCurrentNode(event.node)
+          } else if (event.type === 'answer_delta' && event.delta) {
+            // ISSUE-9：真流式——reason 节点 token 增量直接上屏
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId ? { ...m, content: m.content + event.delta } : m,
+              ),
+            )
           } else if (event.type === 'answer') {
             // 后端 answer 事件承载完整终态：answer 文本 + 引用 + 置信度
             const text = event.answer ?? ''
@@ -110,23 +117,14 @@ export default function ChatPage() {
             if (event.thread_id) {
               setCurrentThreadId(event.thread_id)
             }
-            // 打字机效果
+            // 终态文本为权威内容：覆盖已流出的增量（未走 LLM 流式的
+            // 拒答/澄清/拦截文案只经 answer 事件到达）
             setProgressCompleted(true)
-            let i = 0
-            const typeInterval = setInterval(() => {
-              if (i < text.length) {
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantId
-                      ? { ...m, content: text.slice(0, i + 1), citations, confidence }
-                      : m,
-                  ),
-                )
-                i++
-              } else {
-                clearInterval(typeInterval)
-              }
-            }, 10)
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId ? { ...m, content: text, citations, confidence } : m,
+              ),
+            )
           } else if (event.type === 'error') {
             setMessages((prev) =>
               prev.map((m) =>

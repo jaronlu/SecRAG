@@ -32,3 +32,17 @@ def test_frontend_stream_nodes_match_backend_progress_nodes():
 def test_frontend_stream_node_keys_are_unique():
     keys = _stream_node_keys()
     assert len(keys) == len(set(keys))
+
+
+def test_frontend_stream_event_types_declare_answer_delta():
+    """ISSUE-9：SSE 新增 answer_delta 事件，前端类型必须先于消费端声明。"""
+    text = FRONTEND_TYPES_PATH.read_text(encoding="utf-8")
+    assert "'answer_delta'" in text
+
+
+def test_frontend_chat_page_consumes_answer_delta_without_fake_typewriter():
+    """ISSUE-9：ChatPage 消费真流增量；拿到全文再假打字机的渲染必须移除。"""
+    page_path = Path(__file__).resolve().parents[1] / "frontend" / "src" / "pages" / "ChatPage.tsx"
+    text = page_path.read_text(encoding="utf-8")
+    assert "answer_delta" in text
+    assert "setInterval" not in text
