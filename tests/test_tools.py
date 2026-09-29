@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -189,6 +190,59 @@ def test_market_data_tool_raises_on_invalid_input():
         query_market_data("bad code!", db_path="unused.db")
     with pytest.raises(ValueError):
         query_market_data("600519", fields="close; drop table x", db_path="unused.db")
+
+
+class _RaisingImport:
+    def __call__(self, name):
+        raise ImportError(f"No module named {name!r}")
+
+
+def test_market_data_available_reflects_local_tables_and_baostock(monkeypatch, tmp_path):
+    """ISSUE-19：可用性 = 本地行情表有数据 或 baostock 可导入。"""
+    from src.tools.market_data import market_data_available
+
+    # baostock 可导入 → 可用
+    monkeypatch.setattr(
+        "src.tools.market_data.import_module", lambda name: SimpleNamespace()
+    )
+    assert market_data_available(db_path=tmp_path / "nope.db") is True
+
+    # baostock 缺失 + 本地 market_history 有数据 → 可用
+    monkeypatch.setattr("src.tools.market_data.import_module", _RaisingImport())
+    db = tmp_path / "financial.db"
+    with sqlite3.connect(db) as conn:
+        conn.execute("CREATE TABLE market_history (date TEXT, code TEXT)")
+        conn.execute("INSERT INTO market_history VALUES ('2026-01-05', '600519')")
+    assert market_data_available(db_path=db) is True
+
+    # baostock 缺失 + 无行情表 → 不可用
+    assert market_data_available(db_path=tmp_path / "empty.db") is False
+
+    # 表存在但无数据 → 不可用
+    empty_table_db = tmp_path / "empty_table.db"
+    with sqlite3.connect(empty_table_db) as conn:
+        conn.execute("CREATE TABLE market_snapshot (date TEXT, code TEXT)")
+    assert market_data_available(db_path=empty_table_db) is False
+
+
+def test_market_data_tool_hidden_while_unconfigured(monkeypatch):
+    """ISSUE-19：数据源未配置时摘除 market_data_tool，恒失败工具不得暴露给 LLM。"""
+    from src.agents.tools import get_tools_for_role
+
+    monkeypatch.setattr("src.agents.tools.market_data_available", lambda: False)
+
+    for role in ("advisor", "technical", "operations"):
+        names = {tool_item.name for tool_item in get_tools_for_role(role)}
+        assert "market_data_tool" not in names
+
+
+def test_market_data_tool_visible_when_configured(monkeypatch):
+    from src.agents.tools import get_tools_for_role
+
+    monkeypatch.setattr("src.agents.tools.market_data_available", lambda: True)
+
+    names = {tool_item.name for tool_item in get_tools_for_role("technical")}
+    assert "market_data_tool" in names
 
 
 def test_financial_ratios_tool_returns_phase2_skeleton():
