@@ -779,12 +779,14 @@ def _try_rerank_candidates(
     if not candidates:
         return candidates, "unavailable"
     try:
-        from src.tools.rerank import RerankService
-
+        from src.tools.rerank import RerankService, RerankerNotConfigured
+    except ImportError:
+        return candidates, "unavailable"
+    try:
         service = RerankService()
         reranked = service.rerank(query, cast(list[dict[str, Any]], candidates), top_k=len(candidates))
         return cast(list[RetrievalResult], reranked), "applied"
-    except ImportError:
+    except (ImportError, RerankerNotConfigured):
         return candidates, "unavailable"
     except RuntimeError as exc:
         return candidates, f"error:{exc}"

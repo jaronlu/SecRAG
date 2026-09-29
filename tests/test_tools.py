@@ -251,6 +251,24 @@ def test_rerank_tool_requires_configured_model():
     assert "BGE reranker 模型" in result
 
 
+def test_reranker_available_false_when_flagembedding_missing(monkeypatch):
+    """ISSUE-10：FlagEmbedding 不可导入 = reranker 未配置，探测必须为 False。"""
+    from src.tools import rerank as rerank_module
+
+    def _missing(name):
+        raise ImportError(f"No module named {name!r}")
+
+    monkeypatch.setattr(rerank_module, "import_module", _missing)
+    assert rerank_module.reranker_available() is False
+
+
+def test_reranker_available_true_when_flagembedding_importable(monkeypatch):
+    from src.tools import rerank as rerank_module
+
+    monkeypatch.setattr(rerank_module, "import_module", lambda name: object())
+    assert rerank_module.reranker_available() is True
+
+
 def test_rerank_tool_uses_model_scores():
     RerankService().model = FakeRerankModel()
     docs = json.dumps([{"score": 0.9, "content": "b"}, {"score": 0.1, "content": "a"}])

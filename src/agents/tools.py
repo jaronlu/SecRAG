@@ -20,6 +20,7 @@ from src.schemas.constants import (
     STATE_USER_ROLE,
 )
 from src.schemas.typed_dicts import RetrievalPlanStep
+from src.tools.rerank import reranker_available
 from src.tools import (
     calculator,
     financial_ratios_tool,
@@ -187,6 +188,12 @@ def get_tools_for_role(
     """Return tools visible to the ReAct agent for the given role."""
     allowed_sources = set(ROLE_ALLOWED_SOURCES.get(user_role, []))
     excluded_sources = excluded_retrieval_sources or set()
+    # ISSUE-10：reranker 未配置时摘除 rerank_tool——恒失败工具反复进入
+    # 工具清单只会浪费 LLM 轮次；生效（安装 FlagEmbedding + 模型本地化）
+    # 后经 reranker_available() 自动恢复暴露
+    non_retrieval_whitelist: set[str] = set(_NON_RETRIEVAL_TOOL_WHITELIST)
+    if not reranker_available():
+        non_retrieval_whitelist.discard(rerank_tool.name)
     return [
         tool_item
         for tool_item in tools
@@ -194,5 +201,5 @@ def get_tools_for_role(
             _RETRIEVAL_TOOL_SOURCES.get(tool_item.name) in allowed_sources
             and _RETRIEVAL_TOOL_SOURCES.get(tool_item.name) not in excluded_sources
         )
-        or tool_item.name in _NON_RETRIEVAL_TOOL_WHITELIST
+        or tool_item.name in non_retrieval_whitelist
     ]

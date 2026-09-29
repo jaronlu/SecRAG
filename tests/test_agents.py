@@ -240,6 +240,42 @@ class TestGradeAndFilter:
         result = grade_and_filter(state)
         assert STATE_FINAL_ANSWER not in result
 
+    def test_marks_unconfigured_reranker_as_unavailable_not_error(self, monkeypatch):
+        """ISSUE-10：reranker 未配置是显式降级（unavailable），不得算执行失败。
+
+        RerankService 对 FlagEmbedding 缺失抛 RerankerNotConfigured（RuntimeError
+        子类）；grade_and_filter 必须把它映射为 "unavailable"，否则每跳都被
+        _node_execution_succeeded 判为失败（实测两跳全 ok=False）。
+        """
+        import src.tools.rerank as rerank_module
+        from src.tools.rerank import RerankerNotConfigured
+
+        class _UnconfiguredRerankService:
+            def __init__(self):
+                raise RerankerNotConfigured("未配置 BGE reranker 模型")
+
+        monkeypatch.setattr(rerank_module, "RerankService", _UnconfiguredRerankService)
+        state = _state(**{STATE_RETRIEVAL_RESULTS: [_result("doc", score=0.8)]})
+
+        result = grade_and_filter(state)
+
+        assert result[STATE_RERANKER_STATUS] == "unavailable"
+
+    def test_marks_reranker_runtime_failure_as_error(self, monkeypatch):
+        """真正的运行期失败（非未配置）仍必须记为 error，供上层判失败。"""
+        import src.tools.rerank as rerank_module
+
+        class _BrokenRerankService:
+            def rerank(self, query, documents, top_k=5):
+                raise RuntimeError("BGE runtime failed")
+
+        monkeypatch.setattr(rerank_module, "RerankService", _BrokenRerankService)
+        state = _state(**{STATE_RETRIEVAL_RESULTS: [_result("doc", score=0.8)]})
+
+        result = grade_and_filter(state)
+
+        assert result[STATE_RERANKER_STATUS].startswith("error:")
+
 
 def test_planner_injects_stock_code_filter_for_report_search(monkeypatch):
     response = MagicMock()
@@ -872,6 +908,25 @@ class TestRoleAwareTools:
         for role in (ROLE_ADVISOR, ROLE_OPERATIONS, "unknown"):
             names = {tool_item.name for tool_item in get_tools_for_role(role)}
             assert "rogue_tool" not in names
+
+    def test_rerank_tool_hidden_while_reranker_unavailable(self, monkeypatch):
+        """ISSUE-10：reranker 未配置时摘除 rerank_tool，恒失败工具不得暴露给 LLM。"""
+        from src.agents.tools import get_tools_for_role
+
+        monkeypatch.setattr("src.agents.tools.reranker_available", lambda: False)
+
+        for role in (ROLE_ADVISOR, ROLE_TECHNICAL, ROLE_OPERATIONS):
+            names = {tool_item.name for tool_item in get_tools_for_role(role)}
+            assert "rerank_tool" not in names
+
+    def test_rerank_tool_visible_when_reranker_available(self, monkeypatch):
+        from src.agents.tools import get_tools_for_role
+
+        monkeypatch.setattr("src.agents.tools.reranker_available", lambda: True)
+
+        names = {tool_item.name for tool_item in get_tools_for_role(ROLE_TECHNICAL)}
+
+        assert "rerank_tool" in names
 
     def test_report_tool_filters_chunk_not_allowed_for_technical_role(self, monkeypatch):
         from langchain_core.messages import AIMessage
