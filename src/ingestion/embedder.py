@@ -1,3 +1,4 @@
+import threading
 import warnings
 
 from langchain_chroma import Chroma
@@ -74,11 +75,18 @@ def _detect_device() -> str:
     return "cpu"
 
 
+# ISSUE-15：进程级 embedding 模型缓存，键为 (model_name, device)。
+# 每跳/每工具调用重建 HuggingFaceEmbeddings 会重新加载 SentenceTransformer
+# 权重（实测 0.11-0.44s × 每请求 2-6 次）；与 BM25 的 _bm25_cache 同思路
+_embedding_model_cache: dict[tuple[str, str], HuggingFaceEmbeddings] = {}
+_embedding_model_cache_lock = threading.Lock()
+
+
 def get_embedding_model(
     model_name: str = DEFAULT_EMBEDDING_MODEL,
 ) -> HuggingFaceEmbeddings:
     """
-    返回一个 Embedding 转换器实例。
+    返回一个 Embedding 转换器实例；同一 (模型名, 设备) 进程内只加载一次。
 
     优先从本地 HuggingFace 缓存加载（秒级），缓存未命中时自动回退到在线下载。
     业务场景推荐：
@@ -86,19 +94,26 @@ def get_embedding_model(
       - moka-ai/m3e-base：轻量，适合快速原型（≈ 轻量替代）
     """
     device = _detect_device()
-    try:
-        return HuggingFaceEmbeddings(
-            model_name=model_name,
-            model_kwargs={"device": device, "local_files_only": True},
-            encode_kwargs={"normalize_embeddings": True},
-        )
-    except OSError:
-        warnings.warn(f"本地缓存未命中，尝试在线下载模型: {model_name}", stacklevel=1)
-        return HuggingFaceEmbeddings(
-            model_name=model_name,
-            model_kwargs={"device": device},
-            encode_kwargs={"normalize_embeddings": True},
-        )
+    cache_key = (model_name, device)
+    with _embedding_model_cache_lock:
+        cached = _embedding_model_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            model = HuggingFaceEmbeddings(
+                model_name=model_name,
+                model_kwargs={"device": device, "local_files_only": True},
+                encode_kwargs={"normalize_embeddings": True},
+            )
+        except OSError:
+            warnings.warn(f"本地缓存未命中，尝试在线下载模型: {model_name}", stacklevel=1)
+            model = HuggingFaceEmbeddings(
+                model_name=model_name,
+                model_kwargs={"device": device},
+                encode_kwargs={"normalize_embeddings": True},
+            )
+        _embedding_model_cache[cache_key] = model
+        return model
 
 
 def _model_name(embedding_model: HuggingFaceEmbeddings) -> str:

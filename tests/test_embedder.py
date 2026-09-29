@@ -57,6 +57,7 @@ def test_get_embedding_model_uses_financial_defaults(monkeypatch):
             captured.update(kwargs)
 
     monkeypatch.setattr(embedder, "HuggingFaceEmbeddings", FakeHuggingFaceEmbeddings)
+    monkeypatch.setattr(embedder, "_embedding_model_cache", {})
 
     model = embedder.get_embedding_model("test-model")
 
@@ -66,6 +67,37 @@ def test_get_embedding_model_uses_financial_defaults(monkeypatch):
         "model_kwargs": {"device": captured["model_kwargs"]["device"], "local_files_only": True},
         "encode_kwargs": {"normalize_embeddings": True},
     }
+
+
+def test_get_embedding_model_caches_instance_per_model_and_device(monkeypatch):
+    """ISSUE-15：同一 (模型名, 设备) 进程内只加载一次权重。
+
+    每跳/每工具调用重建 HuggingFaceEmbeddings 会重新加载
+    SentenceTransformer 权重（实测 0.11-0.44s × 每请求 2-6 次）。
+    """
+    calls: list[tuple[str, str]] = []
+
+    class FakeHuggingFaceEmbeddings:
+        def __init__(self, **kwargs):
+            calls.append((kwargs["model_name"], kwargs["model_kwargs"]["device"]))
+
+    monkeypatch.setattr(embedder, "HuggingFaceEmbeddings", FakeHuggingFaceEmbeddings)
+    monkeypatch.setattr(embedder, "_detect_device", lambda: "cpu")
+    monkeypatch.setattr(embedder, "_embedding_model_cache", {})
+
+    first = embedder.get_embedding_model("model-a")
+    second = embedder.get_embedding_model("model-a")
+    other = embedder.get_embedding_model("model-b")
+
+    assert first is second, "同一模型必须复用缓存实例"
+    assert other is not first, "不同模型名不得共用实例"
+    assert calls == [("model-a", "cpu"), ("model-b", "cpu")]
+
+    # 设备变化视为不同的缓存键（如测试桩切换 cuda/cpu）
+    monkeypatch.setattr(embedder, "_detect_device", lambda: "cuda")
+    on_cuda = embedder.get_embedding_model("model-a")
+    assert on_cuda is not first
+    assert calls == [("model-a", "cpu"), ("model-b", "cpu"), ("model-a", "cuda")]
 
 
 def test_embed_and_store_uses_provided_embedding_model(monkeypatch, tmp_path):
