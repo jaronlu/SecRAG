@@ -1,8 +1,10 @@
 # SecRAG 待办问题登记处
 
-> 本文件为立项待办登记处。当前批次：**2026-09-29 全链路演练优化（ISSUE-21 ~ ISSUE-28，全部 open）**。
+> 本文件为立项待办登记处。当前批次：**2026-09-29 全链路演练优化（ISSUE-21 ~ ISSUE-28）已全部修复**
+> （一题一提交，TDD）：c3774a4 / aa1225d / 86e2339 / 4ecb13a / c76109a / 3e1094a /
+> f68815b / 2a6dfe1，修复证据与未验证范围见下文「批次修复证据（2026-09-29 晚）」。
 > 上一批次（LLM 响应延迟审计，ISSUE-9~20，12 项）已全部修复并清理，
-> 修复提交（一题一提交，TDD）：0964a5a / b9f084a / cfc970f / d1f9e2a / c1d7f2a /
+> 修复提交：0964a5a / b9f084a / cfc970f / d1f9e2a / c1d7f2a /
 > 6c11b2f / 79c93d0 / d97706a / 8739ee8 / ac3a3ab / c579b93（ISSUE-20 机制与实测见
 > [todo/model-tiering-report-20260929.md](./model-tiering-report-20260929.md)）。
 > 历史批次（2026-09-25 共 13 项、2026-09-28 演练 ISSUE-1~4、2026-09-28 晚 ISSUE-5~8）
@@ -44,7 +46,15 @@
 
 ## 2026-09-29 批次：全链路演练优化（ISSUE-21 ~ ISSUE-28）
 
+> 状态：**8 项全部修复**（f68815b 为 ISSUE-27，2a6dfe1 为 ISSUE-28），
+> 复测证据见文末「批次修复证据」。
+
 ### ISSUE-21 (P0) 入库按解析元素碎片化，设计分块尺寸从未生效 → 召回崩塌
+
+> **已修复（c3774a4）**：`chunk_documents` 先按文档聚合元素（保留 category 顺序）、
+> 过滤 Header/Footer/EmailAddress、Table 元素整块保留且切分时重复表头行、
+> 文档内 ≥40 字符的重复 chunk 去重、按元素偏移回填 page_number；
+> `CHUNKER_VERSION` 升到 v2 强制重入库。真实语料实测见「批次修复证据」。
 
 - **现象**：30,301 个 chunk 中 **65.6% 长度仅 1–10 字**、87.9% ≤30 字、≥300 字的只有
   20 条（0.1%）；按 `chunk_hash` 去重后有 **43.7% 的重复行**。设计要求的
@@ -70,6 +80,11 @@
 
 ### ISSUE-22 (P0) 数字口径混淆：营业总收入被标成营业收入，一手来源未优先
 
+> **已修复（aa1225d）**：新增 `CaliberVerifier` 做口径标签×数值成对校验
+> （别名归一、单位换算容差、跨口径混用与凭空口径两类拦截）；
+> `grade_and_filter` 在候选池同时含一手来源与转述时把公告/财报提到研报之前；
+> reason prompt 要求口径全称并标注「一手来源/研报转述」。
+
 - **现象**：S3 问"贵州茅台2026年半年度报告**披露的营业收入**和归母净利润"，答
   "营业收入 **922.78 亿元**（同比 +1.30%）"，引用券商跟踪报告。
 - **证据**：922.78 亿是**营业总收入**——茅台年报正文原文即"上半年，公司**营业总收入**
@@ -84,6 +99,13 @@
 
 ### ISSUE-23 (P0) query_understand 单次往返 5.9–17.0s，是首字与端到端第一大头
 
+> **已修复（86e2339）**：合并/重试 prompt 模板从约 446 tokens 压到约 289
+> （预算常量 `PLAN_PROMPT_TOKEN_BUDGET=300` 由测试守护，JSON 契约字段不丢）；
+> `llm_plan_max_tokens` 1024 → 384；计划调用按请求记录 prompt/completion tokens
+> （进 Langfuse span 与审计 `node_timings`）；TTFT 已在设计中立项
+> （README 性能行 + impl-08 §2 准入表，wiki 提交 24ba65f）。
+> **未验证**：单轮 ≤3s 需起服务实测（当前会话未跑端到端）。
+
 - **现象**：10 个请求的 `query_understand` 实测 5.90 / 7.29 / 8.24 / 10.63 / 11.24 /
   11.69 / 13.59 / 13.64 / 14.73 / 16.99s；而 `scripts/benchmark_models.py` 用同模型
   同端点的 small 档（max_tokens 256）总时长只有 **2.05s**——生产调用慢 3–8 倍。
@@ -97,6 +119,12 @@
 
 ### ISSUE-24 (P1) 多跳回环二次规划成本 9.3–14.6s，低召回场景高频触发
 
+> **已修复（4ecb13a）**：`should_retry_retrieval` 区分 0 召回与非 0 低召回——
+> 0 召回才重跑理解+规划，非 0 低召回走新 `widen` 路由直接重跑检索
+> （top_k ×2，封顶 20，无 LLM 往返）；重试轮计划与上一轮实质相同
+> （源/查询/过滤器指纹一致）时改用放宽版计划；路由表 `RETRIEVAL_RETRY_ROUTES`
+> 由测试守护。**未验证**：回环平均成本 ≤3s 需起服务实测。
+
 - **证据**：10 个请求中 **4 次**出现两轮 `query_understand`（量化交易 37.7s、示例稳健
   22.9s、货币基金 43.7s、S4 59.3s），第二轮 9.26–14.64s。触发条件为
   `should_retry_retrieval` 中 `len(usable) < RETRIEVAL_SUFFICIENT_RESULTS(2)`
@@ -107,6 +135,13 @@
 - **验收**：回环触发次数下降且 Recall 不退化；回环平均成本 ≤3s。
 
 ### ISSUE-25 (P1) reason 二次重推仍普遍，且中间验证结果无留痕
+
+> **已修复（c76109a）**：`verify` 每轮留痕 `{round, passed, failure_kind, issues,
+> confidence}`（新 state 键 `verification_attempts`），随 verification 落审计；
+> 另附 `retry_diagnosis`（首轮失败轮次/类别/issues + `format_only_retries`），
+> format-only 重推即 ISSUE-13 类误判信号，应为 0。修复批次中发现并修掉一类
+> 真实误判：行首小数 `1.7%` 被列表序号正则剥成 `7%`（2a6dfe1 内）。
+> **未验证**：误判类重推为 0 需真实请求样本统计。
 
 - **证据**：9 个出答案请求中 **5 次**出现两轮 `reason`（每轮 3.4–22.3s）。两轮 `reason`
   只能由首轮 verify 返回 `passed=false` 触发（`src/agents/graph.py:219-227`，
@@ -120,6 +155,14 @@
 
 ### ISSUE-26 (P1) 答案语义缓存默认关闭，且启用条件已失去出处
 
+> **已修复（3e1094a）**：选方向①补齐实现并启用。`CacheBinding` 绑定身份
+> （user_id）、授权范围（permission_scope）、客户上下文（client_id）、规范化问题、
+> 上下文摘要哈希、知识库版本（取 document_registry 文档数+最近入库时间，
+> 跨进程可见），lookup 六维全匹配才参与相似度比较；命中路径补写会话回合并
+> 标记 outbox；绑定在图执行前构造一次、lookup/store 复用，否则永不命中；
+> `semantic_cache_enabled` 默认 True。
+> **未验证**：命中率 >80% 需真实流量。
+
 - **证据**：`semantic_cache_enabled=False`（`src/config.py:69`）、
   `DEFAULT_CACHE_ENABLED=False`（`src/utils/semantic_cache.py:44`），注释写明
   "重新启用前需满足 issues.md 一.1 的条件"——但该条目已随 484e7aa 批次清理删除，
@@ -130,6 +173,13 @@
 - **验收**：启用条件可追溯；启用后同角色多会话隔离与审计语义正确，命中率达标。
 
 ### ISSUE-27 (P2) BGE reranker 仍未配置，语义重排能力缺失
+
+> **已修复（f68815b）**：选方向①落地。FlagEmbedding 纳入依赖（uv.lock 同步），
+> bge-reranker-v2-m3 权重本地化至 HF cache（2.1G，经 hf-mirror；config.json 需
+> 单独补抓）；模型名走 `config.rerank_model`（architecture.md §5.1 RERANK_MODEL）；
+> 权重取不到归一为「未配置」而非节点故障；ISSUE-16 的启动预热 `_warm_reranker`
+> 原本就在。实测 `grade_and_filter` 返回 `reranker_status="applied"`，
+> 本地权重真实重排用例通过（tests/test_tools.py）。
 
 - **证据**：`FlagEmbedding` 未安装 → `reranker_available()=False`，`grade_and_filter`
   标记 `reranker_status="unavailable"`（e2e TC-015）。设计要求明确：
@@ -142,6 +192,16 @@
 - **验收**：E2E 中 rerank 实际执行、`grade_and_filter` 不再因缺失降级。
 
 ### ISSUE-28 (P2) 评估数据集不足，设计准入标准无法评估
+
+> **已修复（2a6dfe1）**：新增 `scripts/build_evaluation_datasets.py`，从现网语料
+> 与角色矩阵生成四份评估集到 `tests/evaluation/`（数据集绑定真实 chunk_id，
+> 重新入库后重跑生成脚本即可）；新增一份机密级 demo 样本使 permission_level
+> 拒绝类可测。顺带修了三个让准入门槛永不达标/直接崩溃的评估脚本缺陷：
+> 检索权限判定按相关行（而非整批 any(denied)）判正负、答案数字/幻觉门槛只对
+> 有据样本分层统计（负例归 expected_outcome_accuracy）、泄漏统计对空
+> restricted_text 崩溃。四份产物全部过准入（见「批次修复证据」）。
+> **局限**：数据集由语料机械生成（答案取自证据原文、查询取唯一片段），
+> 验证的是流水线机制与验证器行为，不是人工标注的答案质量。
 
 - **证据**：检索评估集 `scripts/evaluate_retrieval.sample.json` 仅 **5 条**，
   设计要求 ≥100 条查询 + ≥30 条权限负例（08-evaluation §3.1）；答案集
@@ -171,6 +231,38 @@
 **残余差距**：①多跳 + 长 reason 查询未达批次目标 P95 ≤25s；②设计线 P95 ≤10s
 受 `query_understand` 前置支配（见 ISSUE-23）；③更快小模型等待账号侧 coding 端点扩容
 （当前仅 deepseek-v4-flash 可用，其余候选 UnsupportedModel，见 model-tiering-report）。
+
+---
+
+## 批次修复证据（2026-09-29 晚，本地验证）
+
+**语料重入库（c3774a4，CHUNKER_VERSION v2）**：30,301 → **3,566 chunks**
+（公告 1,996 / 财报 1,466 / 研报 94 / faq 8 / product 1 / regulation 1，
+研报含新增机密样本），中位长度 **255 字符**、≤30 字占比 **0.1%**
+（修复前全库 65.6% ≤10 字、87.9% ≤30 字、43.7% 重复行，现均为 0）、
+最大 498 字符落在设计区间。S4 根因证据（国信研报 `EPS 为 20.83/25.96/30.45 元`）
+现为 213 字符可检索单块。**S4 是否不再 fail-closed 需起服务实测，本批未跑。**
+
+**评估产物（commit 2a6dfe1，`artifacts/evaluation/2a6dfe1…/`，四份均退出码 0）**：
+
+| 数据集 | 样本 | 指标 |
+|---|---|---|
+| retrieval.json（§3.1） | 133（正例 101 + 负例 32，三类拒绝全覆盖） | recall@5 **0.891**（≥0.80）、recall@10 **0.960**（≥0.90）、permission **1.000** |
+| answers.json（§3.2） | 135（有据 110 + 不可回答 20 + tool-only 正 10 / 负 5） | numeric **1.000**、citation **1.000**、hallucination **0.011**（≤0.05）、outcome **1.000** |
+| compliance.json（§3.3） | 50 | block **1.000**、leakage **0.000** |
+| conversations.json（§3.4） | 20 | case accuracy **1.000** |
+
+**Reranker（f68815b）**：真实检索链路 `grade_and_filter` 返回
+`reranker_status="applied"`（交叉编码器分数如 8.289/7.988 覆盖原始 cosine 序）。
+
+**测试**：645 passed + ruff 全绿（本地需 `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1`，
+否则装上 FlagEmbedding 后任何模型加载路径会去连 huggingface.co——系统代理死端口，
+实测就是这种挂起）。
+
+**本批仍未验证（留档）**：①ISSUE-23/24 的延迟验收（单轮 ≤3s、回环 ≤3s、
+端到端 P95 ≤10s）需 8001 服务实测，当前会话未跑；②缓存命中率 >80% 需真实流量；
+③「误判类重推为 0」需真实请求的 verification 快照统计；④CI 与完整安全审计未确认
+（Mimosa 钩子多次提示 library_source/callgraph 扫描不完整，不宣称项目安全）。
 
 ---
 
