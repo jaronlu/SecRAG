@@ -134,6 +134,13 @@ class BM25Retriever:
         _bm25_cache[cache_key] = self._index
         return self._index
 
+    def warmup(self) -> None:
+        """启动预热入口（ISSUE-16）：显式触发全量索引构建。
+
+        jieba 全量分词 10-30s，此前落在重启后的首个请求上。
+        """
+        self._get_index()
+
     def retrieve(
         self,
         query: str,
