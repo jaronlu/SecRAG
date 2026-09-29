@@ -297,12 +297,42 @@ class FakeRerankModel:
         return [0.9 if content == "a" else 0.1 for _, content in pairs]
 
 
-def test_rerank_tool_requires_configured_model():
+def test_rerank_tool_requires_configured_model(monkeypatch):
+    """未配置 reranker（FlagEmbedding 缺失）时工具必须返回显式错误文本。"""
+    from src.tools import rerank as rerank_module
+
+    def _missing(name):
+        raise ImportError(f"No module named {name!r}")
+
+    monkeypatch.setattr(rerank_module, "import_module", _missing)
     RerankService().model = None
     docs = json.dumps([{"score": 0.9, "content": "b"}, {"score": 0.1, "content": "a"}])
     result = rerank_tool.invoke({"query": "q", "documents": docs, "top_k": 2})
     assert "重排序错误" in result
     assert "BGE reranker 模型" in result
+
+
+def test_unloadable_reranker_weights_are_reported_as_not_configured(monkeypatch):
+    """ISSUE-27：权重取不到（未本地化/无法联网）属"未配置"，不得抛成节点故障。"""
+    from types import SimpleNamespace
+
+    from src.tools import rerank as rerank_module
+    from src.tools.rerank import RerankerNotConfigured
+
+    class _FailingAutoReranker:
+        @staticmethod
+        def from_finetuned(model_name_or_path, use_fp16):
+            raise OSError("couldn't find them in the cached files")
+
+    monkeypatch.setattr(
+        rerank_module,
+        "import_module",
+        lambda name: SimpleNamespace(FlagAutoReranker=_FailingAutoReranker),
+    )
+    RerankService().model = None
+
+    with pytest.raises(RerankerNotConfigured):
+        RerankService().rerank("q", [{"content": "a", "score": 0.0}], top_k=1)
 
 
 def test_reranker_available_false_when_flagembedding_missing(monkeypatch):
@@ -330,6 +360,85 @@ def test_rerank_tool_uses_model_scores():
     assert [doc["content"] for doc in payload] == ["a", "b"]
     assert payload[0]["score"] == 0.9
     RerankService().model = None
+
+
+# ══════════════════════════════════════════════════════════════════════
+# ISSUE-27：reranker 模型名来自配置，且真实模型可加载执行
+# ══════════════════════════════════════════════════════════════════════
+
+
+def test_rerank_service_loads_configured_model(monkeypatch):
+    """模型名取自 config.rerank_model（architecture.md §5.1 RERANK_MODEL）。"""
+    from types import SimpleNamespace
+
+    from src.tools import rerank as rerank_module
+
+    loaded: list[str] = []
+
+    class _FakeAutoReranker:
+        @staticmethod
+        def from_finetuned(model_name_or_path, use_fp16):
+            loaded.append(model_name_or_path)
+            return FakeRerankModel()
+
+    monkeypatch.setattr(
+        rerank_module,
+        "import_module",
+        lambda name: SimpleNamespace(FlagAutoReranker=_FakeAutoReranker),
+    )
+    monkeypatch.setattr(
+        rerank_module, "config", SimpleNamespace(rerank_model="local/bge-reranker-v2-m3")
+    )
+    RerankService().model = None
+
+    RerankService().rerank("q", [{"content": "a", "score": 0.0}], top_k=1)
+
+    assert loaded == ["local/bge-reranker-v2-m3"]
+    RerankService().model = None
+
+
+def test_rerank_model_name_falls_back_to_default(monkeypatch):
+    from types import SimpleNamespace
+
+    from src.tools import rerank as rerank_module
+
+    monkeypatch.setattr(rerank_module, "config", SimpleNamespace(rerank_model=""))
+
+    assert rerank_module.rerank_model_name() == rerank_module.DEFAULT_RERANK_MODEL
+
+
+def test_reranker_available_with_installed_flagembedding():
+    """ISSUE-27：FlagEmbedding 已纳入依赖，探测必须为 True。"""
+    from src.tools.rerank import reranker_available
+
+    assert reranker_available() is True
+
+
+def test_local_reranker_model_actually_reranks():
+    """ISSUE-27 验收：本地 BGE reranker 真实执行语义重排。
+
+    模型未本地化时跳过（离线环境无法下载权重），跳过原因写入报告。
+    """
+    from src.tools.rerank import RerankService
+
+    service = RerankService()
+    if service.model is None:
+        try:
+            service._ensure_model()
+        except Exception as exc:  # pragma: no cover - 依赖本地模型权重
+            pytest.skip(f"本地 reranker 模型不可用: {type(exc).__name__}: {exc}")
+
+    documents = [
+        {"content": "本基金主要投资于货币市场工具，风险等级为 R1（低风险）。", "score": 0.10},
+        {"content": "股票型基金投资于股票市场，净值波动较大，风险等级为 R5。", "score": 0.90},
+    ]
+
+    reranked = service.rerank("货币基金的风险等级是什么？", documents, top_k=2)
+
+    assert len(reranked) == 2
+    # 交叉编码器应把货币基金段落排在股票基金之前，覆盖原始 score 顺序
+    assert "R1" in reranked[0]["content"]
+    assert reranked[0]["score"] > reranked[1]["score"]
 
 
 def test_tracer_records_success_and_error():

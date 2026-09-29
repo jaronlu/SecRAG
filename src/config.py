@@ -102,6 +102,10 @@ class Settings(BaseSettings):
     # Chroma
     chroma_persist_directory: str = CHROMA_DEFAULT_PERSIST_DIR
 
+    # Rerank（architecture.md §5.1 RERANK_MODEL）：BGE 交叉编码器语义重排，
+    # 缺失时 grade_and_filter 显式降级为 unavailable（ISSUE-10）
+    rerank_model: str = "BAAI/bge-reranker-v2-m3"
+
     # Audit
     audit_db_path: str = AUDIT_DB_PATH
     conversation_db_path: str = CONVERSATION_DB_PATH

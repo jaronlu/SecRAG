@@ -8,9 +8,18 @@ from typing import Any
 
 from langchain_core.tools import tool
 
+from src.config import config
 from src.schemas.constants import RR_CONTENT, RR_SCORE
 
 DEFAULT_RERANK_MODEL = "BAAI/bge-reranker-v2-m3"
+
+
+def rerank_model_name() -> str:
+    """配置的 reranker 模型名（architecture.md §5.1 RERANK_MODEL）。
+
+    空配置回落默认模型，保证配置缺失时行为与默认一致。
+    """
+    return config.rerank_model or DEFAULT_RERANK_MODEL
 
 
 class RerankerNotConfigured(RuntimeError):
@@ -54,10 +63,18 @@ class RerankService:
                 "未配置 BGE reranker 模型；请安装并配置 FlagEmbedding/BAAI bge-reranker-v2-m3"
             ) from exc
 
-        self.model = flag_embedding.FlagAutoReranker.from_finetuned(
-            model_name_or_path=DEFAULT_RERANK_MODEL,
-            use_fp16=True,
-        )
+        # 模型名来自配置（architecture.md §5.1 RERANK_MODEL），便于本地化/离线。
+        # 权重不可获取（未本地化且无法联网）属于"未配置"而非运行期故障：
+        # 归一到 RerankerNotConfigured，让调用方走显式 unavailable 降级
+        try:
+            self.model = flag_embedding.FlagAutoReranker.from_finetuned(
+                model_name_or_path=rerank_model_name(),
+                use_fp16=True,
+            )
+        except OSError as exc:
+            raise RerankerNotConfigured(
+                f"无法加载 BGE reranker 权重 {rerank_model_name()}；请先本地化模型: {exc}"
+            ) from exc
         return self.model
 
     def rerank(

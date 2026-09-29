@@ -384,16 +384,24 @@ class _FakeBM25:
         return list(self._results)
 
 
-def test_rrf_order_survives_grade_and_filter():
+def test_rrf_order_survives_grade_and_filter(monkeypatch):
     """issues.md 一.5：RRF 融合排序必须保留到 grade_and_filter。
 
     旧实现丢弃融合分数，下游按原始 score 重排，导致 BM25 原始分
     （量纲不同、数值更大）把同时命中的文档挤到后面。
+
+    本用例验证的是重排之前的融合序，须把 BGE reranker 固定为不可用——
+    重排可用时语义重排合法地改变最终顺序（见 rerank 相关用例）。
     """
+    from src.agents import nodes
     from src.agents.nodes import grade_and_filter
     from src.retrieval.bm25_retriever import rrf_fuse
     from src.schemas.constants import (
         STATE_RETRIEVAL_RESULTS,
+    )
+
+    monkeypatch.setattr(
+        nodes, "_try_rerank_candidates", lambda query, candidates: (candidates, "unavailable")
     )
 
     vec_a: RetrievalResult = {RR_CONTENT: "A", RR_METADATA: {META_SOURCE: "s", META_CHUNK_ID: "a"}, RR_SCORE: 0.9}
@@ -411,16 +419,23 @@ def test_rrf_order_survives_grade_and_filter():
     assert graded == ["B", "A", "C"]
 
 
-def test_mixed_pool_does_not_demote_fused_results():
+def test_mixed_pool_does_not_demote_fused_results(monkeypatch):
     """issues.md 一.5 残留：混合池中 rrf_score 与原始 cosine 不得直接混排。
 
     部分来源有 BM25 命中（结果带 rrf_score，约 <=2/(k+1)）、部分没有
     （结果只剩 cosine，阈值 0.6 起）时，两种量纲进同一个排序键会让
     融合结果被系统性压底——双路命中的最优证据反而沉底。
+
+    固定 reranker 不可用：本用例验证的是重排之前融合分与余弦分的同量纲排序。
     """
+    from src.agents import nodes
     from src.agents.nodes import grade_and_filter
     from src.retrieval.bm25_retriever import rrf_fuse
     from src.schemas.constants import STATE_RETRIEVAL_RESULTS
+
+    monkeypatch.setattr(
+        nodes, "_try_rerank_candidates", lambda query, candidates: (candidates, "unavailable")
+    )
 
     vec_a1: RetrievalResult = {RR_CONTENT: "A1", RR_METADATA: {META_SOURCE: "s-a", META_CHUNK_ID: "a1"}, RR_SCORE: 0.9}
     vec_a2: RetrievalResult = {RR_CONTENT: "A2", RR_METADATA: {META_SOURCE: "s-a", META_CHUNK_ID: "a2"}, RR_SCORE: 0.8}
