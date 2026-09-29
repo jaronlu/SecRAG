@@ -95,11 +95,13 @@ export interface CacheStats {
 
 // SSE 流式事件类型（与后端 assistant_qa_stream 的事件协议一致：
 // event 名与 JSON 内 type 字段相同，issues.md 一.3）
-export type StreamEventType = 'progress' | 'answer' | 'error' | 'done'
+export type StreamEventType = 'progress' | 'answer_delta' | 'answer' | 'error' | 'done'
 
 export interface StreamEvent {
   type: StreamEventType
   node?: string
+  // answer_delta 携带 reason 节点 LLM token 级增量（ISSUE-9），先于 answer 终态流出
+  delta?: string
   answer?: string
   citations?: Citation[]
   confidence?: string
