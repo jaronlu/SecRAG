@@ -82,6 +82,8 @@ class AssistantState(TypedDict):
 
     # 验证结果 — STATE_VERIFICATION
     verification: VerificationResult
+    # STATE_VERIFICATION_ATTEMPTS；每轮 reason 的验证快照（ISSUE-25）
+    verification_attempts: list[dict[str, Any]]
 
     # LLM 计量 — STATE_LLM_USAGE；当前节点一次 LLM 调用的 token 用量
     # （prompt_tokens/completion_tokens/total_tokens），供审计按请求计量开销

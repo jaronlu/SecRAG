@@ -107,6 +107,7 @@ from src.schemas.constants import (
     STATE_USER_ID,
     STATE_USER_ROLE,
     STATE_VERIFICATION,
+    STATE_VERIFICATION_ATTEMPTS,
 )
 from src.schemas.typed_dicts import IntermediateStep, RetrievalPlanStep, RetrievalResult, ToolCallDict
 from src.utils.compliance import (
@@ -117,7 +118,11 @@ from src.utils.compliance import (
 )
 from src.utils.dates import parse_date_day
 from src.utils.langfuse_adapter import start_node_span
-from src.utils.verifier import CitationExtractor, ComprehensiveVerifier
+from src.utils.verifier import (
+    CitationExtractor,
+    ComprehensiveVerifier,
+    summarize_verification_attempts,
+)
 
 
 # ISSUE-23：理解+计划 prompt 的估算 token 预算。prompt 长度直接决定 prefill 时长，
@@ -1429,7 +1434,7 @@ def extract_citations(state: AssistantState) -> dict[str, Any]:
 
 
 def verify(state: AssistantState) -> dict[str, Any]:
-    """Run source, number, consistency, and hallucination verification."""
+    """Run source, number, caliber, consistency, and hallucination verification."""
     verification = _VERIFIER.verify(
         answer=state.get(STATE_FINAL_ANSWER, ""),
         citations=state.get(STATE_CITATIONS, []),
@@ -1449,7 +1454,20 @@ def verify(state: AssistantState) -> dict[str, Any]:
             issues.append(f"投顾/销售角色不得输出业务建议: {pattern}")
     if issues:
         verification.update(passed=False, issues=issues, confidence=CONFIDENCE_LOW)
-    return {STATE_VERIFICATION: verification}
+
+    # ISSUE-25：每轮 reason 的验证结果留痕（轮次 + failure_kind + issues）。
+    # 审计只保存最终结果时，无法区分"验证器误判"与"真实无支撑"。
+    snapshot = {
+        "round": state.get(STATE_REASON_ATTEMPTS, 1),
+        "passed": bool(verification.get("passed")),
+        "failure_kind": verification.get("failure_kind"),
+        "issues": list(verification.get("issues", [])),
+        "confidence": verification.get("confidence", CONFIDENCE_MEDIUM),
+    }
+    attempts = list(state.get(STATE_VERIFICATION_ATTEMPTS, [])) + [snapshot]
+    verification["attempts"] = attempts
+    verification["retry_diagnosis"] = summarize_verification_attempts(attempts)
+    return {STATE_VERIFICATION: verification, STATE_VERIFICATION_ATTEMPTS: attempts}
 
 
 # ══════════════════════════════════════════════════════════════════════

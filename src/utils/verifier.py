@@ -569,6 +569,28 @@ class HallucinationDetector:
         return bool(claims) and all(claim in evidence.lower() for claim in claims)
 
 
+def summarize_verification_attempts(attempts: list[dict]) -> dict:
+    """按轮次汇总验证快照，定位重推原因（ISSUE-25）。
+
+    "误判类重推"的判定依据：某轮失败但失败原因全部属于格式/引用标注
+    （``failure_kind == "format"``），即证据本身可支撑、只是标注写法不合规。
+    这类重推不需要重新取证，是 ISSUE-13 类验证器误判的残留信号，
+    ``format_only_retries`` 应长期为 0。
+    """
+    failures = [snapshot for snapshot in attempts if not snapshot.get("passed")]
+    first_failure = failures[0] if failures else None
+    return {
+        "attempts": len(attempts),
+        "failures": len(failures),
+        "first_failure_round": first_failure.get("round") if first_failure else None,
+        "first_failure_kind": first_failure.get("failure_kind") if first_failure else None,
+        "first_failure_issues": list(first_failure.get("issues", [])) if first_failure else [],
+        "format_only_retries": sum(
+            1 for snapshot in failures if snapshot.get("failure_kind") == "format"
+        ),
+    }
+
+
 class ComprehensiveVerifier:
     def __init__(self):
         self.source_verifier = SourceVerifier()

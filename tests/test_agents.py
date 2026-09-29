@@ -127,6 +127,7 @@ from src.schemas.constants import (
     STATE_USER_ROLE,
     STATE_USER_ID,
     STATE_VERIFICATION,
+    STATE_VERIFICATION_ATTEMPTS,
 )
 from src.utils.audit import SQLiteAuditStore
 from src.schemas.typed_dicts import RetrievalResult
@@ -961,6 +962,106 @@ class TestVerify:
         })
         result = verify(state)
         assert result[STATE_VERIFICATION].get("passed") is True
+
+
+class TestVerificationAttemptSnapshots:
+    """ISSUE-25：每轮验证留痕（轮次 + failure_kind + issues），可定位首轮失败原因。"""
+
+    def test_records_first_round_snapshot_with_failure_kind(self):
+        state = _state(
+            **{
+                STATE_FINAL_ANSWER: "净利润 999 亿元",
+                STATE_RETRIEVAL_RESULTS: [_result("净利润 747 亿元")],
+                STATE_REASON_ATTEMPTS: 1,
+            }
+        )
+
+        result = verify(state)
+
+        attempts = result[STATE_VERIFICATION]["attempts"]
+        assert [snapshot["round"] for snapshot in attempts] == [1]
+        assert attempts[0]["passed"] is False
+        assert attempts[0]["failure_kind"] == "facts"
+        assert any("999" in issue for issue in attempts[0]["issues"])
+
+    def test_accumulates_snapshots_across_rounds(self):
+        first = verify(
+            _state(
+                **{
+                    STATE_FINAL_ANSWER: "净利润 999 亿元",
+                    STATE_RETRIEVAL_RESULTS: [_result("净利润 747 亿元")],
+                    STATE_REASON_ATTEMPTS: 1,
+                }
+            )
+        )
+        second = verify(
+            _state(
+                **{
+                    STATE_FINAL_ANSWER: "净利润 747 亿元",
+                    STATE_RETRIEVAL_RESULTS: [_result("净利润 747 亿元")],
+                    STATE_REASON_ATTEMPTS: 2,
+                    STATE_VERIFICATION_ATTEMPTS: first[STATE_VERIFICATION_ATTEMPTS],
+                }
+            )
+        )
+
+        attempts = second[STATE_VERIFICATION]["attempts"]
+        assert [snapshot["round"] for snapshot in attempts] == [1, 2]
+        assert attempts[0]["passed"] is False
+        assert attempts[1]["passed"] is True
+
+    def test_retry_diagnosis_marks_format_only_retry_as_misjudgment_suspect(self):
+        """首轮只因引用标注写法失败、证据本身可支撑 → 误判类重推信号。"""
+        state = _state(
+            **{
+                STATE_FINAL_ANSWER: "净利润 747 亿元 [来源2]",
+                STATE_RETRIEVAL_RESULTS: [_result("净利润 747 亿元")],
+                STATE_REASON_ATTEMPTS: 1,
+            }
+        )
+
+        result = verify(state)
+        diagnosis = result[STATE_VERIFICATION]["retry_diagnosis"]
+
+        assert diagnosis["first_failure_kind"] == "format"
+        assert diagnosis["format_only_retries"] == 1
+
+    def test_retry_diagnosis_reports_zero_misjudgment_for_fact_failures(self):
+        state = _state(
+            **{
+                STATE_FINAL_ANSWER: "净利润 999 亿元",
+                STATE_RETRIEVAL_RESULTS: [_result("净利润 747 亿元")],
+                STATE_REASON_ATTEMPTS: 1,
+            }
+        )
+
+        result = verify(state)
+        diagnosis = result[STATE_VERIFICATION]["retry_diagnosis"]
+
+        assert diagnosis["first_failure_kind"] == "facts"
+        assert diagnosis["format_only_retries"] == 0
+
+    def test_audit_trail_persists_verification_attempts(self, tmp_path, monkeypatch):
+        """审计只存最终结果时无法区分误判与真实无支撑；快照必须落审计。"""
+        from src.utils.audit import SQLiteAuditStore
+
+        store = SQLiteAuditStore(tmp_path / "audit.db")
+        monkeypatch.setattr("src.agents.nodes._get_audit_store", lambda: store)
+        state = _state(
+            **{
+                STATE_FINAL_ANSWER: "净利润 999 亿元",
+                STATE_RETRIEVAL_RESULTS: [_result("净利润 747 亿元")],
+                STATE_REASON_ATTEMPTS: 1,
+                STATE_AUDIT_TRAIL: {AUDIT_REQUEST_ID: "req-attempts"},
+            }
+        )
+        verified = verify(state)
+
+        trail = audit_log({**state, **verified})[STATE_AUDIT_TRAIL]
+
+        attempts = trail["verification"]["attempts"]
+        assert [snapshot["round"] for snapshot in attempts] == [1]
+        assert trail["verification"]["retry_diagnosis"]["first_failure_kind"] == "facts"
 
     def test_tool_only_answer_uses_successful_tool_output_as_evidence(self):
         state = _state(**{

@@ -1,5 +1,7 @@
 """Shared TypedDict schemas for agent state and serialized payloads."""
 
+from typing import Any
+
 from typing_extensions import TypedDict
 
 
@@ -66,11 +68,18 @@ class VerificationResult(TypedDict, total=False):
 
     total=False keeps initialization with an empty dict valid; the verify node
     emits all fields.
+
+    ISSUE-25：``attempts`` 是每轮 reason 的验证快照（轮次 + failure_kind +
+    issues），``retry_diagnosis`` 是据快照得出的重推归类；两者随审计落库，
+    用于区分"验证器误判"与"真实无支撑"。
     """
 
     passed: bool
     issues: list[str]
     confidence: str
+    failure_kind: str | None
+    attempts: list[dict[str, Any]]
+    retry_diagnosis: dict[str, Any]
 
 
 class ComplianceResult(TypedDict, total=False):
