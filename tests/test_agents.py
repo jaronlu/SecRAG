@@ -112,6 +112,7 @@ from src.schemas.constants import (
     STATE_RETRIEVAL_PLAN,
     STATE_RETRIEVAL_PLAN_RAW,
     STATE_RETRIEVAL_RESULTS,
+    STATE_RETRIEVAL_WIDENING,
     STATE_RETRIEVAL_TOTAL_CHUNKS,
     STATE_REWRITTEN_QUERY,
     STATE_RISK_DISCLOSURE,
@@ -2003,9 +2004,11 @@ class TestShouldRetryRetrieval:
     def test_empty_results(self):
         assert should_retry_retrieval(_state()) == "retrieve"
 
-    def test_low_score(self):
+    def test_low_recall_widens_instead_of_replanning(self):
+        """ISSUE-24：非 0 的低召回不再重跑理解+规划，改为放宽 top_k 重新检索。"""
         state = _state(**{STATE_RETRIEVAL_RESULTS: [_result("x", score=0.3)]})
-        assert should_retry_retrieval(state) == "retrieve"
+
+        assert should_retry_retrieval(state) == "widen"
 
     def test_enough_medium_score_results_continue_without_replanning(self):
         state = _state(**{
@@ -2029,9 +2032,11 @@ class TestShouldRetryRetrieval:
         })
         assert should_retry_retrieval(state) == "continue"
 
-    def test_single_high_score_still_retries(self):
+    def test_single_usable_result_widens(self):
+        """ISSUE-24：只有 1 条可用结果时放宽检索，而不是重跑一次 LLM 规划。"""
         state = _state(**{STATE_RETRIEVAL_RESULTS: [_result("x", score=0.9)]})
-        assert should_retry_retrieval(state) == "retrieve"
+
+        assert should_retry_retrieval(state) == "widen"
 
     def test_two_usable_results_continue_without_replanning(self):
         """ISSUE-12：已有 2 条可用结果即视为检索充分，不再强制多跑一轮 planner。"""
@@ -2057,6 +2062,170 @@ class TestShouldRetryRetrieval:
             }
         )
         assert should_retry_retrieval(state) == "continue"
+
+
+class TestRetrievalWidening:
+    """ISSUE-24：低召回走廉价放宽（top_k 翻倍），不重跑理解+规划 LLM 往返。"""
+
+    def test_graph_routes_widen_to_retrieve_without_replanning(self):
+        from src.agents.graph import RETRIEVAL_RETRY_ROUTES
+
+        assert RETRIEVAL_RETRY_ROUTES["widen"] == "retrieve"
+        assert RETRIEVAL_RETRY_ROUTES["retrieve"] == "query_understand"
+        compiled = build_agent_graph().compile()
+        edges = {(edge.source, edge.target) for edge in compiled.get_graph().edges}
+        assert ("grade_and_filter", "retrieve") in edges
+
+    def test_retrieve_widens_top_k_on_widen_round(self, monkeypatch):
+        captured: dict = {}
+
+        class _FakeRetriever:
+            def __init__(self, **kwargs):
+                pass
+
+            def retrieve(self, plan):
+                captured["plan"] = plan
+                return []
+
+        monkeypatch.setattr("src.agents.nodes.HybridRetriever", _FakeRetriever)
+        state = _state(
+            **{
+                STATE_USER_ROLE: ROLE_ADVISOR,
+                STATE_REWRITTEN_QUERY: "货币基金风险等级",
+                STATE_RETRIEVAL_PLAN: [
+                    {PLAN_SOURCE: SOURCE_PRODUCT, PLAN_QUERY: "货币基金风险等级", PLAN_TOP_K: 3}
+                ],
+                STATE_RETRIEVAL_WIDENING: 1,
+            }
+        )
+
+        retrieve(state)
+
+        assert captured["plan"][0][PLAN_TOP_K] == 6
+
+    def test_retrieve_keeps_planned_top_k_on_first_round(self, monkeypatch):
+        captured: dict = {}
+
+        class _FakeRetriever:
+            def __init__(self, **kwargs):
+                pass
+
+            def retrieve(self, plan):
+                captured["plan"] = plan
+                return []
+
+        monkeypatch.setattr("src.agents.nodes.HybridRetriever", _FakeRetriever)
+        state = _state(
+            **{
+                STATE_USER_ROLE: ROLE_ADVISOR,
+                STATE_REWRITTEN_QUERY: "货币基金风险等级",
+                STATE_RETRIEVAL_PLAN: [
+                    {PLAN_SOURCE: SOURCE_PRODUCT, PLAN_QUERY: "货币基金风险等级", PLAN_TOP_K: 3}
+                ],
+            }
+        )
+
+        retrieve(state)
+
+        assert captured["plan"][0][PLAN_TOP_K] == 3
+
+    def test_retrieve_widening_is_capped(self, monkeypatch):
+        captured: dict = {}
+
+        class _FakeRetriever:
+            def __init__(self, **kwargs):
+                pass
+
+            def retrieve(self, plan):
+                captured["plan"] = plan
+                return []
+
+        monkeypatch.setattr("src.agents.nodes.HybridRetriever", _FakeRetriever)
+        state = _state(
+            **{
+                STATE_USER_ROLE: ROLE_ADVISOR,
+                STATE_REWRITTEN_QUERY: "q",
+                STATE_RETRIEVAL_PLAN: [
+                    {PLAN_SOURCE: SOURCE_PRODUCT, PLAN_QUERY: "q", PLAN_TOP_K: 10}
+                ],
+                STATE_RETRIEVAL_WIDENING: 3,
+            }
+        )
+
+        retrieve(state)
+
+        assert captured["plan"][0][PLAN_TOP_K] == 20
+
+    def test_retrieve_counts_widening_rounds(self, monkeypatch):
+        monkeypatch.setattr(
+            "src.agents.nodes.HybridRetriever",
+            type("_R", (), {"__init__": lambda self, **kw: None, "retrieve": lambda self, plan: []}),
+        )
+        state = _state(
+            **{
+                STATE_USER_ROLE: ROLE_ADVISOR,
+                STATE_REWRITTEN_QUERY: "q",
+                STATE_RETRIEVAL_PLAN: [
+                    {PLAN_SOURCE: SOURCE_PRODUCT, PLAN_QUERY: "q", PLAN_TOP_K: 3}
+                ],
+                STATE_RETRIEVAL_WIDENING: 1,
+            }
+        )
+
+        result = retrieve(state)
+
+        assert result[STATE_RETRIEVAL_WIDENING] == 2
+        assert result[STATE_RETRIEVAL_ATTEMPTS] == 1
+
+
+class TestPlanChangeGuard:
+    """ISSUE-24：重试轮计划与上一轮实质相同则放宽 top_k，不重跑同一计划。"""
+
+    def _retry_state(self, **overrides: Any) -> AssistantState:
+        return _state(
+            **{
+                STATE_USER_ROLE: ROLE_ADVISOR,
+                STATE_ORIGINAL_QUERY: "贵州茅台营业收入",
+                STATE_REWRITTEN_QUERY: "贵州茅台营业收入",
+                STATE_RETRIEVAL_ATTEMPTS: 1,
+                STATE_RETRIEVAL_RESULTS: [],
+                STATE_RETRIEVAL_PLAN: [
+                    {PLAN_SOURCE: SOURCE_REPORT, PLAN_QUERY: "贵州茅台营业收入", PLAN_TOP_K: 3}
+                ],
+                **overrides,
+            }
+        )
+
+    def test_identical_replan_widens_instead_of_repeating(self, monkeypatch):
+        class _SamePlanLLM:
+            def invoke(self, messages, **kwargs):
+                response = MagicMock()
+                response.content = json.dumps(
+                    [{PLAN_SOURCE: SOURCE_REPORT, PLAN_QUERY: "贵州茅台营业收入", PLAN_TOP_K: 3}]
+                )
+                return response
+
+        monkeypatch.setattr("src.agents.nodes.llm", _SamePlanLLM())
+
+        result = query_understand(self._retry_state())
+
+        assert result[STATE_RETRIEVAL_PLAN_RAW][0][PLAN_TOP_K] == 6
+
+    def test_changed_replan_is_kept(self, monkeypatch):
+        class _ChangedPlanLLM:
+            def invoke(self, messages, **kwargs):
+                response = MagicMock()
+                response.content = json.dumps(
+                    [{PLAN_SOURCE: SOURCE_REPORT, PLAN_QUERY: "茅台 营业总收入", PLAN_TOP_K: 3}]
+                )
+                return response
+
+        monkeypatch.setattr("src.agents.nodes.llm", _ChangedPlanLLM())
+
+        result = query_understand(self._retry_state())
+
+        assert result[STATE_RETRIEVAL_PLAN_RAW][0][PLAN_QUERY] == "茅台 营业总收入"
+        assert result[STATE_RETRIEVAL_PLAN_RAW][0][PLAN_TOP_K] == 3
 
 
 class TestNoResultsResponse:

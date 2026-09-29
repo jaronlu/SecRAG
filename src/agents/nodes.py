@@ -97,6 +97,7 @@ from src.schemas.constants import (
     STATE_RETRIEVAL_PLAN_RAW,
     STATE_RETRIEVAL_RESULTS,
     STATE_RETRIEVAL_TOTAL_CHUNKS,
+    STATE_RETRIEVAL_WIDENING,
     STATE_REWRITTEN_QUERY,
     STATE_RISK_DISCLOSURE,
     STATE_THREAD_ID,
@@ -519,6 +520,41 @@ def _fallback_raw_plan(allowed_sources: list[str], query: str) -> list[dict[str,
     )
 
 
+# ISSUE-24：低召回放宽倍率与上限。放宽是廉价动作（只重跑检索），
+# 用它替代"重跑理解+规划"（实测第二轮 9.3-14.6s）。
+WIDEN_TOP_K_FACTOR = 2
+MAX_WIDEN_TOP_K = 20
+
+
+def _widen_top_k(top_k: object) -> int:
+    current = top_k if isinstance(top_k, int) and top_k > 0 else DEFAULT_TOP_K
+    return min(current * WIDEN_TOP_K_FACTOR, MAX_WIDEN_TOP_K)
+
+
+def _plan_signature(plan: list[dict[str, Any]]) -> tuple[tuple[str, str, str], ...]:
+    """检索计划的实质指纹：源/查询/过滤器任一变化即为不同计划（ISSUE-24）。"""
+    signature = []
+    for step in plan:
+        filters = step.get(PLAN_FILTERS) or {}
+        signature.append(
+            (
+                str(step.get(PLAN_SOURCE, "")),
+                str(step.get(PLAN_QUERY, "")),
+                json.dumps(filters, sort_keys=True, ensure_ascii=False, default=str),
+            )
+        )
+    return tuple(sorted(signature))
+
+
+def _widen_raw_plan(plan: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    widened = []
+    for step in plan:
+        item = dict(step)
+        item[PLAN_TOP_K] = _widen_top_k(item.get(PLAN_TOP_K))
+        widened.append(item)
+    return widened
+
+
 def _plan_only_llm_call(state: AssistantState) -> dict[str, Any]:
     """多跳重试轮的合并节点分支：只补检索计划，不重问查询理解（ISSUE-11）。
 
@@ -561,6 +597,11 @@ def _plan_only_llm_call(state: AssistantState) -> dict[str, Any]:
 
     if not isinstance(parsed_plan, list):
         parsed_plan = []
+    # ISSUE-24：与上一轮实质相同的计划再跑一遍不会带来新证据，改为放宽 top_k
+    if parsed_plan and _plan_signature(parsed_plan) == _plan_signature(
+        state.get(STATE_RETRIEVAL_PLAN, [])
+    ):
+        parsed_plan = _widen_raw_plan(parsed_plan)
     return {
         STATE_RETRIEVAL_PLAN_RAW: parsed_plan,
         STATE_LLM_USAGE: _llm_usage_metadata(response),
@@ -776,15 +817,23 @@ def planner(state: AssistantState) -> dict[str, Any]:
 
 
 def retrieve(state: AssistantState) -> dict[str, Any]:
-    """使用 HybridRetriever 按角色权限执行一轮检索计划。"""
+    """使用 HybridRetriever 按角色权限执行一轮检索计划。
+
+    ISSUE-24：低召回放宽轮（STATE_RETRIEVAL_WIDENING > 0）只把计划里的
+    top_k 按倍率放大后重跑检索，不重跑理解+规划 LLM 往返。
+    """
+    widening = state.get(STATE_RETRIEVAL_WIDENING, 0)
     # 先把 state 里可能被合并过的计划重新标准化，避免旧结构残留
     normalized_plan: list[RetrievalPlanStep] = []
     for step in state.get(STATE_RETRIEVAL_PLAN, []):
+        top_k = step.get(PLAN_TOP_K, DEFAULT_TOP_K)
+        if widening:
+            top_k = _widen_top_k(top_k)
         normalized_plan.append(
             RetrievalPlanStep(
                 source=step.get(PLAN_SOURCE, ""),
                 query=step.get(PLAN_QUERY, state[STATE_REWRITTEN_QUERY]),
-                top_k=step.get(PLAN_TOP_K, DEFAULT_TOP_K),
+                top_k=top_k,
                 filters=step.get(PLAN_FILTERS),
             )
         )
@@ -801,6 +850,7 @@ def retrieve(state: AssistantState) -> dict[str, Any]:
     return {
         STATE_RETRIEVAL_RESULTS: accumulated,
         STATE_RETRIEVAL_ATTEMPTS: state.get(STATE_RETRIEVAL_ATTEMPTS, 0) + 1,
+        STATE_RETRIEVAL_WIDENING: widening + 1,
         STATE_RETRIEVAL_TOTAL_CHUNKS: state.get(STATE_RETRIEVAL_TOTAL_CHUNKS, 0) + len(results),
     }
 

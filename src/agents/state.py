@@ -62,6 +62,8 @@ class AssistantState(TypedDict):
     retrieval_results: list[RetrievalResult]
     retrieval_total_chunks: int
     retrieval_filtered_chunks: int
+    # STATE_RETRIEVAL_WIDENING；低召回放宽轮次（ISSUE-24），只重跑检索不重跑规划
+    retrieval_widening: int
     reranker_status: str  # STATE_RERANKER_STATUS；值域 "applied" | "unavailable" | "error:<msg>"
 
     # 推理过程 — STATE_MESSAGES / STATE_TOOL_CALLS / STATE_INTERMEDIATE_STEPS / STATE_REASON_ATTEMPTS

@@ -199,7 +199,7 @@ def _traced_node(
 
 def should_retry_retrieval(
     state: AssistantState,
-) -> Literal["denied", "continue", "retrieve", "no_results"]:
+) -> Literal["denied", "continue", "retrieve", "widen", "no_results"]:
     """判断是否需要补充检索（最多 DEFAULT_MAX_HOPS 次，计数器由 retrieve 节点维护）。
 
     重试轮次耗尽仍无任何可用结果时走 no_results 短路（ISSUE-3）：
@@ -208,6 +208,9 @@ def should_retry_retrieval(
     回环触发阈值用 RETRIEVAL_SUFFICIENT_RESULTS（ISSUE-12）而非
     CONFIDENCE_HIGH_MIN_RESULTS：已有 2 条可用结果即不再强制重新规划，
     避免为置信度评级硬凑证据数而多烧一轮 planner。
+
+    ISSUE-24：非 0 的低召回不再重跑理解+规划（第二轮实测 9.3-14.6s），
+    改为 "widen"——只把 top_k 翻倍重跑检索；只有 0 召回才重新规划。
     """
     attempts = state.get(STATE_RETRIEVAL_ATTEMPTS, 0)
     results = state.get(STATE_RETRIEVAL_RESULTS, [])
@@ -220,8 +223,19 @@ def should_retry_retrieval(
     if not results:
         return "retrieve"
     if len(usable) < RETRIEVAL_SUFFICIENT_RESULTS:
-        return "retrieve"
+        return "widen"
     return "continue"
+
+
+# grade_and_filter 的条件路由表。由图模块声明并供测试守护：低召回走 widen
+# 直接回到 retrieve（不经理解+规划），只有 0 召回才回到 query_understand。
+RETRIEVAL_RETRY_ROUTES: Final[dict[str, str]] = {
+    "continue": "reason",
+    "retrieve": "query_understand",
+    "widen": "retrieve",
+    "denied": "permission_denied_response",
+    "no_results": "no_results_response",
+}
 
 
 def should_reason_again(state: AssistantState) -> Literal["retry", "continue"]:
@@ -380,18 +394,14 @@ def build_agent_graph() -> StateGraph[AssistantState]:
     graph.add_edge("planner", "retrieve")
     graph.add_edge("retrieve", "grade_and_filter")
 
-    # 条件路由：检索不足则重新规划并补充检索（最多 DEFAULT_MAX_HOPS 次）；
-    # 重规划回到合并节点（ISSUE-11：理解+计划一次往返，重试轮只补计划）；
+    # 条件路由：检索不足则补充检索（最多 DEFAULT_MAX_HOPS 次）；
+    # 低召回走 widen 直接重跑检索（ISSUE-24），0 召回才重规划回到合并节点
+    # （ISSUE-11：理解+计划一次往返，重试轮只补计划）；
     # 耗尽仍无可用结果则短路返回"未找到资料"（ISSUE-3）
     graph.add_conditional_edges(
         "grade_and_filter",
         should_retry_retrieval,
-        {
-            "continue": "reason",
-            "retrieve": "query_understand",
-            "denied": "permission_denied_response",
-            "no_results": "no_results_response",
-        },
+        RETRIEVAL_RETRY_ROUTES,
     )
 
     graph.add_edge("permission_denied_response", "persist_conversation_turn")

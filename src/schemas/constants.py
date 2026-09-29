@@ -95,6 +95,8 @@ STATE_RETRIEVAL_PLAN_RAW: Final = "retrieval_plan_raw"
 STATE_RETRIEVAL_RESULTS: Final = "retrieval_results"
 STATE_RETRIEVAL_TOTAL_CHUNKS: Final = "retrieval_total_chunks"
 STATE_RETRIEVAL_FILTERED_CHUNKS: Final = "retrieval_filtered_chunks"
+# ISSUE-24：低召回放宽轮次计数。放宽只重跑检索（top_k 翻倍），不再重跑理解+规划
+STATE_RETRIEVAL_WIDENING: Final = "retrieval_widening"
 STATE_RERANKER_STATUS: Final = "reranker_status"  # "applied" | "unavailable" | "error:<msg>"
 # ISSUE-23：LLM 节点本次调用的 token 计量（prompt_tokens/completion_tokens/total_tokens），
 # 由 _traced_node 并入 intermediate_steps 的 metadata，落审计后可按请求区分
