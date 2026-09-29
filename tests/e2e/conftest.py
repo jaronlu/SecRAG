@@ -39,7 +39,9 @@ FUND_REPORT_CHUNK = (
     "适合保守型投资者。基金主要投资于货币市场工具，不投资股票或可转换债券。"
 )
 
-QUERY_UNDERSTAND_MARKER = "请分析以下行业业务查询"
+# 首轮合并调用的 prompt 特征串（ISSUE-23 压缩后仍保留该表述）；
+# 重试轮只补计划，用 PLANNER_MARKER 区分，两个标记互不包含
+QUERY_UNDERSTAND_MARKER = "一次返回查询理解与检索计划"
 PLANNER_MARKER = "生成检索计划"
 
 

@@ -33,7 +33,7 @@ from src.utils.langfuse_adapter import (
 from src.utils.metrics import MetricsRegistry
 
 # 与 tests/e2e/conftest.py 的替身回答契约一致（tests 目录非包，无法导入）
-QUERY_UNDERSTAND_MARKER = "请分析以下行业业务查询"
+QUERY_UNDERSTAND_MARKER = "一次返回查询理解与检索计划"
 PLANNER_MARKER = "生成检索计划"
 REASON_CONTENT = "## 结论\n\n本基金风险等级为R1（低风险），适合保守型投资者[来源1]。"
 

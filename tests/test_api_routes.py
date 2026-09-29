@@ -327,6 +327,26 @@ def test_qa_stream_emits_answer_delta_for_reason_tokens(qa_client, monkeypatch):
     assert "SHOULD_NOT_LEAK" not in "".join(deltas)
 
 
+def test_qa_stream_records_time_to_first_token_once(qa_client, monkeypatch):
+    """ISSUE-23：TTFT 在首个 answer_delta 记录一次，供设计线 P95 ≤5s 评估。"""
+    import src.api.main as api_main
+    from src.utils.metrics import MetricsRegistry
+
+    registry = MetricsRegistry()
+    monkeypatch.setattr(api_main, "get_metrics", lambda: registry)
+    monkeypatch.setattr("src.api.main._get_agent_app", lambda: _TokenStreamingAgentApp())
+
+    with qa_client.stream(
+        "POST", API_ROUTE_ASSISTANT_QA_STREAM, json={"query": "货币基金风险"}
+    ) as res:
+        assert res.status_code == 200
+        events = _parse_sse_events(res)
+
+    assert any(name == "answer_delta" for name, _ in events)
+    assert registry.time_to_first_token.get_count() == 1
+    assert registry.get_summary()["ttft_p95_seconds"] >= 0.0
+
+
 # ══════════════════════════════════════════════════════════════════════
 # ISSUE-18：async 路由内的同步 SQLite/Chroma 调用必须移出事件循环
 # ══════════════════════════════════════════════════════════════════════

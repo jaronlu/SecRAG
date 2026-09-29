@@ -98,6 +98,7 @@ from src.schemas.constants import (
     STATE_INTENT,
     STATE_MESSAGES,
     STATE_INTERMEDIATE_STEPS,
+    STATE_LLM_USAGE,
     STATE_ORIGINAL_QUERY,
     STATE_QUERY_TYPE,
     STATE_REASON_ATTEMPTS,
@@ -696,6 +697,139 @@ class TestUnderstandAndPlanSingleRoundTrip:
         query_understand(self._first_pass_state())
 
         assert seen == [{"max_tokens": 1024, "model": "doubao-seed-1-6-flash"}]
+
+
+class TestPlanCallLatencyAccounting:
+    """ISSUE-23：理解+计划 prompt 压缩到预算内，并按请求记录 token 计量。"""
+
+    def _state_for_plan(self) -> AssistantState:
+        return _state(
+            **{
+                STATE_USER_ROLE: ROLE_ADVISOR,
+                STATE_DEPARTMENT: "wealth",
+                STATE_ORIGINAL_QUERY: "贵州茅台2026年半年度报告披露的营业收入和归母净利润是多少？",
+                STATE_RETRIEVAL_ATTEMPTS: 0,
+            }
+        )
+
+    def _usage_llm(self, prompts: list[str]):
+        class _UsageLLM:
+            def invoke(self, messages, **kwargs):
+                prompts.append(messages[-1].content)
+                response = MagicMock()
+                response.content = "{}"
+                response.usage_metadata = {
+                    "input_tokens": 321,
+                    "output_tokens": 87,
+                    "total_tokens": 408,
+                }
+                return response
+
+        return _UsageLLM()
+
+    def test_merged_prompt_stays_within_token_budget(self, monkeypatch):
+        from src.agents.nodes import PLAN_PROMPT_TOKEN_BUDGET, _estimate_tokens
+
+        prompts: list[str] = []
+        monkeypatch.setattr("src.agents.nodes.llm", self._usage_llm(prompts))
+
+        query_understand(self._state_for_plan())
+
+        # 固定模板（去掉用户查询）是压缩的着力点，直接决定 prefill 时长
+        template_tokens = _estimate_tokens(prompts[0]) - _estimate_tokens(
+            "贵州茅台2026年半年度报告披露的营业收入和归母净利润是多少？"
+        )
+        assert template_tokens <= PLAN_PROMPT_TOKEN_BUDGET
+        for key in (
+            "intent",
+            "query_type",
+            "entities",
+            "rewritten_query",
+            "ambiguity",
+            "retrieval_plan",
+        ):
+            assert key in prompts[0], f"压缩 prompt 不得丢掉 JSON 契约字段 {key}"
+        assert SOURCE_PRODUCT in prompts[0]
+        assert "贵州茅台2026年半年度报告" in prompts[0]
+
+    def test_merged_prompt_bounded_for_max_length_query(self, monkeypatch):
+        """最长允许查询下 prompt 仍有硬上限，prefill 不会无界增长。"""
+        from src.agents.nodes import PLAN_PROMPT_MAX_TOKENS, _estimate_tokens
+
+        prompts: list[str] = []
+        monkeypatch.setattr("src.agents.nodes.llm", self._usage_llm(prompts))
+        state = self._state_for_plan()
+        state[STATE_ORIGINAL_QUERY] = "请详细说明" * (MAX_QUERY_LENGTH // 5)
+
+        query_understand(state)
+
+        assert _estimate_tokens(prompts[0]) <= PLAN_PROMPT_MAX_TOKENS
+
+    def test_retry_plan_prompt_stays_within_token_budget(self, monkeypatch):
+        from src.agents.nodes import PLAN_PROMPT_TOKEN_BUDGET, _estimate_tokens
+
+        prompts: list[str] = []
+        monkeypatch.setattr("src.agents.nodes.llm", self._usage_llm(prompts))
+        state = _state(
+            **{
+                STATE_USER_ROLE: ROLE_ADVISOR,
+                STATE_DEPARTMENT: "wealth",
+                STATE_ORIGINAL_QUERY: "贵州茅台2026年半年度报告披露的营业收入是多少？",
+                STATE_REWRITTEN_QUERY: "贵州茅台 2026 半年报 营业收入",
+                STATE_RETRIEVAL_ATTEMPTS: 1,
+                STATE_RETRIEVAL_RESULTS: [],
+            }
+        )
+
+        query_understand(state)
+
+        template_tokens = _estimate_tokens(prompts[0]) - _estimate_tokens(
+            "贵州茅台2026年半年度报告披露的营业收入是多少？"
+        )
+        assert template_tokens <= PLAN_PROMPT_TOKEN_BUDGET
+
+    def test_merged_call_records_token_usage(self, monkeypatch):
+        prompts: list[str] = []
+        monkeypatch.setattr("src.agents.nodes.llm", self._usage_llm(prompts))
+
+        result = query_understand(self._state_for_plan())
+
+        assert result[STATE_LLM_USAGE] == {
+            "prompt_tokens": 321,
+            "completion_tokens": 87,
+            "total_tokens": 408,
+        }
+
+    def test_retry_plan_call_records_token_usage(self, monkeypatch):
+        prompts: list[str] = []
+        monkeypatch.setattr("src.agents.nodes.llm", self._usage_llm(prompts))
+        state = _state(
+            **{
+                STATE_USER_ROLE: ROLE_ADVISOR,
+                STATE_DEPARTMENT: "wealth",
+                STATE_ORIGINAL_QUERY: "query",
+                STATE_REWRITTEN_QUERY: "query",
+                STATE_RETRIEVAL_ATTEMPTS: 1,
+                STATE_RETRIEVAL_RESULTS: [],
+            }
+        )
+
+        result = query_understand(state)
+
+        assert result[STATE_LLM_USAGE]["prompt_tokens"] == 321
+
+    def test_token_usage_lands_in_node_timings_for_audit(self, monkeypatch):
+        """token 计量随节点耗时进入 node_timings，可在 audit.db 按请求查询。"""
+        prompts: list[str] = []
+        monkeypatch.setattr("src.agents.nodes.llm", self._usage_llm(prompts))
+        traced = _traced_node("query_understand", query_understand)
+
+        result = traced(self._state_for_plan())
+
+        step = result[STATE_INTERMEDIATE_STEPS][-1]
+        assert step["step"] == "query_understand"
+        assert step["metadata"]["prompt_tokens"] == 321
+        assert step["metadata"]["completion_tokens"] == 87
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -2105,7 +2239,7 @@ class TestCompiledGraphRerankerStatus:
 
             def invoke(self, messages, **kwargs):
                 prompt = messages[-1].content
-                if "请分析以下行业业务查询" in prompt:
+                if "一次返回查询理解与检索计划" in prompt:
                     return _StubResponse(json.dumps({
                         "intent": "FAQ",
                         "query_type": "faq_inquiry",

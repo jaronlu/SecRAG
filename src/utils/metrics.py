@@ -12,6 +12,7 @@
 指标清单：
 - secrag_queries_total: 查询总数（按 role/status 标签）
 - secrag_query_duration_seconds: 查询延迟直方图（P50/P95/P99）
+- secrag_time_to_first_token_seconds: 流式首字延迟（TTFT）直方图（ISSUE-23）
 - secrag_cache_hits_total: 缓存命中数
 - secrag_cache_misses_total: 缓存未命中数
 - secrag_retrieval_chunks_total: 检索返回 chunk 总数
@@ -161,10 +162,17 @@ class Histogram(Metric):
                 self._values[key] = vals[-1000:]
 
     def percentile(self, p: float, labels: dict[str, str] | None = None) -> float:
-        """计算百分位（p: 0-100）。"""
+        """计算百分位（p: 0-100）。
+
+        labels 为 None 时跨所有标签组合聚合：观测值都带 role 等标签，
+        按空标签取值只会得到空集合，让摘要里的延迟分位数恒为 0。
+        """
         key = self._label_key(labels)
         with self._lock:
-            vals = sorted(self._values.get(key, []))
+            if labels is None:
+                vals = sorted(value for values in self._values.values() for value in values)
+            else:
+                vals = sorted(self._values.get(key, []))
             if not vals:
                 return 0.0
             idx = int(len(vals) * p / 100)
@@ -172,14 +180,16 @@ class Histogram(Metric):
             return vals[idx]
 
     def get_count(self, labels: dict[str, str] | None = None) -> int:
-        key = self._label_key(labels)
         with self._lock:
-            return self._counts.get(key, 0)
+            if labels is None:
+                return sum(self._counts.values())
+            return self._counts.get(self._label_key(labels), 0)
 
     def get_sum(self, labels: dict[str, str] | None = None) -> float:
-        key = self._label_key(labels)
         with self._lock:
-            return self._sums.get(key, 0.0)
+            if labels is None:
+                return sum(self._sums.values())
+            return self._sums.get(self._label_key(labels), 0.0)
 
     def collect(self) -> list[tuple[dict[str, str], dict[str, Any]]]:
         with self._lock:
@@ -237,6 +247,14 @@ class MetricsRegistry:
         self.active_requests = Gauge(
             "secrag_active_requests",
             "Number of active requests being processed",
+        )
+        # ISSUE-23：流式首字延迟（TTFT）——请求发出到首个 answer_delta 事件；
+        # 设计线 P95 ≤5s（impl-08 §2）。分桶围绕 5s 目标细化
+        self.time_to_first_token = Histogram(
+            "secrag_time_to_first_token_seconds",
+            "Time from request start to the first streamed answer token",
+            labels=["role"],
+            buckets=[0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 30.0, 60.0],
         )
 
         # 缓存指标
@@ -312,6 +330,10 @@ class MetricsRegistry:
         else:
             self.cache_misses_total.inc()
 
+    def record_ttft(self, role: str, seconds: float):
+        """记录一次流式首字延迟（请求发出到首个 answer_delta，ISSUE-23）。"""
+        self.time_to_first_token.observe(max(seconds, 0.0), labels={"role": role})
+
     def get_summary(self) -> dict[str, Any]:
         """获取指标摘要（用于健康检查和快速查看）。"""
         total_queries = sum(v for _, v in self.queries_total.collect())
@@ -343,6 +365,7 @@ class MetricsRegistry:
             "latency_p50_seconds": round(p50, 3),
             "latency_p95_seconds": round(p95, 3),
             "latency_p99_seconds": round(p99, 3),
+            "ttft_p95_seconds": round(self.time_to_first_token.percentile(95), 3),
             "verification_passed": int(self.verification_passed_total.get()),
             "verification_failed": int(self.verification_failed_total.get()),
             "compliance_blocked": int(self.compliance_blocked_total.get()),
