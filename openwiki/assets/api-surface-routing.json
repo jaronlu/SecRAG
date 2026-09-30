@@ -1,0 +1,210 @@
+{
+  "schema_version": 1,
+  "mode": "flowchart",
+  "template_type": "flowchart",
+  "style": 1,
+  "width": 1000,
+  "height": 760,
+  "title": "API 入口与路由拓扑",
+  "subtitle": "React SPA 经 FastAPI 应用进入认证、问答、会话、管理与观测端点",
+  "text_policy": "strict",
+  "legend_orientation": "vertical",
+  "legend_x": 48,
+  "legend_y": 560,
+  "legend_locked": true,
+  "legend": [
+    {
+      "flow": "control",
+      "label": "HTTP 路由 / 调用方向"
+    }
+  ],
+  "footer": "SecRAG · API Surface",
+  "footer_y": 736,
+  "nodes": [
+    {
+      "id": "fe",
+      "kind": "rect",
+      "x": 28,
+      "y": 292,
+      "width": 172,
+      "height": 64,
+      "type_label": "UI",
+      "label": "React SPA",
+      "sublabel": "唯一 UI 入口"
+    },
+    {
+      "id": "api",
+      "kind": "double_rect",
+      "x": 316,
+      "y": 286,
+      "width": 194,
+      "height": 76,
+      "type_label": "HUB",
+      "label": "FastAPI 应用",
+      "sublabel": "src/api/main.py"
+    },
+    {
+      "id": "auth",
+      "kind": "rect",
+      "x": 640,
+      "y": 106,
+      "width": 320,
+      "height": 56,
+      "type_label": "AUTH",
+      "label": "authenticate_user",
+      "sublabel": "依赖注入"
+    },
+    {
+      "id": "qa",
+      "kind": "rect",
+      "x": 640,
+      "y": 186,
+      "width": 320,
+      "height": 56,
+      "type_label": "QA",
+      "label": "assistant_qa",
+      "sublabel": "POST /v1/assistant/qa"
+    },
+    {
+      "id": "sse",
+      "kind": "rect",
+      "x": 640,
+      "y": 266,
+      "width": 320,
+      "height": 56,
+      "type_label": "QA · SSE",
+      "label": "assistant_qa_stream",
+      "sublabel": "POST /v1/assistant/qa/stream"
+    },
+    {
+      "id": "thr",
+      "kind": "rect",
+      "x": 640,
+      "y": 346,
+      "width": 320,
+      "height": 56,
+      "type_label": "THREADS",
+      "label": "SQLiteConversationStore",
+      "sublabel": "/v1/assistant/threads*"
+    },
+    {
+      "id": "ing",
+      "kind": "rect",
+      "x": 640,
+      "y": 426,
+      "width": 320,
+      "height": 56,
+      "type_label": "ADMIN",
+      "label": "ingestion router",
+      "sublabel": "/v1/admin/ingestion/* · technical-only"
+    },
+    {
+      "id": "adm",
+      "kind": "rect",
+      "x": 640,
+      "y": 506,
+      "width": 320,
+      "height": 56,
+      "type_label": "ADMIN",
+      "label": "KnowledgeBaseManager / SemanticCache",
+      "sublabel": "/v1/admin/documents* · cache* · stats"
+    },
+    {
+      "id": "obs",
+      "kind": "rect",
+      "x": 640,
+      "y": 586,
+      "width": 320,
+      "height": 56,
+      "type_label": "OBSERVABILITY",
+      "label": "MetricsRegistry / ChromaVectorRetriever",
+      "sublabel": "/health · /metrics"
+    },
+    {
+      "id": "spa",
+      "kind": "rect",
+      "x": 640,
+      "y": 666,
+      "width": 320,
+      "height": 56,
+      "type_label": "STATIC",
+      "label": "frontend/dist",
+      "sublabel": "静态资源与 SPA catch-all"
+    }
+  ],
+  "arrows": [
+    {
+      "id": "e0",
+      "source": "fe",
+      "target": "api",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control",
+      "label": "Bearer token"
+    },
+    {
+      "id": "e1",
+      "source": "api",
+      "target": "auth",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "e2",
+      "source": "api",
+      "target": "qa",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "e3",
+      "source": "api",
+      "target": "sse",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "e4",
+      "source": "api",
+      "target": "thr",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "e5",
+      "source": "api",
+      "target": "ing",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "e6",
+      "source": "api",
+      "target": "adm",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "e7",
+      "source": "api",
+      "target": "obs",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "e8",
+      "source": "api",
+      "target": "spa",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control"
+    }
+  ]
+}

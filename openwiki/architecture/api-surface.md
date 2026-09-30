@@ -56,18 +56,7 @@ generated: { by: "codex", at: "2026-09-29T15:40:40.317Z" }
 
 本页是 SecRAG 的 HTTP 公共表面清单：每个端点的路径、请求/响应模型、角色要求与错误映射，以及 React 前端（`frontend/src/api.ts`）消费这些接口的方式。问答请求在图内部如何执行、每个节点做什么，请读[问答请求执行链路](../tutorials/request-execution.md)；状态字段与安全边界见[状态、权限与安全边界](state-and-safety.md)。本页只讲“线上长什么样、前端怎么接”。
 
-```mermaid
-flowchart LR
-    FE["React SPA（唯一 UI）"] -->|"Bearer token"| API["FastAPI 应用 src/api/main.py"]
-    API --> AUTH["authenticate_user 依赖注入"]
-    API -->|"POST /v1/assistant/qa"| QA["assistant_qa"]
-    API -->|"POST /v1/assistant/qa/stream"| SSE["assistant_qa_stream SSE"]
-    API -->|"/v1/assistant/threads*"| THR["SQLiteConversationStore"]
-    API -->|"/v1/admin/ingestion/*"| ING["ingestion router technical-only"]
-    API -->|"/v1/admin/documents* / cache* / stats"| ADM["KnowledgeBaseManager / SemanticCache"]
-    API -->|"/health /metrics"| OBS["MetricsRegistry / ChromaVectorRetriever"]
-    API -->|"静态资源与 SPA catch-all"| SPA["frontend/dist"]
-```
+![API 入口与路由拓扑](../assets/api-surface-routing.svg)
 
 HTTP 表面总览：所有业务端点（除 `/health`、`/metrics`、静态与 UI 页面）都要求 Bearer token；图内部节点流程不在此页展开。旧版 HTML UI（`src/api/ui.py`/`ui.html`/`admin.html` 与 `/legacy` 路由）已整体删除，React SPA 是唯一 UI，`frontend/dist` 构建产物缺失时服务启动直接失败。
 
