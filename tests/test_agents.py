@@ -506,6 +506,75 @@ class TestPlannerDateFilters:
         assert {META_DATE_DAY: {"$gte": 20250101}} in plan[0][PLAN_FILTERS]["$and"]
 
 
+class TestPlannerIntentSourceFloor:
+    """DEF-006（2026-09-30 实机演练）：意图分类稳定但计划源在采样间摇摆
+    （输出截断走 JSONDecodeError 兜底时落到 allowed_sources[0]）。planner
+    按意图补齐必需源，主题源缺席会让干净拒绝（全 denied 短路）与一手来源
+    召回同时失效。
+    """
+
+    def _state(self, **overrides: Any) -> AssistantState:
+        return _state(**{
+            STATE_USER_ROLE: ROLE_ADVISOR,
+            STATE_ORIGINAL_QUERY: "内部制度对客户数据导出申请的操作流程有什么要求？",
+            STATE_REWRITTEN_QUERY: "内部制度 客户数据导出申请 操作流程",
+            STATE_INTENT: "法规咨询",
+            STATE_QUERY_TYPE: "regulation_inquiry",
+            STATE_ENTITIES: {},
+            **overrides,
+        })
+
+    def test_regulation_intent_appends_missing_regulation_source(self):
+        result = planner(self._state(**{
+            STATE_RETRIEVAL_PLAN_RAW: [
+                {PLAN_SOURCE: SOURCE_PRODUCT, PLAN_QUERY: "客户数据导出", PLAN_TOP_K: 3},
+            ]
+        }))
+
+        sources = [s[PLAN_SOURCE] for s in result[STATE_RETRIEVAL_PLAN]]
+        assert sources == [SOURCE_PRODUCT, SOURCE_REGULATION]
+
+    def test_intent_source_not_duplicated_when_already_planned(self):
+        result = planner(self._state(**{
+            STATE_RETRIEVAL_PLAN_RAW: [
+                {PLAN_SOURCE: SOURCE_REGULATION, PLAN_QUERY: "客户数据导出", PLAN_TOP_K: 3},
+            ]
+        }))
+
+        sources = [s[PLAN_SOURCE] for s in result[STATE_RETRIEVAL_PLAN]]
+        assert sources == [SOURCE_REGULATION]
+
+    def test_intent_source_outside_role_allowlist_is_not_appended(self):
+        # advisor 角色白名单不含 faq_search，FAQ 意图也不得越权补源
+        result = planner(self._state(**{
+            STATE_INTENT: "FAQ",
+            STATE_QUERY_TYPE: "faq_inquiry",
+            STATE_RETRIEVAL_PLAN_RAW: [
+                {PLAN_SOURCE: SOURCE_PRODUCT, PLAN_QUERY: "操作流程", PLAN_TOP_K: 3},
+            ],
+        }))
+
+        sources = [s[PLAN_SOURCE] for s in result[STATE_RETRIEVAL_PLAN]]
+        assert sources == [SOURCE_PRODUCT]
+
+    def test_report_intent_appended_step_carries_stock_code_filter(self):
+        result = planner(self._state(**{
+            STATE_INTENT: "研报观点",
+            STATE_QUERY_TYPE: "report_inquiry",
+            STATE_ORIGINAL_QUERY: "宁德时代2026年每股收益预测是多少元？",
+            STATE_REWRITTEN_QUERY: "宁德时代 300750 2026 EPS 预测",
+            STATE_ENTITIES: {"stock_code": "300750.SZ"},
+            STATE_RETRIEVAL_PLAN_RAW: [
+                {PLAN_SOURCE: SOURCE_PRODUCT, PLAN_QUERY: "宁德时代", PLAN_TOP_K: 3},
+            ],
+        }))
+
+        plan = result[STATE_RETRIEVAL_PLAN]
+        assert [s[PLAN_SOURCE] for s in plan] == [SOURCE_PRODUCT, SOURCE_REPORT]
+        # 底线补步与手写 report 步同等待遇：补股票代码过滤、不做 date_day 硬过滤
+        assert plan[-1][PLAN_FILTERS] == {"stock_code": "300750"}
+
+
 class TestUnderstandAndPlanSingleRoundTrip:
     """ISSUE-11：query_understand 单次 LLM 往返同时产出理解结果与原始检索计划。"""
 

@@ -66,6 +66,9 @@ from src.schemas.constants import (
     RR_SCORE,
     RRF_K,
     SOURCE_REPORT,
+    SOURCE_PRODUCT,
+    SOURCE_REGULATION,
+    SOURCE_FAQ,
     STATE_AMBIGUITY,
     STATE_AUDIT_TRAIL,
     STATE_CHAT_HISTORY,
@@ -796,28 +799,79 @@ def planner(state: AssistantState) -> dict[str, Any]:
     relax_date_filters = _retrying_after_empty_retrieval(state)
     # P1-2: 从 entities 中提取时间范围，转为 ChromaDB 过滤器
     time_filters = _time_range_to_filters(state.get(STATE_ENTITIES, {}).get("time_range"))
+
+    def enrich(step: RetrievalPlanStep) -> RetrievalPlanStep:
+        """白名单过滤后的单步富化：研报补股票代码、合并时间过滤。"""
+        if step.get(PLAN_SOURCE) == SOURCE_REPORT:
+            stock_code = str(state.get(STATE_ENTITIES, {}).get(META_STOCK_CODE, ""))
+            if stock_code:
+                filters = dict(step.get(PLAN_FILTERS) or {})
+                # 只保留代码部分，去掉沪市 .SH / 深市 .SZ 等后缀
+                filters[META_STOCK_CODE] = stock_code.split(".", maxsplit=1)[0]
+                step[PLAN_FILTERS] = filters
+        if relax_date_filters:
+            step[PLAN_FILTERS] = _strip_date_day_filters(step.get(PLAN_FILTERS))
+        elif time_filters and step.get(PLAN_SOURCE) != SOURCE_REPORT:
+            existing_filters = dict(step.get(PLAN_FILTERS) or {})
+            existing_filters.update(time_filters)
+            step[PLAN_FILTERS] = existing_filters
+        return step
+
     filtered_plan: list[RetrievalPlanStep] = []
     for raw_step in raw_steps:
         step = _normalize_plan_step(raw_step, state[STATE_REWRITTEN_QUERY])
         if step is not None and step.get(PLAN_SOURCE) in allowed_sources:
-            # 研报通常按股票组织，补股票代码过滤可提高召回精度
-            if step.get(PLAN_SOURCE) == SOURCE_REPORT:
-                stock_code = str(state.get(STATE_ENTITIES, {}).get(META_STOCK_CODE, ""))
-                if stock_code:
-                    filters = dict(step.get(PLAN_FILTERS) or {})
-                    # 只保留代码部分，去掉沪市 .SH / 深市 .SZ 等后缀
-                    filters[META_STOCK_CODE] = stock_code.split(".", maxsplit=1)[0]
-                    step[PLAN_FILTERS] = filters
-            # P1-2: 合并时间范围过滤器（report_search 与 0 召回重试除外）
-            if relax_date_filters:
-                step[PLAN_FILTERS] = _strip_date_day_filters(step.get(PLAN_FILTERS))
-            elif time_filters and step.get(PLAN_SOURCE) != SOURCE_REPORT:
-                existing_filters = dict(step.get(PLAN_FILTERS) or {})
-                existing_filters.update(time_filters)
-                step[PLAN_FILTERS] = existing_filters
-            filtered_plan.append(step)
+            filtered_plan.append(enrich(step))
+
+    # 2026-09-30 实机演练 DEF-006：意图分类稳定，但计划源在采样间摇摆——
+    # 同一制度问题一轮规划 regulation_search、一轮 product_search（输出截断
+    # 时的 JSONDecodeError 兜底也落在 allowed_sources[0]）。主题源缺席会让
+    # 干净拒绝（全 denied 短路）与一手来源召回同时失效。这里按已判定的
+    # 意图补齐必需源：角色白名单外不补，计划已含则不动。
+    required_source = _intent_required_source(
+        state.get(STATE_INTENT, ""), state.get(STATE_QUERY_TYPE, "")
+    )
+    if (
+        required_source
+        and required_source in allowed_sources
+        and all(step.get(PLAN_SOURCE) != required_source for step in filtered_plan)
+    ):
+        step = _normalize_plan_step(
+            {
+                PLAN_SOURCE: required_source,
+                PLAN_QUERY: state.get(STATE_REWRITTEN_QUERY, ""),
+                PLAN_TOP_K: DEFAULT_TOP_K,
+            },
+            state[STATE_REWRITTEN_QUERY],
+        )
+        if step is not None:
+            filtered_plan.append(enrich(step))
 
     return {STATE_RETRIEVAL_PLAN: filtered_plan}
+
+
+# 意图 → 必需检索源（planner 确定性底线，见 planner 内 DEF-006 注释）
+_INTENT_REQUIRED_SOURCES: dict[str, str] = {
+    "产品咨询": SOURCE_PRODUCT,
+    "法规咨询": SOURCE_REGULATION,
+    "规则审查": SOURCE_REGULATION,
+    "研报观点": SOURCE_REPORT,
+    "FAQ": SOURCE_FAQ,
+}
+_QUERY_TYPE_REQUIRED_SOURCES: dict[str, str] = {
+    "product_inquiry": SOURCE_PRODUCT,
+    "rule_inquiry": SOURCE_REGULATION,
+    "regulation_inquiry": SOURCE_REGULATION,
+    "report_inquiry": SOURCE_REPORT,
+    "faq_inquiry": SOURCE_FAQ,
+}
+
+
+def _intent_required_source(intent: str, query_type: str) -> str:
+    """返回该意图下计划必须覆盖的检索源；无明确映射返回空串。"""
+    return _INTENT_REQUIRED_SOURCES.get(
+        intent, _QUERY_TYPE_REQUIRED_SOURCES.get(query_type, "")
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════
