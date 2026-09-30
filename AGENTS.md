@@ -23,6 +23,7 @@
 | 07-多轮会话与聊天持久化 | `docs/design/implementation-07-conversation-management.md` |
 | 08-系统评估与准入 | `docs/design/implementation-08-evaluation.md` |
 | 参考-RAG 文档合并策略 | `docs/design/reference-rag-document-combine.md` |
+| 测试案例 | `docs/test-plans/` |
 
 ## 规则优先级
 
@@ -48,6 +49,7 @@
 4. 每条设计要求必须有实现责任和验证证据；TODO、占位、Phase 2 或 silent fallback 不得算作已实现。
 5. 未实现能力只能二选一：补齐真实实现和测试；或明确返回“未配置/未实现”。不得用降级行为冒充设计能力，例如用原始 `score` 排序冒充 BGE 语义重排。
 6. `docs/design/` 指向仓库外的 Wiki；修改后同时检查 Wiki 工作区状态，不能仅凭本仓库的 `git status` 判断变更是否已记录。
+7. 测试案例文档（`docs/test-plans/`）随代码演进维护：行为、能力或配置默认值变化落地时，同步校订受影响案例（以「演进备注」标注）并补复核证据；未覆盖能力登记缺口，不冒充已守护。
 
 ## 实现约束
 
