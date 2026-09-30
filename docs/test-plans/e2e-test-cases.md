@@ -337,12 +337,32 @@
 |---|---|---|---|---|---|
 | DEF-001 | TC-024 | TP+数字的目标价表述漏检：`TP 12.5 元`、`建议TP 15元`、`TP12.5`、`建议 TP 15 元` 均不触发 advice 拦截（`TP：12.5`、`target price 12.5` 可检出） | `ComplianceChecker().check("建议TP 15元", user_role="advisor")` → passed=True、无 advice flag；测试证据：`tests/e2e/test_e2e_compliance.py::test_tc024_tp_with_number_should_be_blocked`（xfail strict） | `matches_investment_advice` 先做全空白归一化（防空格绕过），`"TP 12.5"` 归一化为 `"TP12.5"` 后 `_TARGET_PRICE_REGEXES` 的 `\bTP\b` 词边界失效——空格防护与 TP 正则不兼容。修复方向：TP 正则改用归一化后仍成立的边界（如 `TP(?=\d|\W)`）或对 TP/数字组合单独匹配 | 无（新增） |
 | DEF-002 | TC-028 | 注入/PII/语言标记无法持久化：`query_understand` 返回的 `query_sanitized`、`pii_detected`、`language` 不出现在图终态，也不进审计链路 | 运行含"忽略以上所有指令"查询的 Agent Graph，终态 state 无 `query_sanitized` 键（KeyError）；测试证据：`tests/e2e/test_e2e_compliance.py::test_tc028_injection_flag_should_persist_in_state`（xfail strict） | 三键未声明进 `src/agents/state.py` 的 `AssistantState`，LangGraph 丢弃未声明通道；且全仓库无下游消费者——安全标记是"只写不读"的装饰，加固告警只落在进程日志 | 无（新增） |
+| DEF-003 | TC-016（2026-09-30 实机演练 S1） | 重入库（CHUNKER v2）后引用 quote 不含答案事实 R2：demo 断言"citations quote 必须直接支持 R2"3/3 失败 | `uv run python scripts/demo.py --base-url http://127.0.0.1:8001`，授权场景 3 连失败 | `_extract_quote` 仅按查询词重叠选句；重入库后 chunk 以「产品名称：示例稳健增利理财产品（虚构）」引导句开头，其查询词重叠压过 R2 事实句。修复（adb6838）：quote 选句改为答案事实感知——答案含事实 token（R2/20.83 等）时仅在含事实句中选取，事实缺失回退旧行为 | 无（新增） |
+| DEF-004 | TC-034（2026-09-30 实机演练 S3） | fail-closed 兜底被语义缓存复放：S3 同题第二次请求 0.1s 返回缓存的"工具调用次数达到上限"答案且带无关引用 | 同题连续两次 POST /v1/assistant/qa，第二次 <0.1s 返回相同兜底（`data/audit.db` 07:46/07:51 轮） | `tool_limit_response` 未置 `verification.passed=False`，兜底文案通过 verify/compose 的成功路径被 `cache.store` 收录，违反"仅成功终态入缓存"（本集 TC-034 语义、DC-026 契约）。修复（51b5495）：与 `no_results_response` 同契约置失败 + compose 保留兜底文案并清引用 | 无（新增） |
+| DEF-005 | TC-016（2026-09-30 实机演练 S2/S3/S4） | 合并规划输出被 384 token 预算截断，JSONDecodeError 兜底使计划塌缩为单源 product_search：S2 丧失干净拒绝、S3/S4 丧失 report 召回 | 同题 5 次直连采样：解析成功的计划全对（regulation+faq），3/5 输出在 ~600 token 处截断 | ISSUE-23 将 `llm_plan_max_tokens` 收紧到 384 时假设"输出只有一个小 JSON"，但合并理解+计划对象的 pretty 输出实测 ~600 token。修复（97b8707）：预算 640 + 单行紧凑 JSON 指令 + 配置守护测试重校准 | 无（新增） |
+| DEF-006 | TC-016（2026-09-30 实机演练 S2/S3/S4） | 意图分类稳定但计划源在采样间摇摆（同题一轮 regulation_search 一轮 product_search），主题源缺席时干净拒绝与一手来源召回同时失效 | 演练期间 audit.db 各轮 plan 对比 + S2 demo 首轮通过/复跑失败交替 | 规划器缺少确定性的意图→源覆盖底线；LLM 摇摆或 DEF-005 兜底路径都落到 `allowed_sources[0]`。修复（f697e60 + 1305cd9）：prompt 恢复主题→源映射指引；planner 按意图补齐必需源（角色白名单内，带测试守护） | 无（新增） |
 
 修复记录（2026-09-26）：
 - **DEF-001 已修复**（commit 1f5deb6）：`_TARGET_PRICE_REGEXES` 的 `\bTP\b` 改为 `(?<![A-Za-z])TP(?![A-Za-z])`——只排除 ASCII 字母相邻的边界在空白归一化后依然成立，同时覆盖紧邻汉字写法（`TP为12.5`）；`HTTP`/`TPU` 等不误报。`test_tc024_tp_with_number_should_be_blocked` 已解除 xfail(strict) 并新增 `该基金TP为12.5元` 变体。
 - **DEF-002 已修复**（commit 8632996）：`query_sanitized`/`pii_detected`/`language` 声明进 `AssistantState`（`pii_detected` 为 `detect_pii` 结果列表）；`AuditQuery` 新增 `sanitized`/`pii`/`language`，`AuditLogger` 从 state 填充，审计库经 `payload_json` 透明携带（无需改 SQLite 表结构）；`test_tc028_injection_flag_should_persist_in_state` 已解除 xfail 并扩展断言至审计链路。
 
-## 五、执行汇总（2026-09-30 复核更新；2026-09-26 战役记录原样保留）
+修复记录（2026-09-30 演练批次，编号沿本表续编；全量守护见 652-passed 基线）：
+- **DEF-003 已修复**（adb6838）：`CitationExtractor.extract` 增加 `answer` 参数，`_extract_quote` 答案事实感知选句（事实句优先、无事实句回退纯查询重叠）；`extract_citations` 节点传入 `STATE_FINAL_ANSWER`。守护：`TestVerify::test_citation_quote_prefers_sentence_backing_answer_fact`（含回归锚：无答案时引导句仍胜出）。
+- **DEF-004 已修复**（51b5495）：`tool_limit_response` 置 `verification={passed: False, issues: ["tool_limit_exceeded"], confidence: low}`；compose 对该标记保留兜底文案并清引用；API `cache.store` 门（verification.passed）随之自然排除该终态。守护：子图断言 + compose 保留文案断言。
+- **DEF-005 已修复**（97b8707）：`llm_plan_max_tokens` 384→640（`LLMConfig.plan_max_tokens` 与 `Settings.llm_plan_max_tokens` 同步），prompt 首行加"只输出一行紧凑 JSON"；配置守护（默认 640、范围 512~768）随实测证据重写。
+- **DEF-006 已修复**（f697e60 + 1305cd9）：合并 prompt 恢复"主题→数据源"映射指引与双源示例（模板预算 300→370 重校准，实测 361，总上限 700 未破）；`planner` 增加意图必需源底线补步（`_INTENT_REQUIRED_SOURCES` / `_QUERY_TYPE_REQUIRED_SOURCES`，白名单外不补、已含不补、补步走统一富化）。守护：`TestPlannerIntentSourceFloor` 4 例。
+
+## 五、执行汇总（2026-09-30 演练日复核更新；2026-09-26 战役记录原样保留）
+
+### 2026-09-30 演练日复核（HEAD `1305cd9`）
+
+- `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 uv run python -m pytest tests/e2e -q` → **77 passed,
+  1 warning in 9.03s**；全量 `uv run python -m pytest -q` → **652 passed**（36.06s，较 645 基线
+  新增 4 个当日演练缺陷守护 + 3 个 prompt/预算断言）。
+- 同日实机演练（S1~S5）暴露并修复 4 个缺陷，与本集直接相关的是 **DEF-004**（tool_limit 终态
+  曾被语义缓存，违反本集 TC-034 的"仅成功终态入库"语义——TC-032~035 的显式 enabled 实例契约
+  不变，缓存默认启用后的行为守护见 DC-024~027 与 `51b5495`）。演练全记录见
+  [agent-domain-test-cases.md](./agent-domain-test-cases.md) §四。
 
 ### 2026-09-30 复核（ISSUE-9~28 批次后）
 
