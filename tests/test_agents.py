@@ -1731,6 +1731,11 @@ class TestRoleAwareTools:
         assert result[STATE_TOOL_MESSAGE_CURSOR] == len(result[STATE_MESSAGES])
         assert "工具调用次数达到上限" in result[STATE_FINAL_ANSWER]
         assert result[STATE_INTERMEDIATE_STEPS][-1]["success"] is False
+        # fail-closed 终态必须 verification 失败：审计如实记录 + API 缓存排除
+        verification = result[STATE_VERIFICATION]
+        assert verification["passed"] is False
+        assert verification["issues"] == ["tool_limit_exceeded"]
+        assert verification["confidence"] == CONFIDENCE_LOW
 
     def test_prepare_reason_includes_verification_feedback_on_retry(self):
         result = prepare_reason(_state(**{
@@ -1832,6 +1837,26 @@ class TestCompose:
         assert RESTRICTED_TEXT not in result[STATE_FINAL_ANSWER]
         assert result[STATE_CONFIDENCE] == CONFIDENCE_LOW
         assert result[STATE_CITATIONS] == []
+
+    def test_tool_limit_terminal_keeps_canned_answer_and_clears_citations(self):
+        state = _state(**{
+            STATE_FINAL_ANSWER: _structure_answer(
+                "工具调用次数达到上限，无法安全完成当前请求。"
+            ),
+            STATE_CITATIONS: [{"source": "unrelated.pdf", "chunk_id": "c1"}],
+            STATE_VERIFICATION: {
+                "passed": False,
+                "issues": ["tool_limit_exceeded"],
+                "confidence": CONFIDENCE_LOW,
+            },
+            STATE_COMPLIANCE: {"passed": True, "risk_disclosure": ""},
+        })
+        result = compose(state)
+        # 工具上限的兜底文案本身就是安全终态，不得被改写成"验证未通过"
+        assert "工具调用次数达到上限" in result[STATE_FINAL_ANSWER]
+        assert "未通过来源或数字验证" not in result[STATE_FINAL_ANSWER]
+        assert result[STATE_CITATIONS] == []
+        assert result[STATE_CONFIDENCE] == CONFIDENCE_LOW
 
     def test_retrieval_results_replace_after_explicit_accumulation(self):
         from langgraph.graph import END, START, StateGraph

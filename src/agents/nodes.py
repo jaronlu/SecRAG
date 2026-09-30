@@ -1404,12 +1404,20 @@ def tool_limit_response(state: AssistantState) -> dict[str, Any]:
         )
         for message in limit_tool_messages
     )
+    # verification 置为失败（tool_limit_exceeded）：与 no_results_response 同契约——
+    # 一是审计如实记录本轮没有产出经过验证的回答；二是 API 只缓存 verification
+    # 与 compliance 均通过的终态，避免把 fail-closed 兜底文案当作可复用答案
     return {
         STATE_MESSAGES: limit_messages,
         STATE_TOOL_CALLS: tool_calls,
         STATE_TOOL_MESSAGE_CURSOR: len(messages) + len(limit_messages),
         STATE_FINAL_ANSWER: answer,
         STATE_INTERMEDIATE_STEPS: _reason_trace(state, success=False),
+        STATE_VERIFICATION: {
+            "passed": False,
+            "issues": ["tool_limit_exceeded"],
+            "confidence": CONFIDENCE_LOW,
+        },
     }
 
 
@@ -1573,8 +1581,15 @@ def compose(state: AssistantState) -> dict[str, Any]:
     suitability = compliance.get("suitability_warning", "")
     verification_passed = state.get(STATE_VERIFICATION, {}).get("passed", False)
     compliance_passed = compliance.get("passed", False)
+    verification_issues = state.get(STATE_VERIFICATION, {}).get("issues", [])
+    tool_limit_exceeded = "tool_limit_exceeded" in verification_issues
+    # 工具上限终态的文案本身就是安全兜底，保留原文；verification 已置失败，
+    # 供审计如实记录并让 API 缓存排除该终态（与 no_results_response 同契约）
+    if tool_limit_exceeded:
+        # 兜底文案不引用任何证据，检索阶段的引用一并清空
+        citations = []
     # 验证不通过时，直接替换为安全提示，并清空引用，避免继续传播不可靠答案
-    if not verification_passed:
+    elif not verification_passed:
         answer = "当前答案未通过来源或数字验证，无法安全返回。请补充可验证资料后重试。"
         citations = []
     # 合规不通过时，停止输出，但保留风险提示/适当性警告作为最终兜底说明
