@@ -46,7 +46,16 @@ def _structured_metadata_evidence(metadata: dict) -> str:
 
 
 class CitationExtractor:
-    def extract(self, retrieval_results: list[RetrievalResult], query: str) -> list[CitationDict]:
+    # 答案中的事实 token：R2/C2 等等级代号、20.83 等数字、EPS 等术语。
+    # 引用 quote 必须支撑答案使用的事实，不能只按查询词重叠选句
+    _ANSWER_FACT_TOKEN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9.]*%?")
+
+    def extract(
+        self,
+        retrieval_results: list[RetrievalResult],
+        query: str,
+        answer: str | None = None,
+    ) -> list[CitationDict]:
         """提取引用，编号与 prompt 中的来源序号对齐。
 
         issues.md 一.7：prompt 按检索结果顺序给证据编号 [来源1..N]，
@@ -61,7 +70,7 @@ class CitationExtractor:
             if index > 5:
                 break
             metadata = result.get(RR_METADATA, {})
-            quote = self._extract_quote(result.get(RR_CONTENT, ""), query)
+            quote = self._extract_quote(result.get(RR_CONTENT, ""), query, answer)
             structured_evidence = self._structured_evidence(metadata)
             if structured_evidence:
                 quote = f"{quote}\n结构化证据：{structured_evidence}"
@@ -92,15 +101,38 @@ class CitationExtractor:
     def _normalize_evidence(self, evidence: str) -> str:
         return re.sub(r"\s+", "", evidence).lower()
 
-    def _extract_quote(self, content: str, query: str) -> str:
+    def _extract_quote(self, content: str, query: str, answer: str | None = None) -> str:
         sentences = [part.strip() for part in re.split(r"[。；\n]", content) if part.strip()]
         if not sentences:
             return content[:200]
         terms = {term.lower() for term in re.findall(r"[A-Za-z0-9_]+|[\u4e00-\u9fff]", query)}
-        return max(
-            sentences,
-            key=lambda sentence: sum(term in sentence.lower() for term in terms),
-        )[:200]
+        # 答案使用的事实 token（R2/C2/20.83/EPS 等）必须能被可见引用支撑：
+        # 含事实 token 的句子加权，避免按查询词重叠选中只含产品名的引导句
+        fact_tokens = {
+            token.lower()
+            for token in self._ANSWER_FACT_TOKEN_RE.findall(answer or "")
+            if len(token) >= 2
+        }
+
+        def sentence_score(sentence: str) -> int:
+            lowered = sentence.lower()
+            return sum(term in lowered for term in terms) + 2 * sum(
+                token in lowered for token in fact_tokens
+            )
+
+        # 答案使用了事实 token 时，只在含事实 token 的句子里选（引用必须支撑
+        # 答案事实，长产品名引导句的查询词重叠不该赢过直接支撑句）；
+        # 事实 token 在证据里全缺失（如工具计算的数字）则回退纯查询重叠
+        if fact_tokens:
+            fact_backed = [
+                sentence
+                for sentence in sentences
+                if any(token in sentence.lower() for token in fact_tokens)
+            ]
+            if fact_backed:
+                sentences = fact_backed
+
+        return max(sentences, key=sentence_score)[:200]
 
 
 class SourceVerifier:
