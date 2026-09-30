@@ -1,0 +1,285 @@
+{
+  "schema_version": 1,
+  "mode": "flowchart",
+  "template_type": "flowchart",
+  "style": 1,
+  "width": 960,
+  "height": 800,
+  "title": "知识入库链路：从文件到可检索 chunk",
+  "subtitle": "预检 → 快照 → 解析分块 → 向量化 → ChromaDB 写入 → registry 状态机",
+  "text_policy": "strict",
+  "legend_orientation": "vertical",
+  "legend_x": 540,
+  "legend_y": 680,
+  "legend_locked": true,
+  "legend": [
+    {
+      "flow": "control",
+      "label": "入库主链路"
+    },
+    {
+      "flow": "neutral",
+      "label": "校验失败短路"
+    }
+  ],
+  "footer": "SecRAG · 知识入库",
+  "footer_y": 776,
+  "nodes": [
+    {
+      "id": "a",
+      "kind": "rect",
+      "x": 60,
+      "y": 110,
+      "width": 340,
+      "height": 60,
+      "type_label": "INPUT",
+      "label": "文件 + .meta.json"
+    },
+    {
+      "id": "b",
+      "kind": "rect",
+      "x": 60,
+      "y": 188,
+      "width": 340,
+      "height": 60,
+      "type_label": "PRECHECK",
+      "label": "分类预检",
+      "sublabel": "路径安全 / manifest 校验"
+    },
+    {
+      "id": "c",
+      "kind": "rect",
+      "x": 60,
+      "y": 266,
+      "width": 340,
+      "height": 60,
+      "type_label": "SNAPSHOT",
+      "label": "建立任务快照",
+      "sublabel": "状态 queued"
+    },
+    {
+      "id": "d",
+      "kind": "rect",
+      "x": 60,
+      "y": 344,
+      "width": 340,
+      "height": 60,
+      "type_label": "LEASE",
+      "label": "worker 领取任务",
+      "sublabel": "租约 + 心跳续约"
+    },
+    {
+      "id": "e",
+      "kind": "hexagon",
+      "x": 60,
+      "y": 422,
+      "width": 340,
+      "height": 60,
+      "type_label": "RECHECK",
+      "label": "执行时快照复检",
+      "sublabel": "哈希 / 路径 / doc_type"
+    },
+    {
+      "id": "g",
+      "kind": "rect",
+      "x": 60,
+      "y": 546,
+      "width": 340,
+      "height": 60,
+      "type_label": "PARSE",
+      "label": "按后缀解析为 Document"
+    },
+    {
+      "id": "h",
+      "kind": "rect",
+      "x": 60,
+      "y": 624,
+      "width": 340,
+      "height": 60,
+      "type_label": "CHUNK",
+      "label": "按 doc_type 分块"
+    },
+    {
+      "id": "i",
+      "kind": "rect",
+      "x": 60,
+      "y": 702,
+      "width": 340,
+      "height": 60,
+      "type_label": "NORMALIZE",
+      "label": "normalize_chunks",
+      "sublabel": "补齐 doc_id / chunk_id / 权限 / 版本"
+    },
+    {
+      "id": "j",
+      "kind": "rect",
+      "x": 520,
+      "y": 110,
+      "width": 360,
+      "height": 60,
+      "type_label": "EMBED",
+      "label": "embedding 向量化",
+      "sublabel": "模型一致性校验"
+    },
+    {
+      "id": "k",
+      "kind": "rect",
+      "x": 520,
+      "y": 188,
+      "width": 360,
+      "height": 60,
+      "type_label": "UPSERT",
+      "label": "ChromaDB upsert 新 chunk"
+    },
+    {
+      "id": "l",
+      "kind": "rect",
+      "x": 520,
+      "y": 266,
+      "width": 360,
+      "height": 60,
+      "type_label": "STALE",
+      "label": "删除旧 doc_id 的 stale chunk"
+    },
+    {
+      "id": "m",
+      "kind": "rect",
+      "x": 520,
+      "y": 344,
+      "width": 360,
+      "height": 60,
+      "type_label": "REGISTRY",
+      "label": "registry 记录动作",
+      "sublabel": "created / skipped / replaced / archived / failed"
+    },
+    {
+      "id": "n",
+      "kind": "rect",
+      "x": 520,
+      "y": 422,
+      "width": 360,
+      "height": 60,
+      "type_label": "CACHE",
+      "label": "invalidate_retrieval_caches"
+    },
+    {
+      "id": "f",
+      "kind": "rect",
+      "x": 520,
+      "y": 546,
+      "width": 380,
+      "height": 60,
+      "type_label": "FAILED",
+      "label": "动作 failed",
+      "sublabel": "unsafe_source_path 或 source_changed_after_enqueue"
+    }
+  ],
+  "arrows": [
+    {
+      "id": "ab",
+      "source": "a",
+      "target": "b",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "bc",
+      "source": "b",
+      "target": "c",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "cd",
+      "source": "c",
+      "target": "d",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "de",
+      "source": "d",
+      "target": "e",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "ef",
+      "source": "e",
+      "target": "f",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "neutral",
+      "label": "失败"
+    },
+    {
+      "id": "eg",
+      "source": "e",
+      "target": "g",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control",
+      "label": "通过"
+    },
+    {
+      "id": "gh",
+      "source": "g",
+      "target": "h",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "hi",
+      "source": "h",
+      "target": "i",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "ij",
+      "source": "i",
+      "target": "j",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "jk",
+      "source": "j",
+      "target": "k",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "kl",
+      "source": "k",
+      "target": "l",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "lm",
+      "source": "l",
+      "target": "m",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "mn",
+      "source": "m",
+      "target": "n",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    }
+  ]
+}

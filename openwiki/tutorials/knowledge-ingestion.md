@@ -179,22 +179,7 @@ ChromaDB 返回的 distance 会在 `ChromaVectorRetriever._format` 中转换成�
 
 ## 9. 一张图记住整条链路
 
-```mermaid
-flowchart TD
-    A["文件 + .meta.json"] --> B["分类预检：路径安全 / manifest 校验"]
-    B --> C["建立任务快照：状态 queued"]
-    C --> D["worker 领取任务：租约 + 心跳续约"]
-    D --> E["执行时快照复检：哈希 / 路径 / doc_type"]
-    E -- "失败" --> F["动作 failed：unsafe_source_path 或 source_changed_after_enqueue"]
-    E -- "通过" --> G["按后缀解析为 Document"]
-    G --> H["按 doc_type 分块"]
-    H --> I["normalize_chunks：补齐 doc_id / chunk_id / 权限 / 版本"]
-    I --> J["embedding 向量化：模型一致性校验"]
-    J --> K["ChromaDB upsert 新 chunk"]
-    K --> L["删除旧 doc_id 的 stale chunk"]
-    L --> M["registry 记录动作：created / skipped / replaced / archived / failed"]
-    M --> N["invalidate_retrieval_caches"]
-```
+![知识入库链路：从文件到可检索 chunk](../assets/knowledge-ingestion-pipeline.svg)
 
 图：文件从预检、快照、解析分块、元数据补齐、embedding、ChromaDB 写入到 registry 状态机的完整入库链路。
 
