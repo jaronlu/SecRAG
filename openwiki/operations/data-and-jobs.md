@@ -46,20 +46,7 @@ SecRAG 的离线数据链是一条「抓取 → 产物目录 → 每日扫描 �
 
 ## 1. 离线数据链总览
 
-```mermaid
-flowchart TD
-    FETCH["fetch_real_securities_data.py 批量抓取"] --> RESOLVE["运行时解析指数成分股"]
-    RESOLVE -->|"akshare / cninfo / efinance / baostock"| PROD["data/raw/real_securities_data 产物"]
-    PROD -->|".fetch_state.json 水位 + .fetch_failures.json 失败清单"| FETCH
-    PROD --> SCAN["run_daily_scan 每日扫描"]
-    PORTFOLIO["SQLitePortfolioStore 持仓/关注池"] --> SCAN
-    SCAN --> CAND["收集三类候选：文档元数据 / 行情 CSV / 研报索引"]
-    CAND --> GRADE["事件分级 P0 / P1 / P2"]
-    GRADE --> STORE["SQLiteDailyScanStore 事件卡片落库"]
-    STORE -->|"P0/P1 供下游消费"| BRIEF["下游简报"]
-    STORE -->|"P2 入库但 filtered，保留滤除原因"| AUDIT["审计可追溯"]
-    STORE -->|"每用户水位 daily_scan_runs"| WM["次日对照"]
-```
+![数据抓取与每日扫描任务流](../assets/data-and-jobs-pipeline.svg)
 
 离线数据链：抓取脚本把公开数据写入产物目录并留下水位与失败清单；每日扫描按用户持仓把产物分级成事件卡片，P0/P1 供下游消费、P2 保留供审计，每次运行在 `scan.db` 留下按用户的水位。
 

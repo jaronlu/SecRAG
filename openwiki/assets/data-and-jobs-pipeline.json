@@ -1,0 +1,245 @@
+{
+  "schema_version": 1,
+  "mode": "flowchart",
+  "template_type": "flowchart",
+  "style": 1,
+  "width": 960,
+  "height": 790,
+  "title": "数据抓取与每日扫描任务流",
+  "subtitle": "fetch 抓取回环（水位 / 失败清单）与 run_daily_scan 事件分级落库",
+  "text_policy": "strict",
+  "legend_orientation": "vertical",
+  "legend_x": 52,
+  "legend_y": 500,
+  "legend_locked": true,
+  "legend": [
+    {
+      "flow": "control",
+      "label": "任务 / 数据流向"
+    },
+    {
+      "flow": "feedback",
+      "label": "抓取状态回写"
+    },
+    {
+      "flow": "neutral",
+      "label": "入库留痕 / 对照"
+    }
+  ],
+  "footer": "SecRAG · 数据管道与每日扫描",
+  "footer_y": 762,
+  "nodes": [
+    {
+      "id": "fetch",
+      "kind": "rect",
+      "x": 50,
+      "y": 140,
+      "width": 320,
+      "height": 64,
+      "type_label": "FETCH",
+      "label": "fetch_real_securities_data.py",
+      "sublabel": "批量抓取"
+    },
+    {
+      "id": "resolve",
+      "kind": "rect",
+      "x": 50,
+      "y": 252,
+      "width": 320,
+      "height": 64,
+      "type_label": "RESOLVE",
+      "label": "运行时解析指数成分股",
+      "sublabel": "akshare / cninfo / efinance / baostock"
+    },
+    {
+      "id": "prod",
+      "kind": "rect",
+      "x": 50,
+      "y": 356,
+      "width": 320,
+      "height": 64,
+      "type_label": "ARTIFACT",
+      "label": "data/raw/real_securities_data",
+      "sublabel": ".fetch_state.json / .fetch_failures.json"
+    },
+    {
+      "id": "portfolio",
+      "kind": "rect",
+      "x": 480,
+      "y": 140,
+      "width": 320,
+      "height": 64,
+      "type_label": "STATE",
+      "label": "SQLitePortfolioStore",
+      "sublabel": "持仓 / 关注池"
+    },
+    {
+      "id": "scan",
+      "kind": "rect",
+      "x": 490,
+      "y": 252,
+      "width": 300,
+      "height": 64,
+      "type_label": "SCAN",
+      "label": "run_daily_scan",
+      "sublabel": "每日扫描"
+    },
+    {
+      "id": "cand",
+      "kind": "rect",
+      "x": 480,
+      "y": 364,
+      "width": 320,
+      "height": 64,
+      "type_label": "CANDIDATES",
+      "label": "收集三类候选",
+      "sublabel": "文档元数据 / 行情 CSV / 研报索引"
+    },
+    {
+      "id": "grade",
+      "kind": "hexagon",
+      "x": 500,
+      "y": 476,
+      "width": 280,
+      "height": 56,
+      "type_label": "GRADE",
+      "label": "事件分级",
+      "sublabel": "P0 / P1 / P2"
+    },
+    {
+      "id": "store",
+      "kind": "rect",
+      "x": 490,
+      "y": 580,
+      "width": 300,
+      "height": 64,
+      "type_label": "STORE",
+      "label": "SQLiteDailyScanStore",
+      "sublabel": "事件卡片落库"
+    },
+    {
+      "id": "brief",
+      "kind": "rect",
+      "x": 40,
+      "y": 688,
+      "width": 250,
+      "height": 56,
+      "type_label": "DOWNSTREAM",
+      "label": "下游简报"
+    },
+    {
+      "id": "audit",
+      "kind": "rect",
+      "x": 340,
+      "y": 688,
+      "width": 290,
+      "height": 56,
+      "type_label": "AUDIT",
+      "label": "审计可追溯"
+    },
+    {
+      "id": "wm",
+      "kind": "rect",
+      "x": 680,
+      "y": 688,
+      "width": 260,
+      "height": 56,
+      "type_label": "WATERMARK",
+      "label": "次日对照"
+    }
+  ],
+  "arrows": [
+    {
+      "id": "e1",
+      "source": "fetch",
+      "target": "resolve",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "e2",
+      "source": "resolve",
+      "target": "prod",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "e3",
+      "source": "prod",
+      "target": "fetch",
+      "source_port": "left",
+      "target_port": "left",
+      "flow": "feedback",
+      "label": "水位 + 失败清单回写"
+    },
+    {
+      "id": "e4",
+      "source": "prod",
+      "target": "scan",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "e5",
+      "source": "portfolio",
+      "target": "scan",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "e6",
+      "source": "scan",
+      "target": "cand",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "e7",
+      "source": "cand",
+      "target": "grade",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "e8",
+      "source": "grade",
+      "target": "store",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "e9",
+      "source": "store",
+      "target": "brief",
+      "source_port": "left",
+      "target_port": "top",
+      "flow": "control",
+      "label": "P0/P1 供下游消费"
+    },
+    {
+      "id": "e10",
+      "source": "store",
+      "target": "audit",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "neutral",
+      "label": "P2 入库但 filtered，保留滤除原因"
+    },
+    {
+      "id": "e11",
+      "source": "store",
+      "target": "wm",
+      "source_port": "right",
+      "target_port": "top",
+      "flow": "neutral",
+      "label": "每用户水位 daily_scan_runs"
+    }
+  ]
+}

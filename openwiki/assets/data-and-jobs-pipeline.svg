@@ -1,0 +1,151 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 790" width="960" height="790" data-generator="fireworks-tech-graph" data-schema-version="1" data-text-metrics="heuristic-v1" data-style-id="1" data-visual-theme="Flat Icon" data-diagram-type="flowchart" data-motion-scene="" data-semantic-profile="generic" data-semantic-valid="true" data-quality-profile="standard" data-max-bends-per-edge="12" data-max-total-bends="100" data-max-route-stretch="5.0" data-max-bridged-crossings="8" data-min-node-gap="0.0" data-min-container-gutter="0.0" data-min-label-clearance="2.0" data-min-segment-length="0.0">
+  <defs>
+    <marker id="arrowA" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#7c3aed"/>
+    </marker>
+    <marker id="arrowB" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#10b981"/>
+    </marker>
+    <marker id="arrowC" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/>
+    </marker>
+    <marker id="arrowE" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f97316"/>
+    </marker>
+    <marker id="arrowF" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#7c3aed"/>
+    </marker>
+    <marker id="arrowG" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ef4444"/>
+    </marker>
+    <marker id="arrowH" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#6b7280"/>
+    </marker>
+    <filter id="shadowSoft" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.12"/>
+    </filter>
+    <filter id="shadowGlass" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#020617" flood-opacity="0.28"/>
+    </filter>
+    <style>
+    text { font-family: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Noto Sans CJK SC', 'Microsoft YaHei', 'Microsoft JhengHei', 'SimHei', sans-serif; }
+    .title { font-size: 30px; font-weight: 700; fill: #111827; }
+    .subtitle { font-size: 14px; font-weight: 500; fill: #6b7280; }
+    .section { font-size: 13px; font-weight: 700; fill: #2563eb; letter-spacing: 1.4px; }
+    .section-sub { font-size: 12px; font-weight: 500; fill: #64748b; }
+    .node-title { font-weight: 700; fill: #111827; }
+    .node-sub { font-weight: 500; fill: #6b7280; }
+    .node-type { font-size: 12px; font-weight: 700; fill: #64748b; letter-spacing: 0.08em; }
+    .arrow-label { font-size: 12px; font-weight: 600; fill: #6b7280; }
+    .legend { font-size: 12px; font-weight: 500; fill: #6b7280; }
+    .footnote { font-size: 12px; font-weight: 500; fill: #64748b; }
+    .metric-label { font-size: 8.5px; font-weight: 700; fill: #64748b; text-transform: uppercase; }
+    .metric-value { font-size: 9.5px; font-weight: 700; fill: #111827; }
+    </style>
+  </defs>
+  <rect data-graph-role="background" width="960.0" height="790.0" fill="#ffffff"/>
+  <text x="480.0" y="56" text-anchor="middle" class="title">数据抓取与每日扫描任务流</text>
+  <text x="480.0" y="82" text-anchor="middle" class="subtitle">fetch 抓取回环（水位 / 失败清单）与 run_daily_scan 事件分级落库</text>
+  <path id="e1" data-graph-role="edge" data-edge-id="e1" data-source="fetch" data-target="resolve" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 210,204 L 210,252" fill="none" stroke="#7c3aed" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="e2" data-graph-role="edge" data-edge-id="e2" data-source="resolve" data-target="prod" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 210,316 L 210,356" fill="none" stroke="#7c3aed" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="e3" data-graph-role="edge" data-edge-id="e3" data-source="prod" data-target="fetch" data-edge-kind="flow" data-topic-id="" data-flow="feedback" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="2" data-route-stretch="1.222" data-bridges="" d="M 50,388 L 26,388 L 26,172 L 50,172" fill="none" stroke="#ef4444" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowG)"/>
+  <path id="e4" data-graph-role="edge" data-edge-id="e4" data-source="prod" data-target="scan" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="2" data-route-stretch="1.0" data-bridges="" d="M 370,388 L 394,388 L 394,284 L 490,284" fill="none" stroke="#7c3aed" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="e5" data-graph-role="edge" data-edge-id="e5" data-source="portfolio" data-target="scan" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 640,204 L 640,252" fill="none" stroke="#7c3aed" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="e6" data-graph-role="edge" data-edge-id="e6" data-source="scan" data-target="cand" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 640,316 L 640,364" fill="none" stroke="#7c3aed" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="e7" data-graph-role="edge" data-edge-id="e7" data-source="cand" data-target="grade" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 640,428 L 640,476" fill="none" stroke="#7c3aed" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="e8" data-graph-role="edge" data-edge-id="e8" data-source="grade" data-target="store" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 640,532 L 640,580" fill="none" stroke="#7c3aed" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="e9" data-graph-role="edge" data-edge-id="e9" data-source="store" data-target="brief" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="1" data-route-stretch="1.0" data-bridges="" d="M 490,612 L 165,612 L 165,688" fill="none" stroke="#7c3aed" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="e10" data-graph-role="edge" data-edge-id="e10" data-source="store" data-target="audit" data-edge-kind="flow" data-topic-id="" data-flow="neutral" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="2" data-route-stretch="1.0" data-bridges="" d="M 640,644 L 640,664 L 485,664 L 485,688" fill="none" stroke="#6b7280" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowH)"/>
+  <path id="e11" data-graph-role="edge" data-edge-id="e11" data-source="store" data-target="wm" data-edge-kind="flow" data-topic-id="" data-flow="neutral" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="1" data-route-stretch="1.0" data-bridges="" d="M 790,612 L 810,612 L 810,688" fill="none" stroke="#6b7280" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowH)"/>
+  <g id="node-fetch" data-graph-role="node" data-node-id="fetch" data-semantic-role="rect" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="50,140,370,204">
+  <rect x="50.0" y="140.0" width="320.0" height="64.0" rx="10.0" fill="#ffffff" stroke="#d1d5db" stroke-width="1.8" filter="url(#shadowSoft)"/>
+  <text x="210.0" y="158.0" text-anchor="middle" class="node-type">FETCH</text>
+  <text data-text-role="title" data-full-text="fetch_real_securities_data.py" data-text-max-width="296.0" x="210.0" y="178.0" text-anchor="middle" class="node-title" font-size="17.36">fetch_real_securities_data.py</text>
+  <text data-text-role="subtitle" data-full-text="批量抓取" data-text-max-width="296.0" x="210.0" y="200.0" text-anchor="middle" class="node-sub" font-size="12">批量抓取</text>
+  </g>
+  <g id="node-resolve" data-graph-role="node" data-node-id="resolve" data-semantic-role="rect" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="50,252,370,316">
+  <rect x="50.0" y="252.0" width="320.0" height="64.0" rx="10.0" fill="#ffffff" stroke="#d1d5db" stroke-width="1.8" filter="url(#shadowSoft)"/>
+  <text x="210.0" y="270.0" text-anchor="middle" class="node-type">RESOLVE</text>
+  <text data-text-role="title" data-full-text="运行时解析指数成分股" data-text-max-width="296.0" x="210.0" y="290.0" text-anchor="middle" class="node-title" font-size="18">运行时解析指数成分股</text>
+  <text data-text-role="subtitle" data-full-text="akshare / cninfo / efinance / baostock" data-text-max-width="296.0" x="210.0" y="312.0" text-anchor="middle" class="node-sub" font-size="12">akshare / cninfo / efinance / baostock</text>
+  </g>
+  <g id="node-prod" data-graph-role="node" data-node-id="prod" data-semantic-role="rect" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="50,356,370,420">
+  <rect x="50.0" y="356.0" width="320.0" height="64.0" rx="10.0" fill="#ffffff" stroke="#d1d5db" stroke-width="1.8" filter="url(#shadowSoft)"/>
+  <text x="210.0" y="374.0" text-anchor="middle" class="node-type">ARTIFACT</text>
+  <text data-text-role="title" data-full-text="data/raw/real_securities_data" data-text-max-width="296.0" x="210.0" y="394.0" text-anchor="middle" class="node-title" font-size="17.08">data/raw/real_securities_data</text>
+  <text data-text-role="subtitle" data-full-text=".fetch_state.json / .fetch_failures.json" data-text-max-width="296.0" x="210.0" y="416.0" text-anchor="middle" class="node-sub" font-size="12">.fetch_state.json / .fetch_failures.json</text>
+  </g>
+  <g id="node-portfolio" data-graph-role="node" data-node-id="portfolio" data-semantic-role="rect" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="480,140,800,204">
+  <rect x="480.0" y="140.0" width="320.0" height="64.0" rx="10.0" fill="#ffffff" stroke="#d1d5db" stroke-width="1.8" filter="url(#shadowSoft)"/>
+  <text x="640.0" y="158.0" text-anchor="middle" class="node-type">STATE</text>
+  <text data-text-role="title" data-full-text="SQLitePortfolioStore" data-text-max-width="296.0" x="640.0" y="178.0" text-anchor="middle" class="node-title" font-size="18">SQLitePortfolioStore</text>
+  <text data-text-role="subtitle" data-full-text="持仓 / 关注池" data-text-max-width="296.0" x="640.0" y="200.0" text-anchor="middle" class="node-sub" font-size="12">持仓 / 关注池</text>
+  </g>
+  <g id="node-scan" data-graph-role="node" data-node-id="scan" data-semantic-role="rect" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="490,252,790,316">
+  <rect x="490.0" y="252.0" width="300.0" height="64.0" rx="10.0" fill="#ffffff" stroke="#d1d5db" stroke-width="1.8" filter="url(#shadowSoft)"/>
+  <text x="640.0" y="270.0" text-anchor="middle" class="node-type">SCAN</text>
+  <text data-text-role="title" data-full-text="run_daily_scan" data-text-max-width="276.0" x="640.0" y="290.0" text-anchor="middle" class="node-title" font-size="18">run_daily_scan</text>
+  <text data-text-role="subtitle" data-full-text="每日扫描" data-text-max-width="276.0" x="640.0" y="312.0" text-anchor="middle" class="node-sub" font-size="12">每日扫描</text>
+  </g>
+  <g id="node-cand" data-graph-role="node" data-node-id="cand" data-semantic-role="rect" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="480,364,800,428">
+  <rect x="480.0" y="364.0" width="320.0" height="64.0" rx="10.0" fill="#ffffff" stroke="#d1d5db" stroke-width="1.8" filter="url(#shadowSoft)"/>
+  <text x="640.0" y="382.0" text-anchor="middle" class="node-type">CANDIDATES</text>
+  <text data-text-role="title" data-full-text="收集三类候选" data-text-max-width="296.0" x="640.0" y="402.0" text-anchor="middle" class="node-title" font-size="18">收集三类候选</text>
+  <text data-text-role="subtitle" data-full-text="文档元数据 / 行情 CSV / 研报索引" data-text-max-width="296.0" x="640.0" y="424.0" text-anchor="middle" class="node-sub" font-size="12">文档元数据 / 行情 CSV / 研报索引</text>
+  </g>
+  <g id="node-grade" data-graph-role="node" data-node-id="grade" data-semantic-role="hexagon" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="500,476,780,532">
+  <path d="M 522.0 476.0 L 758.0 476.0 L 780.0 504.0 L 758.0 532.0 L 522.0 532.0 L 500.0 504.0 Z" fill="#ffffff" stroke="#d1d5db" stroke-width="2.0" filter="url(#shadowSoft)"/>
+  <text x="640.0" y="494.0" text-anchor="middle" class="node-type">GRADE</text>
+  <text data-text-role="title" data-full-text="事件分级" data-text-max-width="228.0" x="640.0" y="510.0" text-anchor="middle" class="node-title" font-size="18">事件分级</text>
+  <text data-text-role="subtitle" data-full-text="P0 / P1 / P2" data-text-max-width="228.0" x="640.0" y="532.0" text-anchor="middle" class="node-sub" font-size="12">P0 / P1 / P2</text>
+  </g>
+  <g id="node-store" data-graph-role="node" data-node-id="store" data-semantic-role="rect" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="490,580,790,644">
+  <rect x="490.0" y="580.0" width="300.0" height="64.0" rx="10.0" fill="#ffffff" stroke="#d1d5db" stroke-width="1.8" filter="url(#shadowSoft)"/>
+  <text x="640.0" y="598.0" text-anchor="middle" class="node-type">STORE</text>
+  <text data-text-role="title" data-full-text="SQLiteDailyScanStore" data-text-max-width="276.0" x="640.0" y="618.0" text-anchor="middle" class="node-title" font-size="18">SQLiteDailyScanStore</text>
+  <text data-text-role="subtitle" data-full-text="事件卡片落库" data-text-max-width="276.0" x="640.0" y="640.0" text-anchor="middle" class="node-sub" font-size="12">事件卡片落库</text>
+  </g>
+  <g id="node-brief" data-graph-role="node" data-node-id="brief" data-semantic-role="rect" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="40,688,290,744">
+  <rect x="40.0" y="688.0" width="250.0" height="56.0" rx="10.0" fill="#ffffff" stroke="#d1d5db" stroke-width="1.8" filter="url(#shadowSoft)"/>
+  <text x="165.0" y="706.0" text-anchor="middle" class="node-type">DOWNSTREAM</text>
+  <text data-text-role="title" data-full-text="下游简报" data-text-max-width="226.0" x="165.0" y="722.0" text-anchor="middle" class="node-title" font-size="18">下游简报</text>
+  </g>
+  <g id="node-audit" data-graph-role="node" data-node-id="audit" data-semantic-role="rect" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="340,688,630,744">
+  <rect x="340.0" y="688.0" width="290.0" height="56.0" rx="10.0" fill="#ffffff" stroke="#d1d5db" stroke-width="1.8" filter="url(#shadowSoft)"/>
+  <text x="485.0" y="706.0" text-anchor="middle" class="node-type">AUDIT</text>
+  <text data-text-role="title" data-full-text="审计可追溯" data-text-max-width="266.0" x="485.0" y="722.0" text-anchor="middle" class="node-title" font-size="18">审计可追溯</text>
+  </g>
+  <g id="node-wm" data-graph-role="node" data-node-id="wm" data-semantic-role="rect" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="680,688,940,744">
+  <rect x="680.0" y="688.0" width="260.0" height="56.0" rx="10.0" fill="#ffffff" stroke="#d1d5db" stroke-width="1.8" filter="url(#shadowSoft)"/>
+  <text x="810.0" y="706.0" text-anchor="middle" class="node-type">WATERMARK</text>
+  <text data-text-role="title" data-full-text="次日对照" data-text-max-width="236.0" x="810.0" y="722.0" text-anchor="middle" class="node-title" font-size="18">次日对照</text>
+  </g>
+  <g id="e3-label" data-graph-role="label" data-owner="e3" data-graph-bounds="29,327.2,154.6,347.2">
+  <rect x="29.0" y="327.2" width="125.60000000000001" height="20" rx="6" fill="#ffffff" opacity="0.94"/>
+  <text x="91.8" y="341.2" text-anchor="middle" class="arrow-label">水位 + 失败清单回写</text>
+  </g>
+  <g id="e9-label" data-graph-role="label" data-owner="e9" data-graph-bounds="270.94,581,384.06,601">
+  <rect x="270.94" y="581.0" width="113.12" height="20" rx="6" fill="#ffffff" opacity="0.94"/>
+  <text x="327.5" y="595.0" text-anchor="middle" class="arrow-label">P0/P1 供下游消费</text>
+  </g>
+  <g id="e10-label" data-graph-role="label" data-owner="e10" data-graph-bounds="459.5,651,665.5,671">
+  <rect x="459.5" y="651.0" width="206.0" height="20" rx="6" fill="#ffffff" opacity="0.94"/>
+  <text x="562.5" y="665.0" text-anchor="middle" class="arrow-label">P2 入库但 filtered，保留滤除原因</text>
+  </g>
+  <g id="e11-label" data-graph-role="label" data-owner="e11" data-graph-bounds="721.76,654,898.24,674">
+  <rect x="721.76" y="654.0" width="176.48000000000002" height="20" rx="6" fill="#ffffff" opacity="0.94"/>
+  <text x="810.0" y="668.0" text-anchor="middle" class="arrow-label">每用户水位 daily_scan_runs</text>
+  </g>
+  <g id="legend" data-graph-role="legend">
+    <rect id="legend-zone" data-graph-role="reserved" data-reserved-kind="legend" x="42" y="486" width="159.6" height="90" rx="10" fill="none" stroke="none"/>
+    <line data-graph-role="decoration" x1="52.0" y1="500.0" x2="82.0" y2="500.0" stroke="#7c3aed" stroke-width="2.4" marker-end="url(#arrowA)"/>
+    <text data-graph-role="decoration" x="92.0" y="504.0" class="legend">任务 / 数据流向</text>
+    <line data-graph-role="decoration" x1="52.0" y1="522.0" x2="82.0" y2="522.0" stroke="#ef4444" stroke-width="2.4" marker-end="url(#arrowG)"/>
+    <text data-graph-role="decoration" x="92.0" y="526.0" class="legend">抓取状态回写</text>
+    <line data-graph-role="decoration" x1="52.0" y1="544.0" x2="82.0" y2="544.0" stroke="#6b7280" stroke-width="2.4" marker-end="url(#arrowH)"/>
+    <text data-graph-role="decoration" x="92.0" y="548.0" class="legend">入库留痕 / 对照</text>
+  </g>
+  <g id="footer" data-graph-role="reserved" data-graph-bounds="42,750,182,766">
+  <text x="42.0" y="762.0" class="footnote">SecRAG · 数据管道与每日扫描</text>
+  </g>
+</svg>
