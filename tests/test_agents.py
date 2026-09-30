@@ -83,6 +83,7 @@ from src.schemas.constants import (
     SOURCE_FAQ,
     SOURCE_PRODUCT,
     SOURCE_REPORT,
+    SOURCE_REGULATION,
     SOURCE_SQL,
     STATE_AUDIT_TRAIL,
     STATE_AMBIGUITY,
@@ -762,6 +763,11 @@ class TestPlanCallLatencyAccounting:
             assert key in prompts[0], f"压缩 prompt 不得丢掉 JSON 契约字段 {key}"
         assert SOURCE_PRODUCT in prompts[0]
         assert "贵州茅台2026年半年度报告" in prompts[0]
+        # 2026-09-30 演练 DEF-005 回归锚：ISSUE-11 合并 prompt 曾丢掉主题→数据源
+        # 映射指引，S2/S3/S4 计划全部塌缩为单源 product_search
+        assert "必含" in prompts[0]
+        for source in (SOURCE_PRODUCT, SOURCE_REGULATION, SOURCE_REPORT, SOURCE_FAQ):
+            assert source in prompts[0]
 
     def test_merged_prompt_bounded_for_max_length_query(self, monkeypatch):
         """最长允许查询下 prompt 仍有硬上限，prefill 不会无界增长。"""
