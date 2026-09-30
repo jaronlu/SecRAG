@@ -107,17 +107,24 @@ def test_llm_config_has_explicit_retry_and_token_budget_defaults():
     assert cfg.max_retries == 1
     assert cfg.max_tokens == 4096
     # ISSUE-23：理解/计划输出只有一个小 JSON，1024 的预算让模型有机会长输出，
-    # 实测单轮 5.9-17.0s；收紧到 384 封住补全时长
-    assert cfg.plan_max_tokens == 384
+    # 实测单轮 5.9-17.0s；ISSUE-23 收紧到 384
+    # 2026-09-30 实机演练：384 截断合并理解 JSON（实测 ~600 token）→ 单源
+    # 兜底，S2/S3/S4 计划塌成 product_search；640 覆盖实测输出
+    assert cfg.plan_max_tokens == 640
     # ISSUE-20：分层选型默认未配置（空串回落主模型），按 benchmark 结果在 .env 配置
     assert cfg.plan_model == ""
 
 
 def test_plan_max_tokens_budget_covers_the_plan_json():
-    """ISSUE-23：预算必须容得下理解+计划的 JSON，否则会截断成非法 JSON。"""
+    """ISSUE-23：预算必须容得下理解+计划的 JSON，否则截断成非法 JSON。
+
+    2026-09-30 实机演练：384 会截断合并理解的 pretty JSON（实测 ~600 token），
+    截断 → JSONDecodeError → 单源兜底，S2/S3/S4 计划全部塌成 product_search；
+    默认 640 覆盖实测输出（配单行紧凑指令后典型 ~300），上限放宽到 768。
+    """
     settings = _settings(_env_file=None, llm_provider="ollama")
 
-    assert 256 <= settings.llm_plan_max_tokens <= 512
+    assert 512 <= settings.llm_plan_max_tokens <= 768
 
 
 def test_semantic_cache_enabled_after_binding_conditions_landed():

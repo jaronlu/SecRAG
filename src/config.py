@@ -38,7 +38,10 @@ class LLMConfig(BaseModel):
     # 理解+计划合并调用的输出预算（ISSUE-11/14）：JSON 体积小，超预算截断
     # 走既有 JSONDecodeError 回退路径。
     # ISSUE-23：1024 让模型有机会长输出（实测单轮 5.9-17.0s），收紧到 384
-    plan_max_tokens: int = 384
+    # 2026-09-30 实机演练：384 截断合并理解 JSON（实测 ~600 token）→ 单源
+    # 兜底，S2/S3/S4 计划塌成 product_search；640 覆盖实测输出，
+    # 配单行紧凑 JSON 指令后典型 ~300
+    plan_max_tokens: int = 640
 
 
 class EmbeddingConfig(BaseModel):
@@ -84,7 +87,10 @@ class Settings(BaseSettings):
     llm_max_retries: int = 1
     llm_max_tokens: int = 4096
     # ISSUE-23：理解/计划输出只有一个小 JSON，1024 的预算放大了补全时长
-    llm_plan_max_tokens: int = 384
+    # 2026-09-30 实机演练：384 截断合并理解 JSON（pretty 输出实测 ~600 token），
+    # JSONDecodeError 走单源兜底 → S2/S3/S4 计划全部塌成 product_search；
+    # 640 覆盖实测输出上限，配单行紧凑 JSON 指令后典型 ~300
+    llm_plan_max_tokens: int = 640
 
     # OpenAI-compatible 配置（llm_provider = "openai" 时生效）
     openai_api_base: str = OPENAI_DEFAULT_API_BASE
