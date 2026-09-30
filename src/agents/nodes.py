@@ -128,7 +128,10 @@ from src.utils.verifier import (
 # ISSUE-23：理解+计划 prompt 的估算 token 预算。prompt 长度直接决定 prefill 时长，
 # 压缩前固定模板约 446 tokens（实测单轮 query_understand 5.9-17.0s），压缩后
 # 必须留在预算内，且不得丢掉 JSON 契约字段。
-PLAN_PROMPT_TOKEN_BUDGET = 300
+# 2026-09-30 实机演练回归（S2/S3/S4 计划全部单源 product_search）：补回主题→
+# 数据源映射指引后模板 361 tokens，预算按 370 重校准；总上限 700 不变
+# （361 + 最长查询 334 = 695 ≤ 700）。
+PLAN_PROMPT_TOKEN_BUDGET = 370
 # 含最长允许查询（MAX_QUERY_LENGTH=500 字符）时的 prompt 总上限
 PLAN_PROMPT_MAX_TOKENS = 700
 
@@ -664,11 +667,12 @@ def query_understand(state: AssistantState) -> dict[str, Any]:
  "entities": {{"product_name": "", "product_type": "", "stock_code": "", "regulation_name": "", "client_segment": "", "time_range": {{"start": "", "end": ""}}}},
  "rewritten_query": "优化后的结构化查询",
  "ambiguity": [],
- "retrieval_plan": [{{"source": "product_search", "query": "...", "top_k": 5, "filters": {{}}}}]}}
+ "retrieval_plan": [{{"source": "product_search", "query": "...", "top_k": 5}}, {{"source": "regulation_search", "query": "...", "top_k": 3}}]}}
 
 ambiguity 只在缺少关键信息、无法给出任何有意义回答时填澄清问题；通用问题（如"货币基金的风险等级"）不算歧义，绝大多数应为 []。
 time_range 仅在查询含时间范围时填 ISO 日期，否则留空串。
-retrieval_plan 只列当前角色允许的数据源，元素为 source/query/top_k，可选 filters。"""
+retrieval_plan 只列当前角色允许的数据源，元素为 source/query/top_k，可选 filters。
+计划源与查询主题匹配，可多源互补：公司/证券数字（业绩/预测/评级）必含 report_search；制度/法规/处罚必含 regulation_search；产品条款/风险等级必含 product_search；办理流程/常见疑问必含 faq_search；无关源不进计划。"""
 
     response = _invoke_with_plan_budget([HumanMessage(content=prompt)])
     try:
