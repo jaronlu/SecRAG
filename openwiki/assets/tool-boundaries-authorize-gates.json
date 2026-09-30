@@ -1,0 +1,240 @@
+{
+  "schema_version": 1,
+  "mode": "flowchart",
+  "template_type": "flowchart",
+  "style": 1,
+  "width": 960,
+  "height": 780,
+  "title": "authorize_reason_tool_call：执行边界四重检查",
+  "subtitle": "顺序闸门，任一失败即短路返回 status=error ToolMessage",
+  "text_policy": "strict",
+  "nodes": [
+    {
+      "id": "req",
+      "kind": "rect",
+      "x": 60,
+      "y": 118,
+      "width": 230,
+      "height": 56,
+      "type_label": "INPUT",
+      "label": "ToolCallRequest"
+    },
+    {
+      "id": "a1",
+      "kind": "rect",
+      "x": 45,
+      "y": 204,
+      "width": 310,
+      "height": 64,
+      "type_label": "① 角色授权",
+      "label": "工具名白名单",
+      "sublabel": "工具名 ∈ reason_tools(state)"
+    },
+    {
+      "id": "a2",
+      "kind": "rect",
+      "x": 45,
+      "y": 310,
+      "width": 310,
+      "height": 64,
+      "type_label": "② 请求级截止时间",
+      "label": "请求 deadline 检查",
+      "sublabel": "_request_deadline_exceeded(state)"
+    },
+    {
+      "id": "a3",
+      "kind": "rect",
+      "x": 45,
+      "y": 416,
+      "width": 310,
+      "height": 64,
+      "type_label": "③ 熔断器",
+      "label": "60s 冷却检查",
+      "sublabel": "TOOL_CIRCUIT_BREAKER_SECONDS"
+    },
+    {
+      "id": "a4",
+      "kind": "rect",
+      "x": 45,
+      "y": 522,
+      "width": 310,
+      "height": 64,
+      "type_label": "④ 单工具超时",
+      "label": "独立线程执行",
+      "sublabel": "TOOL_TIMEOUT_SECONDS 上限"
+    },
+    {
+      "id": "r1",
+      "kind": "rect",
+      "x": 500,
+      "y": 204,
+      "width": 360,
+      "height": 64,
+      "type_label": "FAIL · 不执行",
+      "label": "返回 status=error ToolMessage",
+      "sublabel": "工具不执行，无观测 span"
+    },
+    {
+      "id": "r2",
+      "kind": "rect",
+      "x": 500,
+      "y": 310,
+      "width": 360,
+      "height": 64,
+      "type_label": "FAIL · 不执行",
+      "label": "返回 status=error ToolMessage",
+      "sublabel": "不启动执行线程"
+    },
+    {
+      "id": "r3",
+      "kind": "rect",
+      "x": 500,
+      "y": 416,
+      "width": 360,
+      "height": 64,
+      "type_label": "FAIL · 跳过",
+      "label": "返回 status=error ToolMessage",
+      "sublabel": "冷却期内跳过执行"
+    },
+    {
+      "id": "r4",
+      "kind": "rect",
+      "x": 396,
+      "y": 634,
+      "width": 250,
+      "height": 64,
+      "type_label": "FAIL · 超时",
+      "label": "写熔断标记",
+      "sublabel": "status=error"
+    },
+    {
+      "id": "r5",
+      "kind": "rect",
+      "x": 70,
+      "y": 634,
+      "width": 250,
+      "height": 64,
+      "type_label": "FAIL · 异常",
+      "label": "写熔断标记",
+      "sublabel": "status=error"
+    },
+    {
+      "id": "ok",
+      "kind": "rect",
+      "x": 690,
+      "y": 634,
+      "width": 240,
+      "height": 64,
+      "type_label": "PASS",
+      "label": "原样返回结果",
+      "sublabel": "status=error 同样按失败记录"
+    }
+  ],
+  "arrows": [
+    {
+      "id": "e0",
+      "source": "req",
+      "target": "a1",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "e1f",
+      "source": "a1",
+      "target": "r1",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "neutral",
+      "label": "否"
+    },
+    {
+      "id": "e1p",
+      "source": "a1",
+      "target": "a2",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control",
+      "label": "是"
+    },
+    {
+      "id": "e2f",
+      "source": "a2",
+      "target": "r2",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "neutral",
+      "label": "已超时"
+    },
+    {
+      "id": "e2p",
+      "source": "a2",
+      "target": "a3",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control",
+      "label": "未超时"
+    },
+    {
+      "id": "e3f",
+      "source": "a3",
+      "target": "r3",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "neutral",
+      "label": "冷却期内"
+    },
+    {
+      "id": "e3p",
+      "source": "a3",
+      "target": "a4",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control",
+      "label": "通过"
+    },
+    {
+      "id": "e4t",
+      "source": "a4",
+      "target": "r4",
+      "source_port": "right",
+      "target_port": "top",
+      "flow": "neutral",
+      "label": "超时"
+    },
+    {
+      "id": "e4x",
+      "source": "a4",
+      "target": "r5",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "neutral",
+      "label": "抛异常"
+    },
+    {
+      "id": "e4k",
+      "source": "a4",
+      "target": "ok",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control",
+      "label": "返回 ToolMessage"
+    }
+  ],
+  "legend": [
+    {
+      "flow": "control",
+      "label": "检查通过 → 下一闸门"
+    },
+    {
+      "flow": "neutral",
+      "label": "检查失败 → 短路返回"
+    }
+  ],
+  "footer": "SecRAG · Agent 工具子系统 · 执行边界",
+  "legend_x": 330,
+  "legend_y": 116,
+  "legend_locked": true,
+  "footer_y": 758,
+  "legend_orientation": "vertical"
+}

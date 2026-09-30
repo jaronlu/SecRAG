@@ -1,0 +1,214 @@
+{
+  "schema_version": 1,
+  "mode": "flowchart",
+  "template_type": "flowchart",
+  "style": 1,
+  "width": 960,
+  "height": 720,
+  "title": "reason 子图：工具调用环与终态",
+  "subtitle": "调用模型 → 路由分支 → 授权执行 → 审计回环",
+  "text_policy": "strict",
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "rect",
+      "x": 380,
+      "y": 118,
+      "width": 200,
+      "height": 56,
+      "type_label": "ENTRY",
+      "label": "reason 子图入口"
+    },
+    {
+      "id": "prep",
+      "kind": "rect",
+      "x": 345,
+      "y": 196,
+      "width": 270,
+      "height": 64,
+      "type_label": "PREPARE",
+      "label": "prepare_reason",
+      "sublabel": "重置工具迭代与消息游标"
+    },
+    {
+      "id": "call",
+      "kind": "rect",
+      "x": 345,
+      "y": 296,
+      "width": 270,
+      "height": 64,
+      "type_label": "CALL",
+      "label": "call_reason_model",
+      "sublabel": "按角色绑定工具并调用模型"
+    },
+    {
+      "id": "route",
+      "kind": "hexagon",
+      "x": 375,
+      "y": 396,
+      "width": 210,
+      "height": 48,
+      "type_label": "BRANCH",
+      "label": "route_reason_model"
+    },
+    {
+      "id": "exec",
+      "kind": "rect",
+      "x": 40,
+      "y": 484,
+      "width": 296,
+      "height": 64,
+      "type_label": "EXEC",
+      "label": "execute_reason_tools",
+      "sublabel": "ToolNode + authorize_reason_tool_call"
+    },
+    {
+      "id": "limit",
+      "kind": "rect",
+      "x": 368,
+      "y": 484,
+      "width": 220,
+      "height": 64,
+      "type_label": "FAIL-CLOSED",
+      "label": "tool_limit_response",
+      "sublabel": "fail-closed 终态"
+    },
+    {
+      "id": "final",
+      "kind": "rect",
+      "x": 672,
+      "y": 484,
+      "width": 240,
+      "height": 64,
+      "type_label": "FINALIZE",
+      "label": "finalize_reason",
+      "sublabel": "保存最终答案"
+    },
+    {
+      "id": "rec",
+      "kind": "rect",
+      "x": 40,
+      "y": 584,
+      "width": 296,
+      "height": 64,
+      "type_label": "AUDIT",
+      "label": "record_tool_results",
+      "sublabel": "增量追加审计 + 迭代计数"
+    },
+    {
+      "id": "endsub",
+      "kind": "rect",
+      "x": 400,
+      "y": 592,
+      "width": 160,
+      "height": 56,
+      "type_label": "EXIT",
+      "label": "子图结束"
+    }
+  ],
+  "arrows": [
+    {
+      "id": "a1",
+      "source": "start",
+      "target": "prep",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "a2",
+      "source": "prep",
+      "target": "call",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "a3",
+      "source": "call",
+      "target": "route",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "a4",
+      "source": "route",
+      "target": "exec",
+      "source_port": "left",
+      "target_port": "top",
+      "flow": "control",
+      "label": "tools 且未达上限"
+    },
+    {
+      "id": "a5",
+      "source": "route",
+      "target": "limit",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "neutral",
+      "label": "limit 已达 MAX_TOOL_ITERATIONS"
+    },
+    {
+      "id": "a6",
+      "source": "route",
+      "target": "final",
+      "source_port": "right",
+      "target_port": "top",
+      "flow": "control",
+      "label": "finalize 无工具调用"
+    },
+    {
+      "id": "a7",
+      "source": "exec",
+      "target": "rec",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "a8",
+      "source": "rec",
+      "target": "call",
+      "source_port": "left",
+      "target_port": "left",
+      "flow": "feedback",
+      "label": "迭代回环"
+    },
+    {
+      "id": "a9",
+      "source": "final",
+      "target": "endsub",
+      "source_port": "bottom",
+      "target_port": "right",
+      "flow": "control"
+    },
+    {
+      "id": "a10",
+      "source": "limit",
+      "target": "endsub",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "neutral"
+    }
+  ],
+  "legend": [
+    {
+      "flow": "control",
+      "label": "主执行路径"
+    },
+    {
+      "flow": "feedback",
+      "label": "工具迭代回环"
+    },
+    {
+      "flow": "neutral",
+      "label": "fail-closed / 终态"
+    }
+  ],
+  "footer": "SecRAG · Agent 工具子系统 · reason 子图",
+  "legend_x": 52,
+  "legend_y": 132,
+  "legend_locked": true,
+  "footer_y": 696
+}

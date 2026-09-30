@@ -46,19 +46,7 @@ SecRAG 的 ReAct 推理不是“模型想调什么就调什么”。工具子系
 
 外层 `StateGraph`（`src/agents/graph.py`）把 `reason` 作为一个聚合节点，其内部是独立的 ReAct 子图（`build_reason_subgraph`）。子图循环由五个节点组成：
 
-```mermaid
-flowchart TD
-    START["reason 子图入口"] --> PREP["prepare_reason：重置工具迭代与消息游标"]
-    PREP --> CALL["call_reason_model：按角色绑定工具并调用模型"]
-    CALL -->|"有未决工具调用"| ROUTE["route_reason_model"]
-    ROUTE -->|"tools 且未达上限"| EXEC["execute_reason_tools：ToolNode + authorize_reason_tool_call"]
-    ROUTE -->|"limit 已达 MAX_TOOL_ITERATIONS"| LIMIT["tool_limit_response：fail-closed 终态"]
-    ROUTE -->|"finalize 无工具调用"| FINAL["finalize_reason：保存最终答案"]
-    EXEC --> REC["record_tool_results：增量追加审计 + 迭代计数"]
-    REC --> CALL
-    FINAL --> ENDSUB["子图结束"]
-    LIMIT --> ENDSUB
-```
+![reason 子图：工具调用环与终态](../assets/tool-boundaries-reason-subgraph.svg)
 
 ReAct 工具循环：`call_reason_model → execute_reason_tools → record_tool_results` 回环到模型，直到模型不再请求工具、超过 `MAX_TOOL_ITERATIONS`（3 次）或请求级截止时间触发短路。
 
@@ -106,19 +94,7 @@ ReAct 工具循环：`call_reason_model → execute_reason_tools → record_tool
 
 `authorize_reason_tool_call(request, execute)` 是 `ToolNode` 的 `wrap_tool_call`，在工具真正执行前按顺序检查四道防线（`repo://src/agents/nodes.py#L1231-L1323`）：
 
-```mermaid
-flowchart TD
-    REQ["ToolCallRequest"] --> A1["① 角色授权：工具名 ∈ _reason_tools(state)"]
-    A1 -->|"否"| R1["返回 status=error ToolMessage，工具不执行，无观测 span"]
-    A1 -->|"是"| A2["② 请求级截止时间：_request_deadline_exceeded(state)"]
-    A2 -->|"已超时"| R2["返回 status=error ToolMessage，不启动线程"]
-    A2 -->|"未超时"| A3["③ 熔断器：距上次失败不足 TOOL_CIRCUIT_BREAKER_SECONDS"]
-    A3 -->|"冷却期内"| R3["返回 status=error ToolMessage，跳过执行"]
-    A3 -->|"通过"| A4["创建工具 span，独立线程执行，TOOL_TIMEOUT_SECONDS 上限"]
-    A4 -->|"超时"| R4["写熔断标记 + status=error"]
-    A4 -->|"抛异常"| R5["写熔断标记 + status=error"]
-    A4 -->|"返回 ToolMessage"| OK["原样返回，status=error 同样按失败记录"]
-```
+![authorize_reason_tool_call：执行边界四重检查](../assets/tool-boundaries-authorize-gates.svg)
 
 执行边界四重检查：角色授权 → 请求级截止时间 → 60 秒熔断器 → 10 秒单工具超时；前两重失败时不启动任何执行线程，第三重失败时跳过执行。
 
