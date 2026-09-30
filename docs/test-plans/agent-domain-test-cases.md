@@ -18,8 +18,9 @@
 | ❌ | 已证实不满足（附实测证据与缺陷登记） |
 | ⬜ | 需实机环境 / 尚未执行（附阻塞原因） |
 
-- **证据基线**：2026-09-30，HEAD `5df21a1`，
-  `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 uv run python -m pytest -q` → **645 passed**（67.15s）。
+- **证据基线**：2026-09-30 校准复核，HEAD `15f3ff5`（`5df21a1` 之后仅文档提交、代码一致），
+  `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 uv run python -m pytest -q` → **645 passed**（44.05s）；
+  评估四件套同日复跑退出码全 0。
   ✅ 状态均指该基线内对应测试通过；单独复跑命令在各案例"验证"栏。
 - 本机测试须带 `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1`（装 FlagEmbedding 后任何模型加载路径
   会连 huggingface.co，系统代理死端口会挂起）；venv 需 `uv sync --extra dev`（pytest-asyncio）。
@@ -27,13 +28,14 @@
   `NO_PROXY='*' no_proxy='*' HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 API_REQUEST_TIMEOUT_SECONDS=300 uv run python -m uvicorn src.api.main:app --port 8001`；
   起服务前 `lsof -tiTCP:8001` 清旧进程；审计细节查 `data/audit.db`（`total_duration_ms` 在 `payload_json` 内）。
 
-### 与 TC-001~035 集的过时点声明（旧文档为收官战役记录，不回改）
+### 与 TC-001~035 集的维护契约（2026-09-30 校准修订）
 
-1. TC-032~035 的备注"语义缓存默认关闭"已过时：ISSUE-26 后 `semantic_cache_enabled` 默认 **True**，
-   且绑定语义升级为 `CacheBinding` 六维等值匹配（见 DC-024~027）。
-2. TC-016 链路描述中"planner(LLM 计划)"已过时：ISSUE-11 后意图/实体/重写/歧义/计划合并在
-   `query_understand` 一次 LLM 往返，`planner` 节点只做规范化与角色白名单过滤，无 LLM 调用。
-3. 检索节点新增超量取回（×3）与 denied 占位语义、低召回 `widen` 路由（TC-011/012/013 的判定契约本身仍成立）。
+- 两集均随代码演进维护：TC 集自 21876d6 起同样采用"历史证据原样保留 + 受影响案例原位追加
+  「演进备注」"机制，本节原"旧文档不回改"的前提已失效。不再维护独立的跨文档过时点清单——
+  语义一律以各案例正文及其演进备注为准（唯一事实源在案例原位，避免两份清单漂移；
+  本次校准前本节列出的三条过时点已在 TC 集环节 F 头注、TC-012/016 演进备注原位校订）。
+- 分工不变：TC 集 = 链路级 E2E 执行证据（2026-09-25/26 战役收官记录）；DC 集 = 领域纵深、
+  设计准入映射与缺口登记（本集）。交叉点 DC 集只引用 TC 编号，不重述案例。
 
 ---
 
@@ -483,8 +485,9 @@
 | ❌ 未达标（已知） | 1 | DC-042 端到端 P95 |
 | ⚠️ 缺口登记 | 3 | DC-035、040、048 |
 
-证据：全量 `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 uv run python -m pytest -q` → 645 passed（HEAD 5df21a1）；
-评估四件套 `artifacts/evaluation/2a6dfe1…/` 退出码全 0（DC-046 实测值）。
+证据：全量 `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 uv run python -m pytest -q` → 645 passed
+（2026-09-30 校准复核 HEAD 15f3ff5，44.05s；5df21a1 后仅文档提交、代码一致）；
+评估四件套同日复跑退出码全 0（历史实测 `artifacts/evaluation/2a6dfe1…/`，DC-046 实测值）。
 
 ## 五、已知缺口与风险登记（不由案例承载，立项入口 todo/issues.md）
 
