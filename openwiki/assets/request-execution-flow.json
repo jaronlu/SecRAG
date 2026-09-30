@@ -1,0 +1,597 @@
+{
+  "schema_version": 1,
+  "mode": "flowchart",
+  "template_type": "flowchart",
+  "style": 1,
+  "width": 1640,
+  "height": 1280,
+  "title": "问答请求执行链路：从 HTTP 到统一终态",
+  "subtitle": "澄清、权限拒绝、检索重试、验证重推与缓存命中分支全展开",
+  "text_policy": "strict",
+  "legend_orientation": "vertical",
+  "legend_x": 1130,
+  "legend_y": 700,
+  "legend_locked": true,
+  "legend": [
+    {
+      "flow": "control",
+      "label": "主链路"
+    },
+    {
+      "flow": "feedback",
+      "label": "检索 / 验证回环"
+    },
+    {
+      "flow": "neutral",
+      "label": "短路 / 旁路终态"
+    }
+  ],
+  "footer": "SecRAG · 问答请求执行链路",
+  "footer_y": 1256,
+  "nodes": [
+    {
+      "id": "req",
+      "kind": "rect",
+      "x": 300,
+      "y": 104,
+      "width": 300,
+      "height": 52,
+      "type_label": "ENTRY",
+      "label": "POST /v1/assistant/qa"
+    },
+    {
+      "id": "auth",
+      "kind": "rect",
+      "x": 300,
+      "y": 184,
+      "width": 300,
+      "height": 56,
+      "type_label": "AUTH",
+      "label": "Bearer 认证 + 限流",
+      "sublabel": "超限 429"
+    },
+    {
+      "id": "thread",
+      "kind": "rect",
+      "x": 300,
+      "y": 268,
+      "width": 300,
+      "height": 56,
+      "type_label": "THREAD",
+      "label": "ensure_thread_for_qa",
+      "sublabel": "404 / 409"
+    },
+    {
+      "id": "init",
+      "kind": "rect",
+      "x": 300,
+      "y": 352,
+      "width": 300,
+      "height": 64,
+      "type_label": "INIT",
+      "label": "构造 AssistantState",
+      "sublabel": "+ Langfuse trace + request_deadline"
+    },
+    {
+      "id": "cache",
+      "kind": "hexagon",
+      "x": 300,
+      "y": 444,
+      "width": 300,
+      "height": 52,
+      "type_label": "CACHE",
+      "label": "语义缓存命中?"
+    },
+    {
+      "id": "load",
+      "kind": "rect",
+      "x": 300,
+      "y": 540,
+      "width": 300,
+      "height": 56,
+      "type_label": "CONTEXT",
+      "label": "load_conversation_context"
+    },
+    {
+      "id": "resolve",
+      "kind": "rect",
+      "x": 300,
+      "y": 624,
+      "width": 300,
+      "height": 56,
+      "type_label": "RESOLVE",
+      "label": "resolve_followup_query"
+    },
+    {
+      "id": "understand",
+      "kind": "rect",
+      "x": 300,
+      "y": 708,
+      "width": 300,
+      "height": 56,
+      "type_label": "UNDERSTAND",
+      "label": "query_understand",
+      "sublabel": "注入 / PII / 语言"
+    },
+    {
+      "id": "clarifyq",
+      "kind": "hexagon",
+      "x": 300,
+      "y": 792,
+      "width": 300,
+      "height": 56,
+      "type_label": "BRANCH",
+      "label": "有歧义?"
+    },
+    {
+      "id": "plan",
+      "kind": "rect",
+      "x": 700,
+      "y": 110,
+      "width": 300,
+      "height": 64,
+      "type_label": "PLAN",
+      "label": "planner",
+      "sublabel": "规范化，不再调 LLM"
+    },
+    {
+      "id": "retr",
+      "kind": "rect",
+      "x": 700,
+      "y": 202,
+      "width": 300,
+      "height": 64,
+      "type_label": "RETRIEVE",
+      "label": "retrieve",
+      "sublabel": "双层权限过滤 + BM25/RRF"
+    },
+    {
+      "id": "grade",
+      "kind": "rect",
+      "x": 700,
+      "y": 294,
+      "width": 300,
+      "height": 64,
+      "type_label": "GRADE",
+      "label": "grade_and_filter",
+      "sublabel": "阈值 / 去重 / 重排 / 主来源优先"
+    },
+    {
+      "id": "deniedq",
+      "kind": "hexagon",
+      "x": 700,
+      "y": 386,
+      "width": 300,
+      "height": 56,
+      "type_label": "BRANCH",
+      "label": "全部越权?"
+    },
+    {
+      "id": "retryq",
+      "kind": "hexagon",
+      "x": 700,
+      "y": 470,
+      "width": 300,
+      "height": 56,
+      "type_label": "BRANCH",
+      "label": "可用结果不足 2 条?"
+    },
+    {
+      "id": "reason",
+      "kind": "rect",
+      "x": 700,
+      "y": 554,
+      "width": 300,
+      "height": 64,
+      "type_label": "REACT",
+      "label": "reason 子图"
+    },
+    {
+      "id": "cite",
+      "kind": "rect",
+      "x": 700,
+      "y": 646,
+      "width": 300,
+      "height": 56,
+      "type_label": "CITATIONS",
+      "label": "extract_citations"
+    },
+    {
+      "id": "verify",
+      "kind": "rect",
+      "x": 700,
+      "y": 730,
+      "width": 300,
+      "height": 64,
+      "type_label": "VERIFY",
+      "label": "verify",
+      "sublabel": "五类验证 + 每轮快照"
+    },
+    {
+      "id": "reasonq",
+      "kind": "hexagon",
+      "x": 700,
+      "y": 822,
+      "width": 300,
+      "height": 56,
+      "type_label": "BRANCH",
+      "label": "验证通过?"
+    },
+    {
+      "id": "compliance",
+      "kind": "rect",
+      "x": 700,
+      "y": 906,
+      "width": 300,
+      "height": 64,
+      "type_label": "COMPLIANCE",
+      "label": "compliance_check"
+    },
+    {
+      "id": "compose",
+      "kind": "rect",
+      "x": 700,
+      "y": 998,
+      "width": 300,
+      "height": 64,
+      "type_label": "COMPOSE",
+      "label": "compose",
+      "sublabel": "失败清空引用并降级"
+    },
+    {
+      "id": "hit",
+      "kind": "rect",
+      "x": 20,
+      "y": 440,
+      "width": 220,
+      "height": 64,
+      "type_label": "CACHE HIT",
+      "label": "补 semantic_cache_hit 审计",
+      "sublabel": "返回存储快照"
+    },
+    {
+      "id": "clarify",
+      "kind": "rect",
+      "x": 30,
+      "y": 784,
+      "width": 200,
+      "height": 64,
+      "type_label": "CLARIFY",
+      "label": "clarify 澄清终态"
+    },
+    {
+      "id": "permdeny",
+      "kind": "rect",
+      "x": 1120,
+      "y": 386,
+      "width": 220,
+      "height": 64,
+      "type_label": "SHORT-CIRCUIT",
+      "label": "permission_denied_response"
+    },
+    {
+      "id": "nores",
+      "kind": "rect",
+      "x": 1120,
+      "y": 478,
+      "width": 220,
+      "height": 64,
+      "type_label": "SHORT-CIRCUIT",
+      "label": "no_results_response",
+      "sublabel": "0 召回且轮次耗尽"
+    },
+    {
+      "id": "widen",
+      "kind": "rect",
+      "x": 1120,
+      "y": 570,
+      "width": 220,
+      "height": 64,
+      "type_label": "WIDEN",
+      "label": "widen",
+      "sublabel": "top_k 翻倍重跑检索"
+    },
+    {
+      "id": "persist",
+      "kind": "rect",
+      "x": 1400,
+      "y": 998,
+      "width": 220,
+      "height": 64,
+      "type_label": "PERSIST",
+      "label": "persist_conversation_turn"
+    },
+    {
+      "id": "audit",
+      "kind": "rect",
+      "x": 1400,
+      "y": 1090,
+      "width": 220,
+      "height": 56,
+      "type_label": "AUDIT",
+      "label": "audit_log",
+      "sublabel": "失败入 outbox"
+    },
+    {
+      "id": "out",
+      "kind": "rect",
+      "x": 1400,
+      "y": 1174,
+      "width": 220,
+      "height": 56,
+      "type_label": "OUTPUT",
+      "label": "统一终态响应",
+      "sublabel": "SSE answer + done"
+    }
+  ],
+  "arrows": [
+    {
+      "id": "req-auth",
+      "source": "req",
+      "target": "auth",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "auth-thread",
+      "source": "auth",
+      "target": "thread",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "thread-init",
+      "source": "thread",
+      "target": "init",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "init-cache",
+      "source": "init",
+      "target": "cache",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "cache-hit",
+      "source": "cache",
+      "target": "hit",
+      "source_port": "left",
+      "target_port": "right",
+      "flow": "neutral",
+      "label": "命中"
+    },
+    {
+      "id": "cache-load",
+      "source": "cache",
+      "target": "load",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control",
+      "label": "未命中"
+    },
+    {
+      "id": "load-resolve",
+      "source": "load",
+      "target": "resolve",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "resolve-understand",
+      "source": "resolve",
+      "target": "understand",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "understand-clarifyq",
+      "source": "understand",
+      "target": "clarifyq",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "clarifyq-clarify",
+      "source": "clarifyq",
+      "target": "clarify",
+      "source_port": "left",
+      "target_port": "right",
+      "flow": "neutral",
+      "label": "是"
+    },
+    {
+      "id": "clarifyq-plan",
+      "source": "clarifyq",
+      "target": "plan",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control",
+      "label": "否"
+    },
+    {
+      "id": "plan-retr",
+      "source": "plan",
+      "target": "retr",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "retr-grade",
+      "source": "retr",
+      "target": "grade",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "grade-deniedq",
+      "source": "grade",
+      "target": "deniedq",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "deniedq-permdeny",
+      "source": "deniedq",
+      "target": "permdeny",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "neutral",
+      "label": "是"
+    },
+    {
+      "id": "deniedq-nores",
+      "source": "deniedq",
+      "target": "nores",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "neutral",
+      "label": "零召回耗尽"
+    },
+    {
+      "id": "deniedq-retryq",
+      "source": "deniedq",
+      "target": "retryq",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control",
+      "label": "否"
+    },
+    {
+      "id": "retryq-widen",
+      "source": "retryq",
+      "target": "widen",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "feedback",
+      "label": "非 0 低召回"
+    },
+    {
+      "id": "retryq-plan",
+      "source": "retryq",
+      "target": "plan",
+      "source_port": "left",
+      "target_port": "left",
+      "flow": "feedback",
+      "label": "零召回"
+    },
+    {
+      "id": "retryq-reason",
+      "source": "retryq",
+      "target": "reason",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control",
+      "label": "否"
+    },
+    {
+      "id": "widen-retr",
+      "source": "widen",
+      "target": "retr",
+      "source_port": "left",
+      "target_port": "right",
+      "flow": "feedback"
+    },
+    {
+      "id": "reason-cite",
+      "source": "reason",
+      "target": "cite",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "cite-verify",
+      "source": "cite",
+      "target": "verify",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "verify-reasonq",
+      "source": "verify",
+      "target": "reasonq",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "reasonq-reason",
+      "source": "reasonq",
+      "target": "reason",
+      "source_port": "right",
+      "target_port": "right",
+      "flow": "feedback",
+      "label": "否且未到 MAX"
+    },
+    {
+      "id": "reasonq-compliance",
+      "source": "reasonq",
+      "target": "compliance",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control",
+      "label": "是或超限"
+    },
+    {
+      "id": "compliance-compose",
+      "source": "compliance",
+      "target": "compose",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "compose-persist",
+      "source": "compose",
+      "target": "persist",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "clarify-persist",
+      "source": "clarify",
+      "target": "persist",
+      "source_port": "bottom",
+      "target_port": "left",
+      "flow": "neutral"
+    },
+    {
+      "id": "permdeny-persist",
+      "source": "permdeny",
+      "target": "persist",
+      "source_port": "right",
+      "target_port": "top",
+      "flow": "neutral"
+    },
+    {
+      "id": "persist-audit",
+      "source": "persist",
+      "target": "audit",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "audit-out",
+      "source": "audit",
+      "target": "out",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    }
+  ]
+}

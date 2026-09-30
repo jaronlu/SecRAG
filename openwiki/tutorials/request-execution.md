@@ -38,41 +38,7 @@ verified:
 
 先区分两张图的用途：`docs/architecture-overview.svg` 是面试和架构阅读用的总览图，只保留认证、问答 API、查询理解、检索、ReAct、验证输出这条主链；本页流程图则展开真实运行时的澄清、权限拒绝、检索重试、工具上限、验证重推、合规阻断和缓存命中分支。总览图中的“ReAct 推理”对应本页的 `prepare_reason → call_reason_model → execute_reason_tools / finalize_reason` 子图，“验证与输出”对应引用提取、验证、合规和 `compose`。
 
-```mermaid
-flowchart TD
-    REQ["POST /v1/assistant/qa"] --> AUTH["Bearer 认证 + 限流 (429)"]
-    AUTH --> THREAD["ensure_thread_for_qa (404/409)"]
-    THREAD --> INIT["构造 AssistantState + Langfuse trace + request_deadline"]
-    INIT --> CACHE{"语义缓存命中?"}
-    CACHE -->|"命中"| HIT["补写 semantic_cache_hit 审计，返回存储快照"]
-    CACHE -->|"未命中"| LOAD["load_conversation_context"]
-    LOAD --> RESOLVE["resolve_followup_query"]
-    RESOLVE --> UNDERSTAND["query_understand (注入/PII/语言)"]
-    UNDERSTAND --> CLARIFYQ{"有歧义?"}
-    CLARIFYQ -->|"是"| CLARIFY["clarify 澄清终态"]
-    CLARIFYQ -->|"否"| PLAN["planner（规范化，不再调 LLM）"]
-    PLAN --> RETR["retrieve (双层权限过滤 + BM25/RRF)"]
-    RETR --> GRADE["grade_and_filter (阈值/去重/重排/主来源优先)"]
-    GRADE --> DENIEDQ{"全部越权?"}
-    DENIEDQ -->|"是"| PERMDENY["permission_denied_response 短路"]
-    DENIEDQ -->|"零召回且轮次耗尽"| NORES["no_results_response 短路"]
-    DENIEDQ -->|"否"| RETRYQ{"可用结果不足 2 条?"}
-    RETRYQ -->|"非 0 低召回"| WIDEN["widen：top_k 翻倍重跑检索"]
-    RETRYQ -->|"零召回"| PLAN
-    RETRYQ -->|"否"| REASON["reason 子图"]
-    WIDEN --> RETR
-    REASON --> CITE["extract_citations"]
-    CITE --> VERIFY["verify 五类验证 + 每轮快照"]
-    VERIFY --> REASONQ{"验证通过?"}
-    REASONQ -->|"否且未到 MAX_REASON_ATTEMPTS"| REASON
-    REASONQ -->|"是或超限"| COMPLIANCE["compliance_check"]
-    COMPLIANCE --> COMPOSE["compose (失败清空引用并降级)"]
-    CLARIFY --> PERSIST["persist_conversation_turn"]
-    PERMDENY --> PERSIST
-    COMPOSE --> PERSIST
-    PERSIST --> AUDIT["audit_log (失败入 outbox)"]
-    AUDIT --> OUT["统一终态响应 / SSE answer+done"]
-```
+![问答请求执行链路：从 HTTP 到统一终态](../assets/request-execution-flow.svg)
 
 主链路控制流：含澄清、权限拒绝、检索重试、工具上限、验证重推、合规阻断与缓存命中路径。
 
