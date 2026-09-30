@@ -48,31 +48,7 @@ SecRAG 的检索不是一个“只查向量库”的步骤，而是一条有明�
 
 ## 1. 检索控制流
 
-```mermaid
-flowchart TD
-    P["Planner 生成检索计划"] --> PF["计划级权限过滤 _filter_plan_by_role"]
-    PF -->|"越权 source"| DD["denied=True 显式拒绝步骤"]
-    PF -->|"允许 source"| FE["fetch_top_k = top_k x PERMISSION_OVERFETCH_FACTOR"]
-    FE --> V["向量检索 ChromaVectorRetriever"]
-    FE --> B["BM25 关键词检索"]
-    V --> F["RRF 融合 rrf_fuse"]
-    B --> F
-    V -.->|"BM25 构建失败 静默降级"| F
-    F --> RF["结果级权限过滤 _filter_results_by_role"]
-    RF -->|"permission_level 越权"| PD["denied 占位结果"]
-    RF -->|"allowed_roles 不包含角色"| PD
-    RF --> OK["可用结果 截断到 top_k"]
-    OK --> G["grade_and_filter 单量纲排序"]
-    G --> RR["BGE Reranker 语义重排 或显式降级"]
-    RR --> PS["一手来源优先 _prioritize_primary_sources"]
-    PS --> T["截断 GRADE_TOP_K 条"]
-    T --> OUT["混合结果列表 含 denied 占位"]
-    PD --> OUT
-    DD --> OUT
-    G -.->|"可用结果 < 2 且非 0 召回"| W["widen：top_k 翻倍重跑检索"]
-    W -.-> FE
-    G -.->|"0 召回且轮次耗尽"| NR["no_results_response 短路"]
-```
+![混合检索与权限过滤流水线](../assets/retrieval-system-pipeline.svg)
 
 图：检索控制流——计划级与结果级两道权限过滤、向量 + BM25 双路与 RRF 融合、超量取回先于截断、grade_and_filter 排序/重排/主来源优先/截断，以及 widen 放宽轮与零召回短路。
 
