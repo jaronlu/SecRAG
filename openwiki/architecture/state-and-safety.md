@@ -65,29 +65,7 @@ verified:
 
 把一条问答请求看作穿过层层防线。每一层失败时的语义不同：认证失败直接 401；检索全部越权则在推理前短路；零召回且重试耗尽也短路（ISSUE-3）；验证失败可以回 reason 重试；合规失败则走安全兜底；审计失败只降级、不阻断回答。下面的流程图概括了这条主链：
 
-```mermaid
-flowchart TD
-    Auth["认证：Bearer token 绑定身份与角色"]
-    Auth -->|无或无效 token| Err401["401 拒绝"]
-    Auth --> QA["问答 API：限流 + 请求级截止时间"]
-    QA --> QC["查询理解：截断 + 注入与 PII 标记"]
-    QC -->|有歧义| Clarify["clarify 澄清终态"]
-    QC --> Plan["planner：检索计划按角色过滤数据源"]
-    Plan --> Ret["retrieve：计划级与结果级权限过滤"]
-    Ret --> Grade["grade_and_filter：排序 + 语义重排"]
-    Grade -->|全部 denied| PD["permission_denied 短路终态"]
-    Grade -->|非 0 低召回| Widen["widen：top_k 翻倍重跑检索"]
-    Grade -->|0 召回且轮次耗尽| NR["no_results 短路终态"]
-    Grade --> Reason["ReAct：工具授权、截止时间、超时与熔断"]
-    Reason -->|工具错误结果| Reason
-    Reason --> Cite["extract_citations 提取引用"]
-    Cite --> Verify["verify：来源、数字、口径、一致性、幻觉"]
-    Verify -->|失败且未超限| Reason
-    Verify --> Comp["compliance_check：合规闸门"]
-    Comp --> Compose["compose：组装终态，失败时清空引用"]
-    Compose --> Persist["persist_conversation_turn 会话持久化"]
-    Persist --> Audit["audit_log：审计，失败走 outbox 不阻断"]
-```
+![状态、权限与安全边界：一次问答的防线](../assets/state-and-safety-flow.svg)
 
 多层防线：每一层失败时按拒绝、短路、重试、降级或安全兜底处理，而不是把不可信内容继续下传。
 

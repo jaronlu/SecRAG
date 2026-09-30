@@ -1,0 +1,385 @@
+{
+  "schema_version": 1,
+  "mode": "flowchart",
+  "template_type": "flowchart",
+  "style": 1,
+  "width": 1040,
+  "height": 770,
+  "title": "状态、权限与安全边界：一次问答的防线",
+  "subtitle": "认证 → 查询理解 → 检索过滤 → ReAct → 验证 → 合规 → 持久化与审计",
+  "text_policy": "strict",
+  "legend_orientation": "vertical",
+  "legend_x": 24,
+  "legend_y": 646,
+  "legend": [
+    {
+      "flow": "control",
+      "label": "主链路"
+    },
+    {
+      "flow": "neutral",
+      "label": "短路 / 澄清终态"
+    },
+    {
+      "flow": "feedback",
+      "label": "回环重试"
+    }
+  ],
+  "footer": "SecRAG · 状态与安全边界",
+  "footer_y": 746,
+  "nodes": [
+    {
+      "id": "auth",
+      "kind": "rect",
+      "x": 340,
+      "y": 110,
+      "width": 300,
+      "height": 64,
+      "type_label": "AUTH",
+      "label": "认证",
+      "sublabel": "Bearer token 绑定身份与角色"
+    },
+    {
+      "id": "qa",
+      "kind": "rect",
+      "x": 340,
+      "y": 188,
+      "width": 300,
+      "height": 64,
+      "type_label": "API",
+      "label": "问答 API",
+      "sublabel": "限流 + 请求级截止时间"
+    },
+    {
+      "id": "qc",
+      "kind": "rect",
+      "x": 340,
+      "y": 266,
+      "width": 300,
+      "height": 64,
+      "type_label": "UNDERSTAND",
+      "label": "查询理解",
+      "sublabel": "截断 + 注入与 PII 标记"
+    },
+    {
+      "id": "plan",
+      "kind": "rect",
+      "x": 340,
+      "y": 344,
+      "width": 300,
+      "height": 64,
+      "type_label": "PLAN",
+      "label": "planner",
+      "sublabel": "检索计划按角色过滤数据源"
+    },
+    {
+      "id": "ret",
+      "kind": "rect",
+      "x": 340,
+      "y": 422,
+      "width": 300,
+      "height": 64,
+      "type_label": "RETRIEVE",
+      "label": "retrieve",
+      "sublabel": "计划级与结果级权限过滤"
+    },
+    {
+      "id": "grade",
+      "kind": "rect",
+      "x": 340,
+      "y": 500,
+      "width": 300,
+      "height": 64,
+      "type_label": "GRADE",
+      "label": "grade_and_filter",
+      "sublabel": "排序 + 语义重排"
+    },
+    {
+      "id": "reason",
+      "kind": "rect",
+      "x": 340,
+      "y": 578,
+      "width": 300,
+      "height": 64,
+      "type_label": "REACT",
+      "label": "ReAct",
+      "sublabel": "工具授权、截止时间、超时与熔断；工具错误回环"
+    },
+    {
+      "id": "cite",
+      "kind": "rect",
+      "x": 700,
+      "y": 110,
+      "width": 300,
+      "height": 64,
+      "type_label": "CITATIONS",
+      "label": "extract_citations",
+      "sublabel": "提取引用"
+    },
+    {
+      "id": "verify",
+      "kind": "rect",
+      "x": 700,
+      "y": 188,
+      "width": 300,
+      "height": 64,
+      "type_label": "VERIFY",
+      "label": "verify",
+      "sublabel": "来源、数字、口径、一致性、幻觉"
+    },
+    {
+      "id": "comp",
+      "kind": "rect",
+      "x": 700,
+      "y": 266,
+      "width": 300,
+      "height": 64,
+      "type_label": "GATE",
+      "label": "compliance_check",
+      "sublabel": "合规闸门"
+    },
+    {
+      "id": "compose",
+      "kind": "rect",
+      "x": 700,
+      "y": 344,
+      "width": 300,
+      "height": 64,
+      "type_label": "COMPOSE",
+      "label": "compose",
+      "sublabel": "组装终态，失败时清空引用"
+    },
+    {
+      "id": "persist",
+      "kind": "rect",
+      "x": 700,
+      "y": 422,
+      "width": 300,
+      "height": 64,
+      "type_label": "PERSIST",
+      "label": "persist_conversation_turn",
+      "sublabel": "会话持久化"
+    },
+    {
+      "id": "audit",
+      "kind": "rect",
+      "x": 700,
+      "y": 500,
+      "width": 300,
+      "height": 64,
+      "type_label": "AUDIT",
+      "label": "audit_log",
+      "sublabel": "审计，失败走 outbox 不阻断"
+    },
+    {
+      "id": "err401",
+      "kind": "rect",
+      "x": 10,
+      "y": 110,
+      "width": 240,
+      "height": 60,
+      "type_label": "REJECT",
+      "label": "401 拒绝"
+    },
+    {
+      "id": "clarify",
+      "kind": "rect",
+      "x": 10,
+      "y": 266,
+      "width": 240,
+      "height": 60,
+      "type_label": "CLARIFY",
+      "label": "clarify 澄清终态"
+    },
+    {
+      "id": "pd",
+      "kind": "rect",
+      "x": 10,
+      "y": 422,
+      "width": 240,
+      "height": 60,
+      "type_label": "DENIED",
+      "label": "permission_denied",
+      "sublabel": "短路终态"
+    },
+    {
+      "id": "widen",
+      "kind": "rect",
+      "x": 10,
+      "y": 500,
+      "width": 240,
+      "height": 60,
+      "type_label": "WIDEN",
+      "label": "widen",
+      "sublabel": "非 0 低召回：top_k 翻倍重跑"
+    },
+    {
+      "id": "nr",
+      "kind": "rect",
+      "x": 10,
+      "y": 578,
+      "width": 240,
+      "height": 60,
+      "type_label": "NO RESULTS",
+      "label": "no_results",
+      "sublabel": "0 召回且轮次耗尽 · 短路"
+    }
+  ],
+  "arrows": [
+    {
+      "id": "auth-401",
+      "source": "auth",
+      "target": "err401",
+      "source_port": "left",
+      "target_port": "right",
+      "flow": "neutral",
+      "label": "无效 token"
+    },
+    {
+      "id": "auth-qa",
+      "source": "auth",
+      "target": "qa",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "qa-qc",
+      "source": "qa",
+      "target": "qc",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "qc-clarify",
+      "source": "qc",
+      "target": "clarify",
+      "source_port": "left",
+      "target_port": "right",
+      "flow": "neutral",
+      "label": "有歧义"
+    },
+    {
+      "id": "qc-plan",
+      "source": "qc",
+      "target": "plan",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "plan-ret",
+      "source": "plan",
+      "target": "ret",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "ret-grade",
+      "source": "ret",
+      "target": "grade",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "grade-pd",
+      "source": "grade",
+      "target": "pd",
+      "source_port": "left",
+      "target_port": "bottom",
+      "flow": "neutral",
+      "label": "全部 denied"
+    },
+    {
+      "id": "grade-widen",
+      "source": "grade",
+      "target": "widen",
+      "source_port": "left",
+      "target_port": "right",
+      "flow": "feedback"
+    },
+    {
+      "id": "grade-nr",
+      "source": "grade",
+      "target": "nr",
+      "source_port": "left",
+      "target_port": "top",
+      "flow": "neutral",
+      "label": "零召回耗尽"
+    },
+    {
+      "id": "grade-reason",
+      "source": "grade",
+      "target": "reason",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "reason-loop",
+      "source": "reason",
+      "target": "reason",
+      "flow": "feedback"
+    },
+    {
+      "id": "reason-cite",
+      "source": "reason",
+      "target": "cite",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "cite-verify",
+      "source": "cite",
+      "target": "verify",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "verify-reason",
+      "source": "verify",
+      "target": "reason",
+      "source_port": "bottom",
+      "target_port": "bottom",
+      "flow": "feedback",
+      "label": "未超限"
+    },
+    {
+      "id": "verify-comp",
+      "source": "verify",
+      "target": "comp",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "comp-compose",
+      "source": "comp",
+      "target": "compose",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "compose-persist",
+      "source": "compose",
+      "target": "persist",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "persist-audit",
+      "source": "persist",
+      "target": "audit",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    }
+  ]
+}
