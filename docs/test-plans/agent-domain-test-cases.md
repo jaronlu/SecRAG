@@ -18,9 +18,11 @@
 | ❌ | 已证实不满足（附实测证据与缺陷登记） |
 | ⬜ | 需实机环境 / 尚未执行（附阻塞原因） |
 
-- **证据基线**：2026-09-30 校准复核，HEAD `15f3ff5`（`5df21a1` 之后仅文档提交、代码一致），
-  `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 uv run python -m pytest -q` → **645 passed**（44.05s）；
-  评估四件套同日复跑退出码全 0。
+- **证据基线**：2026-09-30 演练日全量复核，HEAD `1305cd9`（当日实机演练修复批次
+  `51b5495..1305cd9` 之后），`HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 uv run python -m pytest -q`
+  → **652 passed**（新增 4 个演练缺陷守护，36.06s）；评估四件套同日复跑退出码全 0
+  （recall@5=0.891 / recall@10=0.960 / permission=1.000；answers numeric=1.000、hallucination=0.0107；
+  compliance block=1.000、leakage=0.000；conversations=1.000，产物 `artifacts/evaluation/f8c21f22…/`）。
   ✅ 状态均指该基线内对应测试通过；单独复跑命令在各案例"验证"栏。
 - 本机测试须带 `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1`（装 FlagEmbedding 后任何模型加载路径
   会连 huggingface.co，系统代理死端口会挂起）；venv 需 `uv sync --extra dev`（pytest-asyncio）。
@@ -43,14 +45,14 @@
 
 | 编号 | 主题 | 优先级 | 状态 |
 |---|---|---|---|
-| DC-001 | 财报口径问答：营业收入 vs 营业总收入（ISSUE-22 回归） | P0 | ✅ 单元层 / ⬜ 实机 S3 复测 |
+| DC-001 | 财报口径问答：营业收入 vs 营业总收入（ISSUE-22 回归） | P0 | ✅ 单元层 / ❌ S3 实机未获合规回答 |
 | DC-002 | 引用可核验：结构化事实（机构/评级/日期/代码）归属 | P0 | ✅ |
 | DC-003 | 归属目标价展示 vs 主动投资建议（impl-08 §3.2） | P0 | ✅ |
 | DC-004 | tool-only 问答（SQL/行情，citations=[]） | P1 | ✅ 机制 / ⬜ 实机 |
 | DC-005 | 工具失败 fail-closed（tool-only 负样本） | P0 | ✅ |
 | DC-006 | 不可回答问题的唯一合法终态 | P0 | ✅ |
 | DC-007 | 时间范围检索（date_day 数值过滤与放宽重试） | P1 | ✅ |
-| DC-008 | 研报预测数字召回（S4 回归，CHUNKER v2 后） | P0 | ⬜ 需实机 |
+| DC-008 | 研报预测数字召回（S4 回归，CHUNKER v2 后） | P0 | ❌ fail-closed（召回未打通） |
 | DC-009 | 数值提取与等价边界（含行首 1.7% 回归） | P0 | ✅ |
 | DC-010 | 口径×数值成对校验（CaliberVerifier） | P0 | ✅ |
 | DC-011 | 验证重推留痕与误判诊断（format_only_retries=0） | P1 | ✅ 机制 / ⬜ 真实流量 |
@@ -85,9 +87,9 @@
 | DC-040 | 审计 outbox 重放缺口 | P1 | ⚠️ 缺陷登记 |
 | DC-041 | Langfuse 脱敏与 fail-open | P1 | ✅ |
 | DC-042 | 端到端 P95 ≤10s 与 50 QPS 压测 | P0 | ❌ 未达标 / ⬜ 复测 |
-| DC-043 | 单轮规划与回环成本验收（≤3s） | P1 | ⬜ 需实机 |
+| DC-043 | 单轮规划与回环成本验收（≤3s） | P1 | ❌ median 7.25s（机制已落地） |
 | DC-044 | TTFT 指标口径与流式计时 | P1 | ✅ 机制 |
-| DC-045 | 单源/多源检索延迟 SLO | P2 | ⬜ 需实机（部分证据） |
+| DC-045 | 单源/多源检索延迟 SLO | P2 | ✅ 机制侧实测亚秒 |
 | DC-046 | 评估四件套准入门与退出码 | P0 | ✅ |
 | DC-047 | 数据集绑定 chunk_id：重入库后重跑 | P1 | ✅ |
 | DC-048 | 消融/E2E 评估无准入门 | P2 | ⚠️ 缺口登记 |
@@ -100,7 +102,7 @@
 | DC-055 | 七节点进度契约与 token 级真流式 | P0 | ✅ |
 | DC-056 | dist fail-fast 与 legacy 路由移除 | P1 | ✅ |
 | DC-057 | QA API 错误码矩阵 | P0 | ✅ |
-| DC-058 | 演练客户端契约与 S1~S5 实机场景 | P1 | ✅ 机制 / ⬜ 实机 |
+| DC-058 | 演练客户端契约与 S1~S5 实机场景 | P1 | ✅ S1/S2/S5 实测 / S3/S4 见 ❌ |
 
 ---
 
@@ -134,7 +136,10 @@
 - 契约要点：① `CaliberVerifier` 对口径别名（营业总收入/营业收入/归母净利润/扣非归母净利润等 14 项）做"口径标签×数值"成对校验，混用报"口径与数值不匹配"、凭空口径报"口径标签未在证据中出现/未成对出现"；② `grade_and_filter` 候选池同时含一手来源（公告/财报）与转述时，把一手来源排前；③ reason prompt 要求口径全称并标注「一手来源/研报转述」。
 - 预期结果：问"XX 半年报披露的营业收入"时，答案口径标签与数值和一手来源一致；把营业总收入数值标成营业收入会被验证拦截并触发重推/安全兜底。
 - 验证：`tests/test_verifier_boundaries.py`（Caliber）、`tests/test_agents.py`（一手来源排序、prompt 约定）。
-- 状态：✅ 单元层已守护；⬜ 实机 S3 同题复测未跑（2026-09-29 批次后未起服务）。
+- 状态：✅ 单元层已守护；❌ 实机 S3 复测未获合规回答（2026-09-30 演练 3 次尝试：503 瞬态×2
+  ——Ark 上游 `APITimeoutError`，非本仓缺陷；1 次走 reason 工具自救后 `verify` 失败兜底 154s，
+  幻觉 100% 被拦截——口径防线本身工作正常，错口径数字未出闸；plan 已正确落到 report_search）。
+  复测证据 `data/audit.db` 08:44:34 轮次。
 
 #### DC-002 引用可核验：结构化事实归属（P0）
 - 契约要点：答案使用 `institution/rating/date/stock_code` 时，可见引用 quote 必须包含同一事实，否则 SourceVerifier 报"可见引用未包含答案使用的结构化事实： {field}={value}"；引用编号 >min(5, 非 denied 结果数) 报"引用来源 … 不存在"；`(source, chunk_id)` 不在当前轮证据集报"引用不属于当前轮检索结果"；引用编号非数字或 <1 报"引用来源编号无效"。
@@ -174,7 +179,14 @@
 - 契约要点：CHUNKER v2 后国信研报 `EPS为20.83/25.96/30.45元` 为 213 字符可检索单块；S4 类问题应完成召回→数字通过验证→正常回答（或证据确实缺失时干净拒答），而非因召回崩塌 100% 幻觉 fail-closed。
 - 代理证据：retrieval.json 133 条 recall@5=0.891 / recall@10=0.960（含研报源正例）；chunk 长度分布测试通过（DC-049）。
 - 验证：实机跑 S4 同题（前置见文档头部），或以 `scripts/evaluate_retrieval.py` 数据集中研报源正例作机制代理。
-- 状态：⬜ 需实机（批次留档明确"S4 是否不再 fail-closed 需起服务实测"）。
+- 状态：❌ 实机复测仍未达标（2026-09-30 演练）：S4 问句 fail-closed 兜底（96s，CaliberVerifier
+  正确拦截模型凭参数知识给出的 20.83——数字确未在证据中成对出现，安全语义符合 DC-005）。检索
+  实测（v4 服务）：EPS chunk（`EPS为20.83/25.96/30.45元`）向量排名——同义问句 rank=2、演练习句
+  rank=4，均在 top-5 内；但 plan 步 top_k=3 的融合截断让 reranker 无从挽回，reason 工具自救
+  （sql 白名单拒绝×2、financial_ratios missing）也未能把该块送入证据池。**深挖登记**：step 级
+  top_k=3 与 grade_and_filter 超量取回(×3)/rerank 的交互需专项验证（是否对 report 源配更大
+  step top_k、或对意图源底线补步放宽 top_k），见 §五.9。防线行为全部正确（0 泄漏），缺的是
+  召回打通。`data/audit.db` 08:53:02 轮次为证据。
 
 ### 组 B：数字与口径验证器
 
@@ -272,12 +284,15 @@
 #### DC-025 缓存默认启用与命中快照语义（P0）
 - 契约要点：`semantic_cache_enabled` 默认 True（config 与 `DEFAULT_CACHE_ENABLED` 一致）；命中返回存储时的 `compliance/verification` 终态快照（非硬编码 passed=True），不泄露 `similarity/hit_count` 等内部字段；命中路径补写会话回合 + `mark_outbox_processed` + 审计事件 `execution_path=["semantic_cache_hit"]`（retrieval total_chunks=0）；绑定在图执行前构造一次，会话摘要读不到 fail closed；**流式端点 `/v1/assistant/qa/stream` 不查缓存**（仅同步端点有缓存路径）。
 - 验证：`tests/test_semantic_cache.py::test_cache_enabled_by_default_after_issue_26`、`tests/e2e/test_e2e_audit_cache.py`（TC-032/033）。
-- 状态：✅
+- 状态：✅（2026-09-30 实机演练补充证据：S1 同题重放 `semantic_cache_hit` 11~23ms 落审计、
+  存储快照原样返回、retrieval total_chunks=0——`data/audit.db` 08:40:45 轮次）
 
 #### DC-026 仅成功终态入缓存（P0）
 - 契约要点：仅当 `answer 非空且 len>10 且 compliance.passed 且 verification.passed` 才 `cache.store`（携带与 lookup 同一 binding 与快照）；拒绝/拦截/验证失败终态不得以"合规通过"语义二次返回。
 - 验证：`tests/e2e/test_e2e_audit_cache.py`（TC-034）、`src/api/main.py` store 条件。
-- 状态：✅
+- 状态：✅（2026-09-30 演练补强：DEF-004——`tool_limit_response` 此前未置 `verification.passed=False`，
+  fail-closed 兜底文案被当作成功终态缓存，S3 同题重放 0.1s 返回带无关引用的拒答；已修复
+  （51b5495，与 `no_results_response` 同契约：issues=[tool_limit_exceeded]），并补缓存命中实测复归证据）
 
 #### DC-027 相似度阈值 / TTL / 知识库版本失效（P1）
 - 契约要点：embedding 归一化余弦，命中阈值 `0.90`；TTL 默认 86400s，过期 lookup 返回 None；`kb_version` 取 document_registry 文档数+最近入库时间指纹（跨进程可见），重入库后旧缓存自然失效；store 失败 rollback 返回 False 不抛。
@@ -365,13 +380,17 @@
 
 #### DC-042 端到端 P95 ≤10s 与 50 QPS 压测（P0）
 - 契约要点：`scripts/load_test.py`（`--url/--token/--qps 50/--duration 600/--query`）判退三条任一满足即 exit 1：`achieved_qps < qps×0.99`、`error_rate ≥ 0.01`、`p95_seconds > 10`；产物写 `artifacts/evaluation/<sha>/load.json`。
-- 实测证据：2026-09-29 批次后复测代表查询 43.7s/23.0s（基线 74.1/87.8s），距端到端 P95 ≤10s 仍差 2~4 倍；`query_understand` 5.9~17.0s 是第一大头；压测 50 QPS 未跑。
-- 状态：❌ 端到端 P95 未达标（已知，issues.md 留档）；⬜ 50 QPS×10min 压测需实机。
+- 实测证据（2026-09-30 演练，15 个非缓存真实 LLM 轮次）：9~154.5s，P95≈154s——距端到端 ≤10s 仍
+  差一个数量级，主体耗时在 reason 的 ReAct 工具自救回路（median 15.8s / max 86.6s）；**简单题
+  最好 9~11s**（S1 同题流式 10.9s，S5 见 DC-058），语义缓存命中 <0.1s。50 QPS×10min 压测仍未跑。
+- 状态：❌ 端到端 P95 未达标（已知，issues.md 留档）；⬜ 50 QPS 压测需实机。
 
 #### DC-043 单轮规划与回环成本验收（P1，ISSUE-23/24）
-- 契约要点：验收线 `query_understand` 单轮 ≤3s、多跳回环平均 ≤3s（机制已落地：prompt 压缩 446→289 tokens、`llm_plan_max_tokens=384`、合并单次往返、widen 零 LLM 回环、按请求记录 prompt/completion tokens 进审计与 Langfuse）。
-- 验证：实机起服务后从 `data/audit.db` node_timings 统计 P95。
-- 状态：⬜ 需实机（批次留档"未验证"）。
+- 契约要点：验收线 `query_understand` 单轮 ≤3s、多跳回环平均 ≤3s（机制已落地：prompt 压缩 446→~361 tokens、`plan_max_tokens=640`、合并单次往返、widen 零 LLM 回环、按请求记录 prompt/completion tokens 进审计与 Langfuse）。
+- 实测（2026-09-30，audit.db 16 轮）：query_understand **median 7.25s / max 12.66s**——ISSUE-11
+  合并单往返已把 5.9~17.0s 收敛到 4.2~12.7s，但对 ≤3s 验收线仍未达标；剩余为 Ark deepseek-v4-flash
+  的模型侧硬延迟（同机 small 档基准 2.05s，需分层小模型或换 provider 才有望达标）。
+- 状态：❌ 未达标（实测留档，机制全部落地）；⬜ 多跳回环均值随 DC-042 复测。
 
 #### DC-044 TTFT 指标口径与流式计时（P1）
 - 契约要点：`MetricsRegistry.record_ttft` 记录、`ttft_p95_seconds` 摘要、Prometheus 指标名 `secrag_time_to_first_token_seconds`；空表 0.0；计时口径=流式生成器开始到首个 `answer_delta`；流式以 `stream_mode=["updates","messages"], subgraphs=True` 透出 reason 子图 token，仅外发 `langgraph_node=="call_reason_model"` 的非空增量（progress 事件由图 updates 派生、不耗 LLM token）。
@@ -379,9 +398,11 @@
 - 状态：✅ 机制（真实首字延迟归 DC-043/042 实测）。
 
 #### DC-045 单源/多源检索延迟 SLO（P2）
-- 设计线：单源 P95 ≤3s、3-5 源 P95 ≤5s。
-- 部分证据：批次后 audit.db 瀑布 `retrieve ≤0.81s`、`grade_and_filter ≤0.7s`（检索侧非瓶颈）。
-- 状态：⬜ 需实机做 P95 统计（样本量与角色覆盖）。
+- 设计线：单源 P95 ≤3s、3~5 源 P95 ≤5s。
+- 实测（2026-09-30，39 次 retrieve + 39 次 grade_and_filter）：retrieve **median 0.04s / max
+  0.23s**、grade_and_filter **median 0.17s / max 1.41s**——检索侧远低于设计线，非瓶颈（耗时
+  大头在 reason/LLM，见 DC-042/043）。
+- 状态：✅ 机制侧实测达标；⬜ 全量 P95 统计待真实流量样本。
 
 ### 组 J：评估准入与数据集
 
@@ -469,21 +490,47 @@
 
 #### DC-058 演练客户端契约与 S1~S5 实机场景（P1）
 - 契约要点（`scripts/demo.py`）：connect/read 超时分离（`httpx.Timeout(connect=5.0, read=可覆盖默认 180.0, write=30.0, pool=5.0)`），`trust_env=False` 禁环境代理；授权场景断言 answer 以 `## 结论` 开头、含 R2 与 `[来源1]` 且不含 `[来源N]`、citations 非空且 quote 含 R2、compliance.passed、confidence∈{medium,high}；拒绝场景断言 answer 含"无权限"、citations==[]、flags 含 permission_denied、confidence=low；每场景最多重试 3 次吸收采样波动但断言不放宽；HTTP 200 不等于演练成功，任一断言失败 `sys.exit(1)`。
-- 实机场景（S1~S5，2026-09-29 批次实测留档：S1 30.8s 通过、S2 拒绝 8.4s、S3 口径缺陷→ISSUE-22 已修、S4 3/3 fail-closed→ISSUE-21 已修、S5 首字 38.3s）：CHUNKER v2 重入库后 **S1~S5 未复测**。
+- 实机场景（S1~S5，**2026-09-30 演练终轮实测**，服务 v4=`1305cd9`）：
+  S1 30.8s → 修复后经缓存命中（引用 quote 含 R2）✅；S2 **干净拒绝 8s**（plan 落
+  regulation_search → 全 denied 短路，flags=[permission_denied]、citations=[]、low）✅ 确定性；
+  S3 ❌（503 瞬态×2 + verify 失败兜底 154s，防线正常未答错，见 DC-001）；S4 ❌（fail-closed，
+  见 DC-008）；S5 **流式 TTFT 9.9s / 总 10.9s / 174 个 token 级 answer_delta**（09-29 为
+  38.3s/60.0s）✅。`scripts/demo.py --base-url http://127.0.0.1:8001` 退出码 0（S1/S2 断言全过）。
 - 验证：`tests/test_demo.py`；实机 `uv run python scripts/demo.py --base-url http://127.0.0.1:8001`。
-- 状态：✅ 客户端契约；⬜ S1~S5 实机复测（与 DC-001/008 同批次执行）。
+- 状态：✅ 客户端契约 + S1/S2/S5 实测通过；S3/S4 随 DC-001/008 记 ❌（防线正确、回答未达）。
 
 ---
 
-## 四、执行汇总（2026-09-30）
+## 四、执行汇总（2026-09-30 演练日更新）
+
+### 2026-09-30 实机演练（S1~S5，服务 `1305cd9`，Ark deepseek-v4-flash）
+
+演练方式：v4 服务（8001）+ 2026-09-29 重建语料（Chroma 3,566 chunks），`scripts/demo.py`
+严格断言 + S3/S4/S5 自建场景；节点瀑布取自 `data/audit.db`（32 轮留档）。演练暴露 4 个
+真实缺陷（DEF-003~006），当日全部修复并加守护测试：
+
+| # | 缺陷 | 根因 | 修复 | 复测 |
+|---|---|---|---|---|
+| DEF-003 | S1 引用 quote 不含 R2，demo 断言 3/3 失败 | `_extract_quote` 只按查询词重叠选句，重入库后「产品名称」引导句压过 R2 事实句 | quote 选句改为答案事实感知（`adb6838`） | S1 quote 含 R2 ✅ |
+| DEF-004 | S3 fail-closed 兜底被缓存，0.1s 复放 | `tool_limit_response` 未置 `verification.passed=False`，违反 DC-026"仅成功终态入缓存" | 与 `no_results_response` 同契约（`51b5495`） | fail-closed 终态不再入缓存 ✅ |
+| DEF-005 | S2/S3/S4 计划塌缩为单源 product_search | `llm_plan_max_tokens=384` 截断合并理解 JSON（实测 ~600 token），JSONDecodeError 兜底落 `allowed_sources[0]` | 预算 384→640 + 单行紧凑 JSON 指令（`97b8707`） | 直连采样 5 次：解析成功的计划全对 |
+| DEF-006 | 意图正确但计划源在采样间摇摆 | 规划器无确定性的意图→源覆盖底线 | planner 按意图补齐必需源（角色白名单内）（`f697e60`+`1305cd9`） | S2 拒绝路径确定性触发（8s） |
+
+场景结果：S1 ✅（quote 含 R2，缓存命中路径同步验证）、S2 ✅（干净拒绝，permission_denied /
+citations=[] / low，8s）、S3 ❌（503 瞬态×2 + 1 次 verify 失败兜底 154s——防线正确，见 DC-001）、
+S4 ❌（fail-closed，EPS 块 rank=4 未过 step top_k=3 融合截断，见 DC-008）、S5 ✅（TTFT 9.9s /
+总 10.9s / 174 个 token 级 delta，较 09-29 的 38.3s/60.0s 大幅改善）。SLO 实测：检索侧达标
+（DC-045）、端到端与 query_understand 仍未达标（DC-042/043）。
+
+### 状态分布（2026-09-30）
 
 | 状态 | 数量 | 案例 |
 |---|---|---|
-| ✅ 自动化已守护 | 47 | DC-002/003/005~007、009/010/012~023、024~034、036~039、041、044、046/047、049~057 |
-| ✅ 机制 + ⬜ 实机/真实流量 | 4 | DC-001、004、011、058（机制层绿，实机复测待跑） |
-| ⬜ 需实机 | 3 | DC-008、043、045 |
-| ❌ 未达标（已知） | 1 | DC-042 端到端 P95 |
-| ⚠️ 缺口登记 | 3 | DC-035、040、048 |
+| ✅ 自动化已守护 | 47 | DC-002/003/005~007、009/010、012~023、024~034、036~039、041、044、046/047、049~057 |
+| ✅ 机制 + 实测达标 | 2 | DC-045（检索侧实测亚秒）、DC-058（S1/S2/S5 实测通过，S3/S4 见 ❌ 行） |
+| ✅ 机制 + ⬜ 实机 | 2 | DC-004、DC-011 |
+| ❌ 未达标 | 4 | DC-001（S3 实机未获合规回答）、DC-008（S4 召回未打通）、DC-042（端到端 P95）、DC-043（query_understand ≤3s） |
+| ⚠️ 缺口登记 | 3 | DC-035、DC-040、DC-048 |
 
 证据：全量 `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 uv run python -m pytest -q` → 645 passed
 （2026-09-30 校准复核 HEAD 15f3ff5，44.05s；5df21a1 后仅文档提交、代码一致）；
@@ -503,3 +550,7 @@
    （`src/retrieval/hybrid_retriever.py`），节点注释宣称并行；不影响正确性，影响延迟验收解读，
    立项时要么改注释要么真并行。
 8. **CI 与完整安全审计未确认**——沿 issues.md 留档，不宣称项目安全。
+9. **S4 召回打通深挖**（DC-008）——EPS chunk 向量 rank=2~4（在 top-5 内）但 step 级
+   top_k=3 融合截断使其进不了 rerank 挽救窗口；需专项评估"意图底线补步/研报源放宽
+   step top_k/grade_and_filter 超量参数"的组合，并以 `scripts/evaluate_retrieval.py`
+   加自然语言问句（非 chunk 原文片段）回归集守护。
