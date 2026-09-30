@@ -1437,6 +1437,8 @@ def extract_citations(state: AssistantState) -> dict[str, Any]:
     citations = _CITATION_EXTRACTOR.extract(
         state.get(STATE_RETRIEVAL_RESULTS, []),
         query=query,
+        # 引用必须支撑本轮答案使用的事实（如风险等级 R2），传入答案供选句加权
+        answer=state.get(STATE_FINAL_ANSWER, ""),
     )
     return {STATE_CITATIONS: citations}
 

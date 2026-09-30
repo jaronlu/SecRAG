@@ -873,6 +873,34 @@ class TestVerify:
         assert "评级=买入" in (citations[0].get("quote") or "")
         assert "来源日期=2026-05-25" in (citations[0].get("quote") or "")
 
+    def test_citation_quote_prefers_sentence_backing_answer_fact(self):
+        extractor = CitationExtractor()
+        content = (
+            "产品名称：示例稳健增利理财产品（虚构）。产品类型：固定收益类理财产品，非保本浮动收益型。"
+            "本产品风险等级评定为 R2（中低风险）。风险等级由低到高分为 R1 至 R5 五档，"
+            "R2 表示本金和收益受市场波动影响较小，但不代表无风险。"
+        )
+        query = "示例稳健增利理财产品的风险等级是多少？"
+        answer = "## 结论\n\n示例稳健增利理财产品的风险等级为 R2（中低风险）[来源1]。"
+
+        without_answer = extractor.extract([_result(content)], query=query)[0]["quote"]
+        quote = extractor.extract([_result(content)], query=query, answer=answer)[0]["quote"]
+
+        # 回归锚（2026-09-30 演练 DEF-003）：只按查询词重叠会选中"产品名称"引导句，
+        # 答案使用的事实 R2 不出现在可见引用里，演示断言 quote 含 R2 失败
+        assert "R2" not in without_answer
+        assert "R2" in quote
+
+    def test_citation_quote_falls_back_to_query_overlap_without_answer_facts(self):
+        extractor = CitationExtractor()
+        content = "产品名称：示例稳健增利理财产品（虚构）。本产品风险等级评定为 R2（中低风险）。"
+        query = "示例稳健增利理财产品的风险等级是多少？"
+        answer = "## 结论\n\n该产品的收益特征按业绩比较基准表现。[来源1]"
+
+        quote = extractor.extract([_result(content)], query=query, answer=answer)[0]["quote"]
+
+        assert quote  # 无事实 token 命中时回退纯查询重叠，仍能选出句子
+
     def test_source_verifier_rejects_visible_citation_that_omits_structured_claim(self):
         verifier = SourceVerifier()
         result = verifier.verify(
