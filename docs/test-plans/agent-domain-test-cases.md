@@ -43,7 +43,7 @@
 |---|---|---|---|
 | DC-001 | 财报口径问答：营业收入 vs 营业总收入（ISSUE-22 回归） | P0 | ✅ 单元层 / ⬜ 实机 S3 复测 |
 | DC-002 | 引用可核验：结构化事实（机构/评级/日期/代码）归属 | P0 | ✅ |
-| DC-003 | 归属地目标价展示 vs 主动投资建议（impl-08 §3.2） | P0 | ✅ |
+| DC-003 | 归属目标价展示 vs 主动投资建议（impl-08 §3.2） | P0 | ✅ |
 | DC-004 | tool-only 问答（SQL/行情，citations=[]） | P1 | ✅ 机制 / ⬜ 实机 |
 | DC-005 | 工具失败 fail-closed（tool-only 负样本） | P0 | ✅ |
 | DC-006 | 不可回答问题的唯一合法终态 | P0 | ✅ |
@@ -141,7 +141,7 @@
 - 验证：`tests/test_verifier_boundaries.py`、`tests/test_agents.py`；引用链路端到端见 TC-016/TC-030。
 - 状态：✅
 
-#### DC-003 归属地目标价展示 vs 主动投资建议（P0，impl-08 §3.2）
+#### DC-003 归属目标价展示 vs 主动投资建议（P0，impl-08 §3.2）
 - 契约要点：三 targeting——①答案含"目标价"且带 `[来源N]`、且某条非 denied 检索结果原文同样含目标价（`_has_attributed_target_price`）→ 允许既有归属展示；②答案提目标价但无引用归属或证据不含 → verify 层注入 issue、compliance 层 `advice:目标价` 拦截；③"推荐买入/建议增持"等建议性改写任何情况拦截，不得以"转述研报"为由放行。
 - 预期结果：①通过验证与合规；②③分别被 verify（issues 非空→重推）与 compliance（passed=False→compose 兜底）拦截。
 - 验证：`tests/test_agents.py`（verify 层 attributed 豁免）、`tests/test_compliance.py`（`allow_attributed_target_price`）、`tests/e2e/test_e2e_compliance.py`（TC-024 变体）。

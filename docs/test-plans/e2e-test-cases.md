@@ -1,36 +1,52 @@
 # SecRAG 全链路测试案例（E2E Test Cases）
 
-> 依据 2026-09-25 代码实现梳理（`src/api`、`src/agents`、`src/ingestion`、`src/retrieval`、`src/utils`），
+> 依据代码实现梳理（`src/api`、`src/agents`、`src/ingestion`、`src/retrieval`、`src/utils`），
 > 非设计文档推断。LLM 与外部服务在测试中一律 mock/stub。
 >
 > 状态图例：⬜ 未执行 / ✅ 通过 / ❌ 不通过（附原因与缺陷编号）/ ⚠️ 阻塞（附原因）。
 > 最终不允许任何案例停留在 ⬜ 或空白。
+>
+> **本文档随代码演进维护**：2026-09-30 依 ISSUE-9~28 批次语义校订（planner 合并进 query_understand、
+> 语义缓存默认启用并升级 CacheBinding 绑定、reranker 真实生效、新增 widen/no_results 路由与请求级
+> deadline 等）；校订点在受影响案例以「演进备注」标注，历史执行证据原样保留。批次之后新增的领域
+> 能力案例见 [agent-domain-test-cases.md](./agent-domain-test-cases.md)（DC-001~058），两集互补不重复。
 
 ## 一、链路梳理结论（以代码为准）
 
 ```
 认证（Bearer demo token → 角色/部门/数据权限）
-→ QA API（/v1/assistant/qa：限流 → 会话 ensure → 语义缓存 lookup → Agent invoke[总超时] → 仅成功终态写缓存）
-→ SSE（/v1/assistant/qa/stream：progress/answer/error/done 事件）
-→ Agent Graph：load_conversation_context → resolve_followup_query → query_understand(LLM；消毒/注入检测/PII/语言)
-  → [歧义→clarify] → planner(LLM 计划，按 ROLE_ALLOWED_SOURCES 过滤) → retrieve(HybridRetriever+TTL 结果缓存)
-  → grade_and_filter(阈值/去重/rerank/top10；全 denied→permission_denied_response) → reason(ReAct；工具白名单/超时/熔断)
-  → extract_citations → verify(四层验证+角色建议拦截，最多重推 2 次) → compliance_check → compose(验证/合规失败兜底)
+→ QA API（/v1/assistant/qa：限流 → 会话 ensure → 语义缓存 lookup[绑定域等值+相似度] → Agent invoke[总超时+请求级 deadline] → 仅成功终态写缓存）
+→ SSE（/v1/assistant/qa/stream：progress/answer_delta/answer/error/done 事件；reason token 级流式）
+→ Agent Graph：load_conversation_context → resolve_followup_query → query_understand(单次 LLM 往返合并
+  意图/实体/重写/歧义/检索计划；消毒/注入检测/PII/语言)
+  → [歧义→clarify] → planner(计划规范化+ROLE_ALLOWED_SOURCES 白名单过滤，无 LLM)
+  → retrieve(HybridRetriever：超量取回×3 + TTL 结果缓存)
+  → grade_and_filter(阈值/去重/rerank 三态/top10；全 denied→permission_denied_response；
+    0 结果→query_understand 重试补计划；usable<2→widen(top_k×2 重检索，无 LLM 往返)；耗尽→no_results_response)
+  → reason(ReAct 子图；工具白名单/单工具 10s/熔断 60s/请求级 deadline)
+  → extract_citations → verify(五层验证含口径校验+角色建议拦截+归属目标价豁免，最多重推 2 次，每轮留痕)
+  → compliance_check → compose(验证/合规失败兜底；高置信度要求 reranker=applied)
   → persist_conversation_turn → audit_log(SQLite，失败走 outbox)
 文档入库：data/raw 分类目录（文件+<file>.meta.json 权限清单）→ /v1/admin/ingestion（technical 专用）
-  → create_run(202, 后台) → execute_run(逐文件：快照校验 → ingest_document：解析→分块→normalize→向量库 upsert/清理)
+  → create_run(202, 后台) → execute_run(逐文件：快照校验 → ingest_document：解析→分块(CHUNKER v2)→normalize→向量库 upsert/清理)
   → registry 记录 created/replaced/skipped/failed
 ```
 
 要点：
 - 本仓库无 multipart 上传端点；"文档上传"= 文件放入 `data/raw/<分类>/` 并附带 `<file>.meta.json` 权限清单，再经入库任务处理。
-- 语义缓存默认关闭（`config.semantic_cache_enabled = False`），启用条件见 issues.md 一.1；缓存用例使用显式 `enabled=True` 的独立实例或替换 `get_semantic_cache`。
+- 语义缓存自 ISSUE-26（2026-09-29）起默认启用（`config.semantic_cache_enabled = True`）：命中需绑定域
+  `user_id/client_id/permission_scope/normalized_query/context_hash/kb_version` + role 等值全匹配后再比
+  相似度 ≥0.90（TTL 24h，kb_version 随重入库失效）；仅成功终态入缓存；命中路径补写会话回合与审计事件；
+  流式端点不查缓存。TC-032~035 以显式 `enabled=True` 实例编写，结论仍成立（见环节 F 演进备注）。
+- reranker 自 ISSUE-27（2026-09-29）起真实生效（FlagEmbedding + bge-reranker-v2-m3 本地权重）：
+  `reranker_status ∈ applied/unavailable/error:<msg>`，不可用显式降级不冒充；compose 高置信度要求 `applied`。
 - 检索源权限两级：计划级（角色→source 白名单）+ 结果级（`permission_level`/`allowed_roles` metadata）。
 - 支持格式：`.pdf/.docx/.doc/.html/.htm/.csv/.xlsx/.xls`；每个文件必须有同级 `.meta.json`（`permission_level ∈ public/internal/confidential`）。
 
 ## 二、测试环境与运行方式
 
 - 运行命令：`uv run python -m pytest`（注意：`uv run pytest` 会解析到系统 pytest，不可用；2026-09-25 实测 `uv run python -m pytest tests/test_semantic_cache.py` 3 passed in 0.13s）。
+- 2026-09-29 起（FlagEmbedding 进入依赖）本机运行必须带 `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1`，否则模型加载路径会尝试连 huggingface.co；系统代理为死端口时表现为挂起（见 todo/issues.md 备注）。
 - 全量回归：`uv run python -m pytest -q`。
 - 测试代码位置：`tests/e2e/`（pytest `testpaths=["tests"]`，`asyncio_mode="auto"`）。
 - LLM（`src.agents.nodes.llm` / `_get_bound_reason_model`）、向量检索（`HybridRetriever`）、embedding、SQLite 存储（会话/审计/registry）在测试中替换为 mock 或 `tmp_path` 隔离实例；不依赖真实服务与密钥。
@@ -131,6 +147,7 @@
 - 测试步骤：1) permission_level=confidential；2) permission_level=internal 但无 allowed_roles；3) public 无 allowed_roles；4) internal 且 allowed_roles 含 advisor。
 - 预期结果：1) denied；2) denied（非公开缺 allowed_roles 默认拒绝）；3) 放行（公开默认放行）；4) 放行。
 - 实际结果：`test_tc012_*` passed——五种组合（含 allowed_roles 逗号字符串变体）判定全部符合契约，denied 结果内容清空、分数归零。
+- 演进备注（2026-09-30）：执行层现按 `requested_top_k × PERMISSION_OVERFETCH_FACTOR(3)` 超量取回后再做角色过滤，输出 `usable[:top_k] + denied 占位`，避免高分候选全部越权时误判"全部越权"；本案例判定契约不变。
 - 状态：✅ 通过
 
 #### TC-013 BM25 失败静默降级（P1）
@@ -152,6 +169,7 @@
 - 测试步骤：1) 混合高/低分、重复来源结果执行 grade_and_filter；2) 检查 reranker_status。
 - 预期结果：低分（< RETRIEVAL_MIN_SCORE）被过滤；同 source+chunk 去重；保留 GRADE_TOP_K 条；reranker 不可用时 status="unavailable"（不得冒充语义重排）。
 - 实际结果：`test_tc015_*` 2 passed——阈值过滤/去重/top-10/`reranker_status="unavailable"` 均符合；reranker 可用（fake）时 status="applied" 且语义序生效。
+- 演进备注（2026-09-30）：ISSUE-27 后 reranker 真实安装，`unavailable` 仅对应未安装/权重缺失（`RerankerNotConfigured`），其余运行期故障为 `error:<msg>`——三态语义见 `tests/test_tools.py`；生产链路实测 `applied`（交叉编码器分数覆盖原始 cosine 序），compose 高置信度现要求 `applied`。
 - 状态：✅ 通过
 
 ### 环节 D：QA 问答（含 SSE）
@@ -162,6 +180,7 @@
 - 测试数据：《XX 货币市场基金 2024 年年度报告》片段："本基金风险等级为低风险（R1），适合保守型投资者。"
 - 预期结果：final_answer 为结构化 Markdown（`## 结论` 开头）且含 [来源1]；citations 非空且指向该来源；confidence 非 low；verification.passed=True；compliance.passed=True；会话库落 turn；审计库落完整条目。
 - 实际结果：`test_e2e_qa.py::test_tc016_*` passed——真实 Graph + 真实验证器/合规器：答案结构化带 [来源1]，citations 指向财报来源，confidence=medium，验证/合规通过，会话与审计落 tmp 库（Red 阶段曾因绕过 API 层 ensure 会话而失败，按真实链路先建会话后转绿）。
+- 演进备注（2026-09-30）：ISSUE-11 后意图/实体/重写/歧义/检索计划合并为 query_understand 单次 LLM 往返，planner 节点不再调用 LLM，只做规范化与角色白名单过滤；本案例的 mock 面与断言不变。verify 现为五层（新增口径校验 CaliberVerifier），置信度合成要求 `reranker_status == "applied"` 才可判 high。
 - 状态：✅ 通过
 
 #### TC-017 SSE 流式事件协议（P0）
@@ -176,6 +195,7 @@
 - 测试步骤：运行 Agent Graph 至终态。
 - 预期结果：reason 至多重推 MAX_REASON_ATTEMPTS 次；终态 answer 被替换为"未通过来源或数字验证"安全提示；citations 清空；confidence=low；不将不可靠答案返回给用户。
 - 实际结果：`test_tc018_*` passed——编造数字答案重推至 MAX_REASON_ATTEMPTS=2 后被"未通过来源或数字验证"提示替换，引用清空、confidence=low。
+- 演进备注（2026-09-30）：ISSUE-25 后 verify 每轮追加留痕 `{round, passed, failure_kind, issues, confidence}`（state 键 `verification_attempts`，随 verification 落审计）并生成 `retry_diagnosis`（含 `format_only_retries` 计数，应长期为 0）——可区分"验证器误判"与"真实无支撑"；本案例的重推语义与断言不变。
 - 状态：✅ 通过
 
 #### TC-019 请求处理超时（P0）
@@ -211,6 +231,7 @@
 - 测试步骤：1) 角色工具集之外的 tool_call；2) mock 工具执行超过 TOOL_TIMEOUT_SECONDS。
 - 预期结果：1) 返回 status=error 的 ToolMessage（"无权调用"），工具不执行；2) 超时返回 error ToolMessage 且该工具进入熔断（冷却期内再次调用被直接拒绝）。
 - 实际结果：`test_tc023_*` 2 passed——advisor 调 faq_search 被拒且 execute 未调用；calculator 超时后熔断，冷却期内第二次调用直接拒绝。
+- 演进备注（2026-09-30）：ISSUE-17 后新增请求级 `STATE_REQUEST_DEADLINE`——总超时临近时工具执行与规划调用协同取消（"请求处理已超时，工具调用已停止。"），与单工具 10s 超时、60s 熔断并存；守护见 `tests/test_tool_deadline.py`。本案例断言不变。
 - 状态：✅ 通过
 
 ### 环节 E：金融合规与安全
@@ -258,6 +279,13 @@
 - 状态：✅ 通过
 
 ### 环节 F：审计日志与语义缓存
+
+> 演进备注（2026-09-30）：ISSUE-26 后语义缓存默认启用，且绑定升级为 CacheBinding——
+> `user_id / client_id / permission_scope / normalized_query / context_hash / kb_version` 六个绑定域
+> 与 role 列等值全匹配后才进入相似度比较（阈值 0.90、TTL 24h、kb_version 随重入库失效）；
+> 命中路径补写会话回合并补记 `execution_path=["semantic_cache_hit"]` 审计事件。以下 TC-032~035
+> 的执行前提（显式 enabled=True 实例）与结论仍成立；默认启用后的六维隔离、命中快照与审计语义
+> 由 [agent-domain-test-cases.md](./agent-domain-test-cases.md) DC-024~027 承接。
 
 #### TC-030 审计留痕完整性（P0）
 - 前置条件：TC-016 场景执行完成，tmp 审计库。
@@ -314,9 +342,16 @@
 - **DEF-001 已修复**（commit 1f5deb6）：`_TARGET_PRICE_REGEXES` 的 `\bTP\b` 改为 `(?<![A-Za-z])TP(?![A-Za-z])`——只排除 ASCII 字母相邻的边界在空白归一化后依然成立，同时覆盖紧邻汉字写法（`TP为12.5`）；`HTTP`/`TPU` 等不误报。`test_tc024_tp_with_number_should_be_blocked` 已解除 xfail(strict) 并新增 `该基金TP为12.5元` 变体。
 - **DEF-002 已修复**（commit 8632996）：`query_sanitized`/`pii_detected`/`language` 声明进 `AssistantState`（`pii_detected` 为 `detect_pii` 结果列表）；`AuditQuery` 新增 `sanitized`/`pii`/`language`，`AuditLogger` 从 state 填充，审计库经 `payload_json` 透明携带（无需改 SQLite 表结构）；`test_tc028_injection_flag_should_persist_in_state` 已解除 xfail 并扩展断言至审计链路。
 
-## 五、执行汇总（2026-09-26 更新：DEF-001/DEF-002 修复后全绿）
+## 五、执行汇总（2026-09-30 复核更新；2026-09-26 战役记录原样保留）
 
-### 案例总数与状态
+### 2026-09-30 复核（ISSUE-9~28 批次后）
+
+- `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 uv run python -m pytest tests/e2e -q` → **77 passed, 1 warning in 22.10s**（HEAD 5df21a1；战役收官时为 73 用例，其后并入 Langfuse E2E 等用例）。
+- 全量 `uv run python -m pytest -q` → **645 passed**（含本集全部用例与 agent-domain-test-cases.md 引用的守护测试）。
+- 本集语义已按第一节要点与各案例「演进备注（2026-09-30）」校订至当前代码；文档随代码演进维护，
+  后续批次按同一机制在受影响案例追加演进备注、并刷新本节复核记录。
+
+### 案例总数与状态（2026-09-26 战役收官）
 
 | 状态 | 数量 | 案例 |
 |---|---|---|
