@@ -346,8 +346,8 @@
 
 ### 2026-09-30 复核（ISSUE-9~28 批次后）
 
-- `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 uv run python -m pytest tests/e2e -q` → **77 passed, 1 warning in 22.10s**（HEAD 5df21a1；战役收官时为 73 用例，其后并入 Langfuse E2E 等用例）。
-- 全量 `uv run python -m pytest -q` → **645 passed**（含本集全部用例与 agent-domain-test-cases.md 引用的守护测试）。
+- `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 uv run python -m pytest tests/e2e -q` → **77 passed, 1 warning in 22.10s**（首次复核 HEAD 5df21a1；2026-09-30 校准再复核 HEAD 15f3ff5——其后仅文档提交、代码一致——同为 77 passed, 1 warning in 16.31s。战役收官时为 73 用例，其后并入 Langfuse E2E 等用例）。
+- 全量 `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 uv run python -m pytest -q` → **645 passed**（首次复核 67.15s@5df21a1，2026-09-30 校准再复核 44.05s@15f3ff5，结果一致；含本集全部用例与 agent-domain-test-cases.md 引用的守护测试。本机须带 HF 离线变量，见第二节）。
 - 本集语义已按第一节要点与各案例「演进备注（2026-09-30）」校订至当前代码；文档随代码演进维护，
   后续批次按同一机制在受影响案例追加演进备注、并刷新本节复核记录。
 
@@ -364,7 +364,7 @@
 1. **DEF-001（TC-024，P1 合规漏检）— 已修复（1f5deb6）**：TP+数字目标价写法（`TP 12.5 元`/`建议TP 15元`/`TP12.5`）曾逃过投资建议拦截；根因为空白归一化与 `\bTP\b` 词边界不兼容，TP 正则已改用 ASCII 字母 lookaround 边界。
 2. **DEF-002（TC-028，P2 可观测性缺口）— 已修复（8632996）**：`query_sanitized`/`pii_detected`/`language` 曾未声明进 `AssistantState`，LangGraph 静默丢弃且无下游消费者；现已声明进 state 并写入审计 `query.sanitized/pii/language`。
 
-### 未覆盖风险点
+### 未覆盖风险点（2026-09-26 时点快照；语义缓存默认值与 reranker 可用性此后已随 ISSUE-26/27 变化，现值见环节 F 头注与各案例「演进备注」，本节原样保留战役当时记录）
 
 - **语义缓存默认关闭**（`semantic_cache_enabled=False`）：缓存启用条件（issues.md 一.1：绑定会话上下文与知识库版本）未满足，TC-032~035 通过"显式启用实例 + API 层替身"覆盖，缓存开启后与多轮会话叠加的行为无生产验证。
 - **真实 embedding 模型与真实 Chroma 语义检索**：检索用例使用 stub 源检索器 + 真实权限/容错层；embedding 相似度质量、BM25 索引构建、Chroma collection 模型一致性校验未在本战役覆盖（避免模型下载与真实数据依赖）。
