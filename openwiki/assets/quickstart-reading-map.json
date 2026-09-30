@@ -1,0 +1,226 @@
+{
+  "schema_version": 1,
+  "mode": "flowchart",
+  "template_type": "flowchart",
+  "style": 1,
+  "width": 960,
+  "height": 750,
+  "title": "新开发者阅读路线",
+  "subtitle": "完成上手顺序后，按主题进入十条阅读路线",
+  "text_policy": "strict",
+  "footer": "SecRAG · Quickstart",
+  "footer_y": 726,
+  "nodes": [
+    {
+      "id": "dev",
+      "kind": "rect",
+      "x": 380,
+      "y": 108,
+      "width": 200,
+      "height": 48,
+      "type_label": "START",
+      "label": "新开发者"
+    },
+    {
+      "id": "qs",
+      "kind": "double_rect",
+      "x": 230,
+      "y": 196,
+      "width": 500,
+      "height": 64,
+      "type_label": "ONBOARDING",
+      "label": "按本页顺序上手",
+      "sublabel": "安装依赖 → 配置模型 → 导入样例 → 启动服务 → 首次问答"
+    },
+    {
+      "id": "r1",
+      "kind": "rect",
+      "x": 40,
+      "y": 316,
+      "width": 380,
+      "height": 56,
+      "type_label": "R1",
+      "label": "问答请求执行链路"
+    },
+    {
+      "id": "r2",
+      "kind": "rect",
+      "x": 40,
+      "y": 392,
+      "width": 380,
+      "height": 56,
+      "type_label": "R2",
+      "label": "知识入库链路"
+    },
+    {
+      "id": "r3",
+      "kind": "rect",
+      "x": 40,
+      "y": 468,
+      "width": 380,
+      "height": 56,
+      "type_label": "R3",
+      "label": "检索系统：混合检索与权限过滤"
+    },
+    {
+      "id": "r4",
+      "kind": "rect",
+      "x": 40,
+      "y": 544,
+      "width": 380,
+      "height": 56,
+      "type_label": "R4",
+      "label": "状态、权限与安全边界"
+    },
+    {
+      "id": "r5",
+      "kind": "rect",
+      "x": 40,
+      "y": 620,
+      "width": 380,
+      "height": 56,
+      "type_label": "R5",
+      "label": "API 表面与前端契约"
+    },
+    {
+      "id": "r6",
+      "kind": "rect",
+      "x": 540,
+      "y": 316,
+      "width": 380,
+      "height": 56,
+      "type_label": "R6",
+      "label": "共享模式：字段常量与 AssistantState"
+    },
+    {
+      "id": "r7",
+      "kind": "rect",
+      "x": 540,
+      "y": 392,
+      "width": 380,
+      "height": 56,
+      "type_label": "R7",
+      "label": "工具边界：可见性、授权与执行保护"
+    },
+    {
+      "id": "r8",
+      "kind": "rect",
+      "x": 540,
+      "y": 468,
+      "width": 380,
+      "height": 56,
+      "type_label": "R8",
+      "label": "数据与离线作业：样例数据、抓取与每日扫描"
+    },
+    {
+      "id": "r9",
+      "kind": "rect",
+      "x": 540,
+      "y": 544,
+      "width": 380,
+      "height": 56,
+      "type_label": "R9",
+      "label": "测试与评估：检索评估与权限冒烟"
+    },
+    {
+      "id": "r10",
+      "kind": "rect",
+      "x": 540,
+      "y": 620,
+      "width": 380,
+      "height": 56,
+      "type_label": "R10",
+      "label": "观测与运维：审计、指标、追踪与缓存"
+    }
+  ],
+  "arrows": [
+    {
+      "id": "e0",
+      "source": "dev",
+      "target": "qs",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "er1",
+      "source": "qs",
+      "target": "r1",
+      "source_port": "bottom",
+      "target_port": "right",
+      "flow": "control"
+    },
+    {
+      "id": "er2",
+      "source": "qs",
+      "target": "r2",
+      "source_port": "bottom",
+      "target_port": "right",
+      "flow": "control"
+    },
+    {
+      "id": "er3",
+      "source": "qs",
+      "target": "r3",
+      "source_port": "bottom",
+      "target_port": "right",
+      "flow": "control"
+    },
+    {
+      "id": "er4",
+      "source": "qs",
+      "target": "r4",
+      "source_port": "bottom",
+      "target_port": "right",
+      "flow": "control"
+    },
+    {
+      "id": "er5",
+      "source": "qs",
+      "target": "r5",
+      "source_port": "bottom",
+      "target_port": "right",
+      "flow": "control"
+    },
+    {
+      "id": "er6",
+      "source": "qs",
+      "target": "r6",
+      "source_port": "bottom",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "er7",
+      "source": "qs",
+      "target": "r7",
+      "source_port": "bottom",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "er8",
+      "source": "qs",
+      "target": "r8",
+      "source_port": "bottom",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "er9",
+      "source": "qs",
+      "target": "r9",
+      "source_port": "bottom",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "er10",
+      "source": "qs",
+      "target": "r10",
+      "source_port": "bottom",
+      "target_port": "left",
+      "flow": "control"
+    }
+  ]
+}
