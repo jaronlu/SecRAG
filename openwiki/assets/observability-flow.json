@@ -1,0 +1,331 @@
+{
+  "schema_version": 1,
+  "mode": "flowchart",
+  "template_type": "flowchart",
+  "style": 1,
+  "width": 1000,
+  "height": 850,
+  "title": "观测与运维：一次请求的三条观测面",
+  "subtitle": "限流 / 语义缓存 / 图执行主链路 + MetricsRegistry 指标 + 追踪脱敏导出",
+  "text_policy": "strict",
+  "legend_orientation": "vertical",
+  "legend_x": 24,
+  "legend_y": 736,
+  "legend_locked": true,
+  "legend": [
+    {
+      "flow": "control",
+      "label": "请求主链路"
+    },
+    {
+      "flow": "neutral",
+      "label": "失败 / 旁路输出"
+    }
+  ],
+  "footer": "SecRAG · 观测与运维",
+  "footer_y": 826,
+  "nodes": [
+    {
+      "id": "req",
+      "kind": "rect",
+      "x": 360,
+      "y": 100,
+      "width": 300,
+      "height": 64,
+      "type_label": "ENTRY",
+      "label": "POST /v1/assistant/qa",
+      "sublabel": "（或 /stream）"
+    },
+    {
+      "id": "rl429",
+      "kind": "rect",
+      "x": 20,
+      "y": 210,
+      "width": 260,
+      "height": 64,
+      "type_label": "REJECT",
+      "label": "Retry-After: 60",
+      "sublabel": "SSE error 事件"
+    },
+    {
+      "id": "rl",
+      "kind": "rect",
+      "x": 360,
+      "y": 210,
+      "width": 300,
+      "height": 64,
+      "type_label": "RATE LIMIT",
+      "label": "check_rate_limit",
+      "sublabel": "滑动窗口"
+    },
+    {
+      "id": "hit",
+      "kind": "rect",
+      "x": 20,
+      "y": 320,
+      "width": 260,
+      "height": 64,
+      "type_label": "CACHE HIT",
+      "label": "补 semantic_cache_hit 审计",
+      "sublabel": "复用终态快照"
+    },
+    {
+      "id": "cache",
+      "kind": "rect",
+      "x": 360,
+      "y": 320,
+      "width": 300,
+      "height": 64,
+      "type_label": "CACHE",
+      "label": "语义缓存 lookup",
+      "sublabel": "embedding 相似度"
+    },
+    {
+      "id": "span",
+      "kind": "rect",
+      "x": 20,
+      "y": 430,
+      "width": 260,
+      "height": 64,
+      "type_label": "TRACING",
+      "label": "start_node_span",
+      "sublabel": "每节点 _traced_node · 白名单 metadata"
+    },
+    {
+      "id": "graph",
+      "kind": "rect",
+      "x": 360,
+      "y": 430,
+      "width": 300,
+      "height": 64,
+      "type_label": "EXECUTE",
+      "label": "LangGraph 图执行"
+    },
+    {
+      "id": "audit",
+      "kind": "rect",
+      "x": 20,
+      "y": 540,
+      "width": 260,
+      "height": 64,
+      "type_label": "AUDIT",
+      "label": "audit_log 节点",
+      "sublabel": "AuditLogger → SQLite insert"
+    },
+    {
+      "id": "store",
+      "kind": "rect",
+      "x": 360,
+      "y": 540,
+      "width": 300,
+      "height": 64,
+      "type_label": "CACHE WRITE",
+      "label": "cache.store",
+      "sublabel": "TTL 24h · 角色隔离"
+    },
+    {
+      "id": "outbox",
+      "kind": "rect",
+      "x": 20,
+      "y": 650,
+      "width": 260,
+      "height": 64,
+      "type_label": "FAIL",
+      "label": "标记对话 outbox 失败",
+      "sublabel": "audit_write_failed 留痕"
+    },
+    {
+      "id": "metrics",
+      "kind": "rect",
+      "x": 720,
+      "y": 210,
+      "width": 260,
+      "height": 64,
+      "type_label": "METRICS",
+      "label": "MetricsRegistry",
+      "sublabel": "queries · duration · cache · retrieval"
+    },
+    {
+      "id": "prom",
+      "kind": "rect",
+      "x": 720,
+      "y": 320,
+      "width": 260,
+      "height": 56,
+      "type_label": "EXPORT",
+      "label": "Prometheus 文本格式"
+    },
+    {
+      "id": "health",
+      "kind": "rect",
+      "x": 720,
+      "y": 404,
+      "width": 260,
+      "height": 56,
+      "type_label": "EXPORT",
+      "label": "get_summary() 摘要"
+    },
+    {
+      "id": "trace",
+      "kind": "rect",
+      "x": 720,
+      "y": 488,
+      "width": 260,
+      "height": 64,
+      "type_label": "TRACING",
+      "label": "start_request_trace",
+      "sublabel": "根 trace · agent.request"
+    },
+    {
+      "id": "mask",
+      "kind": "rect",
+      "x": 720,
+      "y": 660,
+      "width": 260,
+      "height": 64,
+      "type_label": "PRIVACY",
+      "label": "mask_otel_spans",
+      "sublabel": "导出层脱敏 / 删除"
+    },
+    {
+      "id": "lf",
+      "kind": "rect",
+      "x": 720,
+      "y": 770,
+      "width": 260,
+      "height": 52,
+      "type_label": "SAAS",
+      "label": "Langfuse"
+    }
+  ],
+  "arrows": [
+    {
+      "id": "req-rl",
+      "source": "req",
+      "target": "rl",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "req-metrics",
+      "source": "req",
+      "target": "metrics",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "req-trace",
+      "source": "req",
+      "target": "trace",
+      "source_port": "right",
+      "target_port": "left",
+      "flow": "control"
+    },
+    {
+      "id": "rl-429",
+      "source": "rl",
+      "target": "rl429",
+      "source_port": "left",
+      "target_port": "right",
+      "flow": "neutral",
+      "label": "429"
+    },
+    {
+      "id": "rl-cache",
+      "source": "rl",
+      "target": "cache",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    },
+    {
+      "id": "cache-hit",
+      "source": "cache",
+      "target": "hit",
+      "source_port": "left",
+      "target_port": "right",
+      "flow": "control",
+      "label": "命中"
+    },
+    {
+      "id": "cache-graph",
+      "source": "cache",
+      "target": "graph",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control",
+      "label": "未命中"
+    },
+    {
+      "id": "graph-span",
+      "source": "graph",
+      "target": "span",
+      "source_port": "left",
+      "target_port": "right",
+      "flow": "control"
+    },
+    {
+      "id": "graph-audit",
+      "source": "graph",
+      "target": "audit",
+      "source_port": "left",
+      "target_port": "right",
+      "flow": "control"
+    },
+    {
+      "id": "graph-store",
+      "source": "graph",
+      "target": "store",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control",
+      "label": "成功终态且验证/合规通过"
+    },
+    {
+      "id": "audit-outbox",
+      "source": "audit",
+      "target": "outbox",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "neutral",
+      "label": "失败"
+    },
+    {
+      "id": "metrics-prom",
+      "source": "metrics",
+      "target": "prom",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control",
+      "label": "/metrics"
+    },
+    {
+      "id": "metrics-health",
+      "source": "metrics",
+      "target": "health",
+      "source_port": "bottom",
+      "target_port": "left",
+      "flow": "control",
+      "label": "/health"
+    },
+    {
+      "id": "trace-mask",
+      "source": "trace",
+      "target": "mask",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control",
+      "label": "export 批处理"
+    },
+    {
+      "id": "mask-lf",
+      "source": "mask",
+      "target": "lf",
+      "source_port": "bottom",
+      "target_port": "top",
+      "flow": "control"
+    }
+  ]
+}

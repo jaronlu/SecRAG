@@ -67,24 +67,7 @@ SecRAG 的运维观测面按**职责边界**分成四块，互不重叠：
 
 ## 1. 总览：观测数据流
 
-```mermaid
-flowchart TD
-    REQ["POST /v1/assistant/qa (或 /stream)"] --> RL["check_rate_limit 滑动窗口"]
-    RL -->|"429"| RL429["Retry-After: 60 / SSE error 事件"]
-    RL --> CACHE["语义缓存 lookup（embedding 相似度）"]
-    CACHE -->|命中| HIT["补 semantic_cache_hit 审计 + 复用终态快照"]
-    CACHE -->|未命中| GRAPH["LangGraph 图执行"]
-    GRAPH -->|"每节点 _traced_node"| SPAN["start_node_span 白名单 metadata"]
-    GRAPH --> AUDITNODE["audit_log 节点：AuditLogger 组装 → SQLite insert"]
-    AUDITNODE -->|失败| OUTBOX["标记对话 outbox 失败 + data/audit_outbox.jsonl + audit_write_failed"]
-    GRAPH -->|"成功终态且验证/合规通过"| STORE["cache.store（TTL 24h，角色隔离）"]
-    REQ --> METRICS["MetricsRegistry：queries/duration/cache/retrieval/verification/compliance/langfuse_*"]
-    METRICS -->|"/metrics"| PROM["Prometheus 文本格式"]
-    METRICS -->|"/health"| HEALTH["get_summary() 摘要"]
-    REQ --> TRACE["start_request_trace 根 trace（agent.request）"]
-    TRACE -->|"export 批处理"| MASK["mask_otel_spans 导出层脱敏/删除"]
-    MASK --> LF["Langfuse"]
-```
+![观测与运维：一次请求的三条观测面](../assets/observability-flow.svg)
 
 ## 2. 审计：SQLite 全链路留痕与失败降级
 
