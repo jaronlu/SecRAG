@@ -657,7 +657,7 @@ def query_understand(state: AssistantState) -> dict[str, Any]:
 
     language = detect_language(safe_query)
     allowed_sources = ROLE_ALLOWED_SOURCES.get(state[STATE_USER_ROLE], [])
-    prompt = f"""分析下面的业务查询，一次返回查询理解与检索计划（只返回一个 JSON 对象）：
+    prompt = f"""分析下面的业务查询，一次返回查询理解与检索计划（只输出一行紧凑 JSON，禁止换行缩进）：
 查询：{safe_query}
 角色：{state[STATE_USER_ROLE]}；部门：{state[STATE_DEPARTMENT]}
 数据源（限当前角色）：product_search 产品说明书/合同/风险揭示书；regulation_search 规则法规/内部制度/处罚案例；report_search 研报/晨会/策略周报；faq_search 常见问题/操作流程。
