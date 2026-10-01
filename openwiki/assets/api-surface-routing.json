@@ -3,15 +3,14 @@
   "mode": "flowchart",
   "template_type": "flowchart",
   "style": 1,
-  "width": 1000,
-  "height": 760,
+  "width": 1060,
+  "height": 1142,
   "title": "API 入口与路由拓扑",
   "subtitle": "React SPA 经 FastAPI 应用进入认证、问答、会话、管理与观测端点",
   "text_policy": "strict",
   "legend_orientation": "vertical",
   "legend_x": 48,
   "legend_y": 560,
-  "legend_locked": true,
   "legend": [
     {
       "flow": "control",
@@ -19,7 +18,7 @@
     }
   ],
   "footer": "SecRAG · API Surface",
-  "footer_y": 736,
+  "footer_y": 1116,
   "nodes": [
     {
       "id": "fe",
@@ -27,7 +26,7 @@
       "x": 28,
       "y": 292,
       "width": 172,
-      "height": 64,
+      "height": 88,
       "type_label": "UI",
       "label": "React SPA",
       "sublabel": "唯一 UI 入口"
@@ -38,7 +37,7 @@
       "x": 316,
       "y": 286,
       "width": 194,
-      "height": 76,
+      "height": 88,
       "type_label": "HUB",
       "label": "FastAPI 应用",
       "sublabel": "src/api/main.py"
@@ -49,7 +48,7 @@
       "x": 640,
       "y": 106,
       "width": 320,
-      "height": 56,
+      "height": 88,
       "type_label": "AUTH",
       "label": "authenticate_user",
       "sublabel": "依赖注入"
@@ -58,9 +57,9 @@
       "id": "qa",
       "kind": "rect",
       "x": 640,
-      "y": 186,
+      "y": 238,
       "width": 320,
-      "height": 56,
+      "height": 88,
       "type_label": "QA",
       "label": "assistant_qa",
       "sublabel": "POST /v1/assistant/qa"
@@ -69,9 +68,9 @@
       "id": "sse",
       "kind": "rect",
       "x": 640,
-      "y": 266,
+      "y": 370,
       "width": 320,
-      "height": 56,
+      "height": 88,
       "type_label": "QA · SSE",
       "label": "assistant_qa_stream",
       "sublabel": "POST /v1/assistant/qa/stream"
@@ -80,9 +79,9 @@
       "id": "thr",
       "kind": "rect",
       "x": 640,
-      "y": 346,
+      "y": 502,
       "width": 320,
-      "height": 56,
+      "height": 88,
       "type_label": "THREADS",
       "label": "SQLiteConversationStore",
       "sublabel": "/v1/assistant/threads*"
@@ -91,9 +90,9 @@
       "id": "ing",
       "kind": "rect",
       "x": 640,
-      "y": 426,
+      "y": 634,
       "width": 320,
-      "height": 56,
+      "height": 88,
       "type_label": "ADMIN",
       "label": "ingestion router",
       "sublabel": "/v1/admin/ingestion/* · technical-only"
@@ -102,9 +101,9 @@
       "id": "adm",
       "kind": "rect",
       "x": 640,
-      "y": 506,
+      "y": 766,
       "width": 320,
-      "height": 56,
+      "height": 88,
       "type_label": "ADMIN",
       "label": "KnowledgeBaseManager / SemanticCache",
       "sublabel": "/v1/admin/documents* · cache* · stats"
@@ -113,9 +112,9 @@
       "id": "obs",
       "kind": "rect",
       "x": 640,
-      "y": 586,
+      "y": 898,
       "width": 320,
-      "height": 56,
+      "height": 88,
       "type_label": "OBSERVABILITY",
       "label": "MetricsRegistry / ChromaVectorRetriever",
       "sublabel": "/health · /metrics"
@@ -124,9 +123,9 @@
       "id": "spa",
       "kind": "rect",
       "x": 640,
-      "y": 666,
+      "y": 1030,
       "width": 320,
-      "height": 56,
+      "height": 88,
       "type_label": "STATIC",
       "label": "frontend/dist",
       "sublabel": "静态资源与 SPA catch-all"
@@ -146,9 +145,15 @@
       "id": "e1",
       "source": "api",
       "target": "auth",
-      "source_port": "right",
+      "source_port": "top",
       "target_port": "left",
-      "flow": "control"
+      "flow": "control",
+      "route_points": [
+        [
+          413,
+          150
+        ]
+      ]
     },
     {
       "id": "e2",
@@ -156,7 +161,13 @@
       "target": "qa",
       "source_port": "right",
       "target_port": "left",
-      "flow": "control"
+      "flow": "control",
+      "route_points": [
+        [
+          525,
+          282
+        ]
+      ]
     },
     {
       "id": "e3",
@@ -164,7 +175,13 @@
       "target": "sse",
       "source_port": "right",
       "target_port": "left",
-      "flow": "control"
+      "flow": "control",
+      "route_points": [
+        [
+          615,
+          414
+        ]
+      ]
     },
     {
       "id": "e4",
@@ -172,7 +189,13 @@
       "target": "thr",
       "source_port": "right",
       "target_port": "left",
-      "flow": "control"
+      "flow": "control",
+      "route_points": [
+        [
+          600,
+          546
+        ]
+      ]
     },
     {
       "id": "e5",
@@ -180,7 +203,13 @@
       "target": "ing",
       "source_port": "right",
       "target_port": "left",
-      "flow": "control"
+      "flow": "control",
+      "route_points": [
+        [
+          585,
+          678
+        ]
+      ]
     },
     {
       "id": "e6",
@@ -188,7 +217,13 @@
       "target": "adm",
       "source_port": "right",
       "target_port": "left",
-      "flow": "control"
+      "flow": "control",
+      "route_points": [
+        [
+          570,
+          810
+        ]
+      ]
     },
     {
       "id": "e7",
@@ -196,7 +231,13 @@
       "target": "obs",
       "source_port": "right",
       "target_port": "left",
-      "flow": "control"
+      "flow": "control",
+      "route_points": [
+        [
+          555,
+          942
+        ]
+      ]
     },
     {
       "id": "e8",
@@ -204,7 +245,13 @@
       "target": "spa",
       "source_port": "right",
       "target_port": "left",
-      "flow": "control"
+      "flow": "control",
+      "route_points": [
+        [
+          540,
+          1074
+        ]
+      ]
     }
   ]
 }

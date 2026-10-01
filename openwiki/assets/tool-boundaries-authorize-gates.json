@@ -4,7 +4,7 @@
   "template_type": "flowchart",
   "style": 1,
   "width": 960,
-  "height": 780,
+  "height": 878,
   "title": "authorize_reason_tool_call：执行边界四重检查",
   "subtitle": "顺序闸门，任一失败即短路返回 status=error ToolMessage",
   "text_policy": "strict",
@@ -15,7 +15,7 @@
       "x": 60,
       "y": 118,
       "width": 230,
-      "height": 56,
+      "height": 64,
       "type_label": "INPUT",
       "label": "ToolCallRequest"
     },
@@ -25,7 +25,7 @@
       "x": 45,
       "y": 204,
       "width": 310,
-      "height": 64,
+      "height": 88,
       "type_label": "① 角色授权",
       "label": "工具名白名单",
       "sublabel": "工具名 ∈ reason_tools(state)"
@@ -34,9 +34,9 @@
       "id": "a2",
       "kind": "rect",
       "x": 45,
-      "y": 310,
+      "y": 336,
       "width": 310,
-      "height": 64,
+      "height": 88,
       "type_label": "② 请求级截止时间",
       "label": "请求 deadline 检查",
       "sublabel": "_request_deadline_exceeded(state)"
@@ -45,9 +45,9 @@
       "id": "a3",
       "kind": "rect",
       "x": 45,
-      "y": 416,
+      "y": 468,
       "width": 310,
-      "height": 64,
+      "height": 88,
       "type_label": "③ 熔断器",
       "label": "60s 冷却检查",
       "sublabel": "TOOL_CIRCUIT_BREAKER_SECONDS"
@@ -56,9 +56,9 @@
       "id": "a4",
       "kind": "rect",
       "x": 45,
-      "y": 522,
+      "y": 600,
       "width": 310,
-      "height": 64,
+      "height": 88,
       "type_label": "④ 单工具超时",
       "label": "独立线程执行",
       "sublabel": "TOOL_TIMEOUT_SECONDS 上限"
@@ -69,7 +69,7 @@
       "x": 500,
       "y": 204,
       "width": 360,
-      "height": 64,
+      "height": 88,
       "type_label": "FAIL · 不执行",
       "label": "返回 status=error ToolMessage",
       "sublabel": "工具不执行，无观测 span"
@@ -78,9 +78,9 @@
       "id": "r2",
       "kind": "rect",
       "x": 500,
-      "y": 310,
+      "y": 336,
       "width": 360,
-      "height": 64,
+      "height": 88,
       "type_label": "FAIL · 不执行",
       "label": "返回 status=error ToolMessage",
       "sublabel": "不启动执行线程"
@@ -89,9 +89,9 @@
       "id": "r3",
       "kind": "rect",
       "x": 500,
-      "y": 416,
+      "y": 468,
       "width": 360,
-      "height": 64,
+      "height": 88,
       "type_label": "FAIL · 跳过",
       "label": "返回 status=error ToolMessage",
       "sublabel": "冷却期内跳过执行"
@@ -100,9 +100,9 @@
       "id": "r4",
       "kind": "rect",
       "x": 396,
-      "y": 634,
+      "y": 732,
       "width": 250,
-      "height": 64,
+      "height": 88,
       "type_label": "FAIL · 超时",
       "label": "写熔断标记",
       "sublabel": "status=error"
@@ -111,20 +111,20 @@
       "id": "r5",
       "kind": "rect",
       "x": 70,
-      "y": 634,
+      "y": 732,
       "width": 250,
-      "height": 64,
+      "height": 88,
       "type_label": "FAIL · 异常",
       "label": "写熔断标记",
-      "sublabel": "status=error"
+      "sublabel": "抛异常 · status=error"
     },
     {
       "id": "ok",
       "kind": "rect",
       "x": 690,
-      "y": 634,
+      "y": 732,
       "width": 240,
-      "height": 64,
+      "height": 88,
       "type_label": "PASS",
       "label": "原样返回结果",
       "sublabel": "status=error 同样按失败记录"
@@ -208,8 +208,7 @@
       "target": "r5",
       "source_port": "bottom",
       "target_port": "top",
-      "flow": "neutral",
-      "label": "抛异常"
+      "flow": "neutral"
     },
     {
       "id": "e4k",
@@ -234,7 +233,6 @@
   "footer": "SecRAG · Agent 工具子系统 · 执行边界",
   "legend_x": 330,
   "legend_y": 116,
-  "legend_locked": true,
-  "footer_y": 758,
+  "footer_y": 848,
   "legend_orientation": "vertical"
 }

@@ -4,7 +4,7 @@
   "template_type": "flowchart",
   "style": 1,
   "width": 960,
-  "height": 720,
+  "height": 846,
   "title": "reason 子图：工具调用环与终态",
   "subtitle": "调用模型 → 路由分支 → 授权执行 → 审计回环",
   "text_policy": "strict",
@@ -15,7 +15,7 @@
       "x": 380,
       "y": 118,
       "width": 200,
-      "height": 56,
+      "height": 64,
       "type_label": "ENTRY",
       "label": "reason 子图入口"
     },
@@ -25,7 +25,7 @@
       "x": 345,
       "y": 196,
       "width": 270,
-      "height": 64,
+      "height": 88,
       "type_label": "PREPARE",
       "label": "prepare_reason",
       "sublabel": "重置工具迭代与消息游标"
@@ -34,9 +34,9 @@
       "id": "call",
       "kind": "rect",
       "x": 345,
-      "y": 296,
+      "y": 328,
       "width": 270,
-      "height": 64,
+      "height": 88,
       "type_label": "CALL",
       "label": "call_reason_model",
       "sublabel": "按角色绑定工具并调用模型"
@@ -45,9 +45,9 @@
       "id": "route",
       "kind": "hexagon",
       "x": 375,
-      "y": 396,
+      "y": 460,
       "width": 210,
-      "height": 48,
+      "height": 64,
       "type_label": "BRANCH",
       "label": "route_reason_model"
     },
@@ -55,9 +55,9 @@
       "id": "exec",
       "kind": "rect",
       "x": 40,
-      "y": 484,
+      "y": 568,
       "width": 296,
-      "height": 64,
+      "height": 88,
       "type_label": "EXEC",
       "label": "execute_reason_tools",
       "sublabel": "ToolNode + authorize_reason_tool_call"
@@ -66,9 +66,9 @@
       "id": "limit",
       "kind": "rect",
       "x": 368,
-      "y": 484,
+      "y": 568,
       "width": 220,
-      "height": 64,
+      "height": 88,
       "type_label": "FAIL-CLOSED",
       "label": "tool_limit_response",
       "sublabel": "fail-closed 终态"
@@ -77,9 +77,9 @@
       "id": "final",
       "kind": "rect",
       "x": 672,
-      "y": 484,
+      "y": 568,
       "width": 240,
-      "height": 64,
+      "height": 88,
       "type_label": "FINALIZE",
       "label": "finalize_reason",
       "sublabel": "保存最终答案"
@@ -88,9 +88,9 @@
       "id": "rec",
       "kind": "rect",
       "x": 40,
-      "y": 584,
+      "y": 700,
       "width": 296,
-      "height": 64,
+      "height": 88,
       "type_label": "AUDIT",
       "label": "record_tool_results",
       "sublabel": "增量追加审计 + 迭代计数"
@@ -99,9 +99,9 @@
       "id": "endsub",
       "kind": "rect",
       "x": 400,
-      "y": 592,
+      "y": 700,
       "width": 160,
-      "height": 56,
+      "height": 64,
       "type_label": "EXIT",
       "label": "子图结束"
     }
@@ -209,6 +209,5 @@
   "footer": "SecRAG · Agent 工具子系统 · reason 子图",
   "legend_x": 52,
   "legend_y": 132,
-  "legend_locked": true,
-  "footer_y": 696
+  "footer_y": 816
 }
