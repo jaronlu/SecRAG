@@ -4,7 +4,7 @@
   "template_type": "flowchart",
   "style": 1,
   "width": 1000,
-  "height": 910,
+  "height": 944,
   "title": "观测与运维：一次请求的三条观测面",
   "subtitle": "限流 / 语义缓存 / 图执行主链路 + MetricsRegistry 指标 + 追踪脱敏导出",
   "text_policy": "strict",
@@ -22,7 +22,7 @@
     }
   ],
   "footer": "SecRAG · 观测与运维",
-  "footer_y": 884,
+  "footer_y": 914,
   "nodes": [
     {
       "id": "req",
