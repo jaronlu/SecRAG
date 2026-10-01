@@ -4,7 +4,7 @@
   "template_type": "flowchart",
   "style": 1,
   "width": 960,
-  "height": 1074,
+  "height": 1108,
   "title": "知识入库链路：从文件到可检索 chunk",
   "subtitle": "预检 → 快照 → 解析分块 → 向量化 → ChromaDB 写入 → registry 状态机",
   "text_policy": "strict",
@@ -22,7 +22,7 @@
     }
   ],
   "footer": "SecRAG · 知识入库",
-  "footer_y": 1048,
+  "footer_y": 1078,
   "nodes": [
     {
       "id": "a",
