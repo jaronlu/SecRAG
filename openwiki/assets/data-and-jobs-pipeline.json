@@ -4,7 +4,7 @@
   "template_type": "flowchart",
   "style": 1,
   "width": 960,
-  "height": 812,
+  "height": 846,
   "title": "数据抓取与每日扫描任务流",
   "subtitle": "fetch 抓取回环（水位 / 失败清单）与 run_daily_scan 事件分级落库",
   "text_policy": "strict",
@@ -26,7 +26,7 @@
     }
   ],
   "footer": "SecRAG · 数据管道与每日扫描",
-  "footer_y": 786,
+  "footer_y": 816,
   "nodes": [
     {
       "id": "fetch",
