@@ -4,7 +4,7 @@
   "template_type": "flowchart",
   "style": 1,
   "width": 1640,
-  "height": 1398,
+  "height": 1432,
   "title": "问答请求执行链路：从 HTTP 到统一终态",
   "subtitle": "澄清、权限拒绝、检索重试、验证重推与缓存命中分支全展开",
   "text_policy": "strict",
@@ -26,7 +26,7 @@
     }
   ],
   "footer": "SecRAG · 问答请求执行链路",
-  "footer_y": 1372,
+  "footer_y": 1402,
   "nodes": [
     {
       "id": "req",
