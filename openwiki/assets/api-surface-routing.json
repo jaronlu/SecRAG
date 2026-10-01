@@ -4,7 +4,7 @@
   "template_type": "flowchart",
   "style": 1,
   "width": 1060,
-  "height": 1142,
+  "height": 1176,
   "title": "API 入口与路由拓扑",
   "subtitle": "React SPA 经 FastAPI 应用进入认证、问答、会话、管理与观测端点",
   "text_policy": "strict",
@@ -18,7 +18,7 @@
     }
   ],
   "footer": "SecRAG · API Surface",
-  "footer_y": 1116,
+  "footer_y": 1146,
   "nodes": [
     {
       "id": "fe",
