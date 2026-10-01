@@ -4,7 +4,7 @@
   "template_type": "flowchart",
   "style": 1,
   "width": 1460,
-  "height": 1140,
+  "height": 1174,
   "title": "混合检索与权限过滤流水线",
   "subtitle": "计划级过滤 → 双路召回 → RRF 融合 → 结果级过滤 → 排序重排 → 截断输出",
   "text_policy": "strict",
@@ -26,7 +26,7 @@
     }
   ],
   "footer": "SecRAG · 检索系统",
-  "footer_y": 1114,
+  "footer_y": 1144,
   "nodes": [
     {
       "id": "p",
