@@ -4,12 +4,12 @@
   "template_type": "flowchart",
   "style": 1,
   "width": 1030,
-  "height": 836,
+  "height": 870,
   "title": "新开发者阅读路线",
   "subtitle": "完成上手顺序后，按主题进入十条阅读路线",
   "text_policy": "strict",
   "footer": "SecRAG · Quickstart",
-  "footer_y": 810,
+  "footer_y": 840,
   "nodes": [
     {
       "id": "dev",
