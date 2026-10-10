@@ -1,8 +1,21 @@
 # ══════════════════════════════════════════════════════════════════════
-# SecRAG Dockerfile — 多阶段构建，精简生产镜像
+# Stage 0: Frontend Builder — 构建 React 前端产物
 # ══════════════════════════════════════════════════════════════════════
+FROM node:20-slim AS frontend-builder
 
+WORKDIR /app/frontend
+
+# 先复制依赖文件，利用层缓存
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --silent
+
+# 复制前端源码并构建
+COPY frontend/ ./
+RUN npm run build
+
+# ══════════════════════════════════════════════════════════════════════
 # Stage 1: Builder — 安装 uv 和 Python 依赖
+# ══════════════════════════════════════════════════════════════════════
 FROM python:3.11-slim AS builder
 
 ENV UV_HOME=/opt/uv \
@@ -27,7 +40,9 @@ COPY pyproject.toml uv.lock ./
 # 安装运行时依赖（不含 dev 依赖）
 RUN uv sync --frozen --no-dev --no-install-project
 
+# ══════════════════════════════════════════════════════════════════════
 # Stage 2: Runtime — 精简运行镜像
+# ══════════════════════════════════════════════════════════════════════
 FROM python:3.11-slim AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
@@ -53,6 +68,9 @@ COPY scripts/ /app/scripts/
 COPY start.sh /app/start.sh
 COPY .env.example /app/.env.example
 
+# 从前端构建阶段复制 React 产物
+COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
+
 # 复制数据目录（包含已入库的 ChromaDB 数据和示例数据）
 # 注意：如果 data/ 很大，建议用 volume 挂载而非打包进镜像
 COPY data/ /app/data/
@@ -62,7 +80,7 @@ RUN mkdir -p /data/chroma /data/hf_cache && \
     chmod +x /app/start.sh
 
 # 健康检查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
     CMD curl -f http://localhost:${APP_PORT:-8000}/health || exit 1
 
 EXPOSE 8000
