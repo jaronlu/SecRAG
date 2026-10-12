@@ -26,6 +26,20 @@ jobs:
       - name: Install dependencies (locked)
         run: uv sync --all-extras --frozen
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # API 启动强校验 frontend/dist（缺失即 fail-fast），必须先构建前端再跑 pytest
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
       - name: Lint
         run: uv run ruff check .
 
