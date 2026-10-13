@@ -27,7 +27,7 @@ from src.agents import nodes as agent_nodes
 from src.agents.graph import _node_span_metadata, _traced_node
 from src.agents.state import AssistantState
 from src.api.auth import AuthenticatedUser, build_assistant_initial_state
-from src.api.main import assistant_qa
+from src.api.qa import assistant_qa
 from src.config import LangfuseConfig, config
 from src.schemas.constants import (
     AUDIT_REQUEST_ID,
@@ -155,7 +155,7 @@ def _temp_conversation_store(monkeypatch, tmp_path):
     from src.utils.conversation import SQLiteConversationStore
 
     store = SQLiteConversationStore(tmp_path / "conversations.db")
-    monkeypatch.setattr("src.api.main._get_conversation_store", lambda: store)
+    monkeypatch.setattr("src.api.qa._get_conversation_store", lambda: store)
 
 
 @pytest.fixture()
@@ -163,7 +163,7 @@ def langfuse_env(monkeypatch):
     """启用 adapter（注入 fake client）+ callback handler 替身。"""
     client = FakeLangfuseClient()
     adapter = _wire_adapter(client)
-    monkeypatch.setattr("src.api.main.get_langfuse", lambda: adapter)
+    monkeypatch.setattr("src.api.qa.get_langfuse", lambda: adapter)
     monkeypatch.setattr(
         "langfuse.langchain.CallbackHandler", FakeCallbackHandler, raising=True
     )
@@ -181,7 +181,7 @@ def _qa_request(query: str = "货币基金的风险等级是什么") -> Assistan
 async def test_qa_creates_root_trace_and_injects_bound_callback(langfuse_env, monkeypatch):
     query = "货币基金的风险等级是什么"
     agent = _RecordingAgentApp()
-    monkeypatch.setattr("src.api.main._get_agent_app", lambda: agent)
+    monkeypatch.setattr("src.api.qa._get_agent_app", lambda: agent)
 
     await assistant_qa(
         _qa_request(query),
@@ -234,9 +234,9 @@ async def test_qa_cache_hit_marks_cache_hit_on_trace(langfuse_env, monkeypatch):
         def store(self, **kwargs: Any) -> bool:
             return True
 
-    monkeypatch.setattr("src.api.main.get_semantic_cache", lambda: _StubCache())
+    monkeypatch.setattr("src.api.qa.get_semantic_cache", lambda: _StubCache())
     agent = _RecordingAgentApp()
-    monkeypatch.setattr("src.api.main._get_agent_app", lambda: agent)
+    monkeypatch.setattr("src.api.qa._get_agent_app", lambda: agent)
 
     await assistant_qa(
         _qa_request("货币基金风险等级"),
@@ -253,7 +253,7 @@ async def test_qa_cache_hit_marks_cache_hit_on_trace(langfuse_env, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_qa_error_finishes_trace_as_error(langfuse_env, monkeypatch):
-    monkeypatch.setattr("src.api.main._get_agent_app", lambda: _FailingAgentApp())
+    monkeypatch.setattr("src.api.qa._get_agent_app", lambda: _FailingAgentApp())
 
     with pytest.raises(HTTPException) as exc:
         await assistant_qa(
@@ -279,9 +279,9 @@ async def test_qa_without_langfuse_has_no_callbacks(monkeypatch):
         client=FakeLangfuseClient(),
         metrics=MetricsRegistry(),
     )
-    monkeypatch.setattr("src.api.main.get_langfuse", lambda: adapter)
+    monkeypatch.setattr("src.api.qa.get_langfuse", lambda: adapter)
     agent = _RecordingAgentApp()
-    monkeypatch.setattr("src.api.main._get_agent_app", lambda: agent)
+    monkeypatch.setattr("src.api.qa._get_agent_app", lambda: agent)
 
     await assistant_qa(
         _qa_request("查询"),

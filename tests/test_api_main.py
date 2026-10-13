@@ -6,7 +6,8 @@ from fastapi import HTTPException
 from httpx import ConnectError
 
 from src.api.auth import AuthenticatedUser
-from src.api.main import app, assistant_qa
+from src.api.main import app
+from src.api.qa import assistant_qa
 from src.schemas.constants import AGENT_RECURSION_LIMIT, ROLE_TECHNICAL
 from src.schemas.request_response import AssistantQARequest
 from src.utils.audit import SQLiteAuditStore
@@ -86,13 +87,13 @@ class _StubSemanticCache:
 @pytest.fixture(autouse=True)
 def _temp_conversation_store(monkeypatch, tmp_path):
     store = SQLiteConversationStore(tmp_path / "conversations.db")
-    monkeypatch.setattr("src.api.main._get_conversation_store", lambda: store)
+    monkeypatch.setattr("src.api.qa._get_conversation_store", lambda: store)
 
 
 @pytest.mark.asyncio
 async def test_assistant_qa_returns_503_for_provider_connection_error(monkeypatch):
     monkeypatch.setattr(
-        "src.api.main._get_agent_app",
+        "src.api.qa._get_agent_app",
         lambda: _FailingAgentApp(ConnectError("connection failed")),
     )
 
@@ -108,7 +109,7 @@ async def test_assistant_qa_returns_503_for_provider_connection_error(monkeypatc
 @pytest.mark.asyncio
 async def test_assistant_qa_returns_500_for_internal_error(monkeypatch):
     monkeypatch.setattr(
-        "src.api.main._get_agent_app",
+        "src.api.qa._get_agent_app",
         lambda: _FailingAgentApp(ValueError("bad state")),
     )
 
@@ -134,7 +135,7 @@ def test_assistant_response_does_not_expose_audit_trail():
 @pytest.mark.asyncio
 async def test_assistant_qa_uses_graph_recursion_limit_for_multi_hop_flow(monkeypatch):
     agent = _SuccessfulAgentApp()
-    monkeypatch.setattr("src.api.main._get_agent_app", lambda: agent)
+    monkeypatch.setattr("src.api.qa._get_agent_app", lambda: agent)
 
     response = await assistant_qa(
         AssistantQARequest(query="查询"),
@@ -167,7 +168,7 @@ async def test_assistant_qa_cache_hit_returns_stored_compliance_snapshot(monkeyp
         "compliance": stored_compliance,
         "verification": {"passed": True, "issues": [], "confidence": "high"},
     })
-    monkeypatch.setattr("src.api.main.get_semantic_cache", lambda: cache)
+    monkeypatch.setattr("src.api.qa.get_semantic_cache", lambda: cache)
 
     response = await assistant_qa(
         AssistantQARequest(query="货币基金风险等级"),
@@ -190,8 +191,8 @@ async def test_assistant_qa_cache_hit_returns_stored_compliance_snapshot(monkeyp
 async def test_assistant_qa_stores_compliance_snapshot_on_cache_miss(monkeypatch):
     """P1-1: 入缓存时把终态 compliance/verification 快照一起写入。"""
     cache = _StubSemanticCache()
-    monkeypatch.setattr("src.api.main.get_semantic_cache", lambda: cache)
-    monkeypatch.setattr("src.api.main._get_agent_app", lambda: _CacheableAgentApp())
+    monkeypatch.setattr("src.api.qa.get_semantic_cache", lambda: cache)
+    monkeypatch.setattr("src.api.qa._get_agent_app", lambda: _CacheableAgentApp())
 
     await assistant_qa(
         AssistantQARequest(query="货币基金的风险等级是什么"),
@@ -216,9 +217,9 @@ async def test_assistant_qa_cache_hit_persists_audit_event(monkeypatch, tmp_path
         "compliance": {"passed": True, "risk_disclosure": ""},
         "verification": {"passed": True, "confidence": "high"},
     })
-    monkeypatch.setattr("src.api.main.get_semantic_cache", lambda: cache)
+    monkeypatch.setattr("src.api.qa.get_semantic_cache", lambda: cache)
     audit_store = SQLiteAuditStore(tmp_path / "audit.db")
-    monkeypatch.setattr("src.api.main._get_cache_hit_audit_store", lambda: audit_store)
+    monkeypatch.setattr("src.api.qa._get_cache_hit_audit_store", lambda: audit_store)
 
     await assistant_qa(
         AssistantQARequest(query="货币基金风险等级"),
@@ -241,7 +242,7 @@ async def test_assistant_qa_cache_hit_persists_conversation_turn(monkeypatch, tm
     from src.utils.conversation import SQLiteConversationStore
 
     store = SQLiteConversationStore(tmp_path / "conversations.db")
-    monkeypatch.setattr("src.api.main._get_conversation_store", lambda: store)
+    monkeypatch.setattr("src.api.qa._get_conversation_store", lambda: store)
     cache = _StubSemanticCache(hit={
         "query": "货币基金风险等级",
         "answer": "货币基金风险等级为低。",
@@ -252,9 +253,9 @@ async def test_assistant_qa_cache_hit_persists_conversation_turn(monkeypatch, tm
         "compliance": {"passed": True, "risk_disclosure": ""},
         "verification": {"passed": True, "confidence": "high"},
     })
-    monkeypatch.setattr("src.api.main.get_semantic_cache", lambda: cache)
+    monkeypatch.setattr("src.api.qa.get_semantic_cache", lambda: cache)
     monkeypatch.setattr(
-        "src.api.main._get_cache_hit_audit_store",
+        "src.api.qa._get_cache_hit_audit_store",
         lambda: SQLiteAuditStore(tmp_path / "audit.db"),
     )
     user = AuthenticatedUser("user_tech", ROLE_TECHNICAL, "tech")

@@ -197,17 +197,17 @@ def cache_api(monkeypatch, tmp_path):
     """QA API 上下文：cache holder 可替换缓存替身，agent holder 注入 Agent。"""
     audit_store = SQLiteAuditStore(tmp_path / "audit.db")
     conversation = SQLiteConversationStore(tmp_path / "conversations.db")
-    monkeypatch.setattr("src.api.main._get_conversation_store", lambda: conversation)
-    monkeypatch.setattr("src.api.main._get_cache_hit_audit_store", lambda: audit_store)
+    monkeypatch.setattr("src.api.qa._get_conversation_store", lambda: conversation)
+    monkeypatch.setattr("src.api.qa._get_cache_hit_audit_store", lambda: audit_store)
 
     holder: dict[str, Any] = {"cache": _SpyCache(), "agent": None}
-    monkeypatch.setattr("src.api.main.get_semantic_cache", lambda: holder["cache"])
+    monkeypatch.setattr("src.api.qa.get_semantic_cache", lambda: holder["cache"])
 
     def _agent():
         assert holder["agent"] is not None, "测试未注入 agent 替身"
         return holder["agent"]
 
-    monkeypatch.setattr("src.api.main._get_agent_app", _agent)
+    monkeypatch.setattr("src.api.qa._get_agent_app", _agent)
     app.dependency_overrides[authenticate_user] = lambda: AuthenticatedUser(
         "user_advisor", ROLE_ADVISOR, "wealth"
     )

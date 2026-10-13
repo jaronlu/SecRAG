@@ -28,7 +28,7 @@ from fastapi import HTTPException
 from pydantic import SecretStr
 
 from src.api.auth import AuthenticatedUser
-from src.api.main import assistant_qa
+from src.api.qa import assistant_qa
 from src.config import LangfuseConfig
 from src.schemas.constants import (
     AUDIT_REQUEST_ID,
@@ -178,12 +178,12 @@ def _wire_api(
     from src.utils.conversation import SQLiteConversationStore
 
     store = SQLiteConversationStore(tmp_path / "conversations.db")
-    monkeypatch.setattr("src.api.main._get_conversation_store", lambda: store)
-    monkeypatch.setattr("src.api.main.get_langfuse", lambda: adapter)
-    monkeypatch.setattr("src.api.main._get_agent_app", lambda: agent)
+    monkeypatch.setattr("src.api.qa._get_conversation_store", lambda: store)
+    monkeypatch.setattr("src.api.qa.get_langfuse", lambda: adapter)
+    monkeypatch.setattr("src.api.qa._get_agent_app", lambda: agent)
     # ISSUE-26 起语义缓存默认启用：这些用例断言的是链路行为，命中缓存会跳过
     # 图执行，必须显式替换为永不命中的替身
-    monkeypatch.setattr("src.api.main.get_semantic_cache", lambda: _DisabledCache())
+    monkeypatch.setattr("src.api.qa.get_semantic_cache", lambda: _DisabledCache())
     monkeypatch.setattr(
         "langfuse.langchain.CallbackHandler", FakeCallbackHandler, raising=True
     )

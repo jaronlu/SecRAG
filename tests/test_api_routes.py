@@ -180,10 +180,10 @@ class _TokenStreamingAgentApp:
 def qa_client(monkeypatch, tmp_path):
     """带鉴权覆盖与隔离存储的 QA 客户端：走真实路由与依赖注入。"""
     store = SQLiteConversationStore(tmp_path / "conversations.db")
-    monkeypatch.setattr("src.api.main._get_conversation_store", lambda: store)
-    monkeypatch.setattr("src.api.main.get_semantic_cache", lambda: _DisabledCache())
+    monkeypatch.setattr("src.api.qa._get_conversation_store", lambda: store)
+    monkeypatch.setattr("src.api.qa.get_semantic_cache", lambda: _DisabledCache())
     monkeypatch.setattr(
-        "src.api.main._get_cache_hit_audit_store",
+        "src.api.qa._get_cache_hit_audit_store",
         lambda: SQLiteAuditStore(tmp_path / "audit.db"),
     )
     app.dependency_overrides[authenticate_user] = lambda: AuthenticatedUser(
@@ -194,7 +194,7 @@ def qa_client(monkeypatch, tmp_path):
 
 
 def test_qa_endpoint_rate_limit_returns_429(qa_client, monkeypatch):
-    monkeypatch.setattr("src.api.main.check_rate_limit", lambda key: (False, 0))
+    monkeypatch.setattr("src.api.qa.check_rate_limit", lambda key: (False, 0))
 
     res = qa_client.post(API_ROUTE_ASSISTANT_QA, json={"query": "货币基金风险"})
 
@@ -203,8 +203,8 @@ def test_qa_endpoint_rate_limit_returns_429(qa_client, monkeypatch):
 
 
 def test_qa_endpoint_timeout_returns_504(qa_client, monkeypatch):
-    monkeypatch.setattr("src.api.main._get_agent_app", lambda: _SlowAgentApp())
-    monkeypatch.setattr("src.api.main.config", type("C", (), {"api_request_timeout_seconds": 0.05}))
+    monkeypatch.setattr("src.api.qa._get_agent_app", lambda: _SlowAgentApp())
+    monkeypatch.setattr("src.api.qa.config", type("C", (), {"api_request_timeout_seconds": 0.05}))
 
     res = qa_client.post(API_ROUTE_ASSISTANT_QA, json={"query": "货币基金风险"})
 
@@ -235,7 +235,7 @@ def test_qa_endpoint_cache_hit_returns_stored_compliance(qa_client, monkeypatch)
         def store(self, query, answer, citations=None, confidence="", role="", **kwargs):
             return True
 
-    monkeypatch.setattr("src.api.main.get_semantic_cache", lambda: _HitCache())
+    monkeypatch.setattr("src.api.qa.get_semantic_cache", lambda: _HitCache())
 
     res = qa_client.post(API_ROUTE_ASSISTANT_QA, json={"query": "货币基金风险等级"})
 
@@ -248,7 +248,7 @@ def test_qa_endpoint_cache_hit_returns_stored_compliance(qa_client, monkeypatch)
 
 
 def test_qa_stream_emits_terminal_event_protocol(qa_client, monkeypatch):
-    monkeypatch.setattr("src.api.main._get_agent_app", lambda: _StreamingAgentApp())
+    monkeypatch.setattr("src.api.qa._get_agent_app", lambda: _StreamingAgentApp())
 
     events = []
     with qa_client.stream(
@@ -296,7 +296,7 @@ def _parse_sse_events(res) -> list[tuple[str, dict]]:
 def test_qa_stream_emits_answer_delta_for_reason_tokens(qa_client, monkeypatch):
     """ISSUE-9：reason 节点 LLM token 以 answer_delta 事件先行流出，
     既有 progress/answer/done 事件保持兼容；非 reason 节点的 token 不外发。"""
-    monkeypatch.setattr("src.api.main._get_agent_app", lambda: _TokenStreamingAgentApp())
+    monkeypatch.setattr("src.api.qa._get_agent_app", lambda: _TokenStreamingAgentApp())
 
     with qa_client.stream(
         "POST", API_ROUTE_ASSISTANT_QA_STREAM, json={"query": "货币基金风险"}
@@ -329,12 +329,12 @@ def test_qa_stream_emits_answer_delta_for_reason_tokens(qa_client, monkeypatch):
 
 def test_qa_stream_records_time_to_first_token_once(qa_client, monkeypatch):
     """ISSUE-23：TTFT 在首个 answer_delta 记录一次，供设计线 P95 ≤5s 评估。"""
-    import src.api.main as api_main
+    import src.api.qa as api_qa
     from src.utils.metrics import MetricsRegistry
 
     registry = MetricsRegistry()
-    monkeypatch.setattr(api_main, "get_metrics", lambda: registry)
-    monkeypatch.setattr("src.api.main._get_agent_app", lambda: _TokenStreamingAgentApp())
+    monkeypatch.setattr(api_qa, "get_metrics", lambda: registry)
+    monkeypatch.setattr("src.api.qa._get_agent_app", lambda: _TokenStreamingAgentApp())
 
     with qa_client.stream(
         "POST", API_ROUTE_ASSISTANT_QA_STREAM, json={"query": "货币基金风险"}
@@ -393,7 +393,7 @@ class _LoopRecordingStore:
 def test_conversation_routes_offload_sync_io(qa_client, monkeypatch):
     """ISSUE-18：会话 CRUD 不得在事件循环内执行同步 SQLite 调用。"""
     store = _LoopRecordingStore()
-    monkeypatch.setattr("src.api.main._get_conversation_store", lambda: store)
+    monkeypatch.setattr("src.api.conversation._get_conversation_store", lambda: store)
 
     assert qa_client.get(API_ROUTE_ASSISTANT_THREADS).status_code == 200
     assert qa_client.post(API_ROUTE_ASSISTANT_THREADS, json={"title": "t"}).status_code == 200
@@ -405,8 +405,8 @@ def test_conversation_routes_offload_sync_io(qa_client, monkeypatch):
 
 def test_qa_routes_offload_thread_ensure(qa_client, monkeypatch):
     store = _LoopRecordingStore()
-    monkeypatch.setattr("src.api.main._get_conversation_store", lambda: store)
-    monkeypatch.setattr("src.api.main._get_agent_app", lambda: _StreamingAgentApp())
+    monkeypatch.setattr("src.api.qa._get_conversation_store", lambda: store)
+    monkeypatch.setattr("src.api.qa._get_agent_app", lambda: _StreamingAgentApp())
 
     with qa_client.stream(
         "POST", API_ROUTE_ASSISTANT_QA_STREAM, json={"query": "货币基金风险"}
