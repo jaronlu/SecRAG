@@ -15,7 +15,6 @@ from pathlib import Path
 
 import pytest
 
-from src.api import main as api_main
 from src.api.main import app
 
 
@@ -29,10 +28,10 @@ def test_src_api_ui_module_is_deleted():
 
 
 def test_missing_frontend_dist_fails_fast(monkeypatch):
-    from src.api.main import _ensure_frontend_dist
+    from src.api.frontend import _ensure_frontend_dist
 
     monkeypatch.setattr(
-        api_main, "_FRONTEND_DIST", Path("/nonexistent/secrag-frontend-dist")
+        "src.api.frontend._FRONTEND_DIST", Path("/nonexistent/secrag-frontend-dist")
     )
     with pytest.raises(RuntimeError, match="npm run build"):
         _ensure_frontend_dist()

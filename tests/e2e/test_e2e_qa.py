@@ -118,12 +118,12 @@ def sse_client(monkeypatch, tmp_path):
     from src.utils.conversation import SQLiteConversationStore
 
     store = SQLiteConversationStore(tmp_path / "conversations.db")
-    monkeypatch.setattr("src.api.main._get_conversation_store", lambda: store)
+    monkeypatch.setattr("src.api.qa._get_conversation_store", lambda: store)
     monkeypatch.setattr(
-        "src.api.main._get_cache_hit_audit_store",
+        "src.api.qa._get_cache_hit_audit_store",
         lambda: SQLiteAuditStore(tmp_path / "audit.db"),
     )
-    monkeypatch.setattr("src.api.main._get_agent_app", lambda: _StreamingAgentApp())
+    monkeypatch.setattr("src.api.qa._get_agent_app", lambda: _StreamingAgentApp())
     app.dependency_overrides[authenticate_user] = lambda: AuthenticatedUser(
         "user_advisor", ROLE_ADVISOR, "wealth"
     )
@@ -190,7 +190,7 @@ def test_sse_terminal_answer_follows_final_answer_not_node_name(sse_client, monk
                 },
             )
 
-    monkeypatch.setattr("src.api.main._get_agent_app", lambda: _NewTerminalPathAgent())
+    monkeypatch.setattr("src.api.qa._get_agent_app", lambda: _NewTerminalPathAgent())
 
     with sse_client.stream(
         "POST", API_ROUTE_ASSISTANT_QA_STREAM, json={"query": "货币基金风险"}
@@ -259,12 +259,12 @@ def qa_api(monkeypatch, tmp_path):
     from src.utils.conversation import SQLiteConversationStore
 
     store = SQLiteConversationStore(tmp_path / "conversations.db")
-    monkeypatch.setattr("src.api.main._get_conversation_store", lambda: store)
+    monkeypatch.setattr("src.api.qa._get_conversation_store", lambda: store)
     monkeypatch.setattr(
-        "src.api.main._get_cache_hit_audit_store",
+        "src.api.qa._get_cache_hit_audit_store",
         lambda: SQLiteAuditStore(tmp_path / "audit.db"),
     )
-    monkeypatch.setattr("src.api.main.get_semantic_cache", lambda: _DisabledCache())
+    monkeypatch.setattr("src.api.qa.get_semantic_cache", lambda: _DisabledCache())
 
     holder: dict[str, Any] = {"agent": None}
 
@@ -272,7 +272,7 @@ def qa_api(monkeypatch, tmp_path):
         assert holder["agent"] is not None, "测试未注入 agent 替身"
         return holder["agent"]
 
-    monkeypatch.setattr("src.api.main._get_agent_app", _agent)
+    monkeypatch.setattr("src.api.qa._get_agent_app", _agent)
 
     app.dependency_overrides[authenticate_user] = lambda: AuthenticatedUser(
         "user_advisor", ROLE_ADVISOR, "wealth"
@@ -308,7 +308,7 @@ def test_tc019_qa_timeout_returns_504(qa_api, monkeypatch):
     """TC-019：Agent 超过 api_request_timeout_seconds → 504，不返回部分答案。"""
     qa_api["agent"] = _SleepyAgentApp()
     monkeypatch.setattr(
-        "src.api.main.config", type("C", (), {"api_request_timeout_seconds": 0.05})
+        "src.api.qa.config", type("C", (), {"api_request_timeout_seconds": 0.05})
     )
 
     res = qa_api["client"].post(API_ROUTE_ASSISTANT_QA, json={"query": "货币基金风险"})
@@ -342,7 +342,7 @@ def test_tc020_llm_provider_unavailable_returns_503(qa_api):
 def test_tc021_rate_limit_blocks_qa_and_sse(qa_api, monkeypatch):
     """TC-021：限流触发时 QA 返回 429 + Retry-After；SSE 以 error 事件 429 返回。"""
     qa_api["agent"] = _StreamingAgentApp()
-    monkeypatch.setattr("src.api.main.check_rate_limit", lambda key: (False, 0))
+    monkeypatch.setattr("src.api.qa.check_rate_limit", lambda key: (False, 0))
 
     res = qa_api["client"].post(API_ROUTE_ASSISTANT_QA, json={"query": "货币基金风险"})
     assert res.status_code == 429
