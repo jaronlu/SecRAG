@@ -68,6 +68,11 @@ class Settings(BaseSettings):
     allowed_origins: list[str] = ["*"]
     api_request_timeout_seconds: float = 60.0
 
+    # 产品 profile（MVP 收敛）："knowledge_qa" 只暴露产品文档与 FAQ 检索；
+    # "full" 恢复完整工具路径，用于开发、评估与回退。非法值在启动时
+    # 直接校验失败，不会静默放宽范围
+    product_profile: Literal["knowledge_qa", "full"] = "knowledge_qa"
+
     # 答案语义缓存——ISSUE-26 起默认启用。启用条件已落地：缓存绑定身份与
     # 授权范围、客户上下文、规范化问题、上下文摘要哈希与知识库版本；只缓存
     # 验证与合规均通过的成功终态；命中路径仍写审计事件并保存会话回合。

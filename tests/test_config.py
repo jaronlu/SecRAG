@@ -24,6 +24,24 @@ def test_app_env_rejects_ambiguous_dev_alias():
         _settings(_env_file=None, app_env="dev", openai_api_key="test-key")
 
 
+def _product_profile_settings(**kwargs: Any) -> Settings:
+    # 测试桩密钥每次随机生成，避免在源码中出现任何静态凭据字面量
+    kwargs.setdefault("openai_api_key", f"sk-test-{uuid.uuid4().hex}")
+    return _settings(_env_file=None, **kwargs)
+
+
+def test_product_profile_rejects_unknown_value():
+    """fail closed：非法 PRODUCT_PROFILE 不得静默变成 "full"。"""
+    with pytest.raises(ValidationError):
+        _product_profile_settings(product_profile="everything")
+
+
+def test_product_profile_defaults_to_knowledge_qa():
+    settings = _product_profile_settings()
+
+    assert settings.product_profile == "knowledge_qa"
+
+
 def _langfuse_stub_keys() -> dict[str, str]:
     # 测试桩密钥每次随机生成，避免在源码中出现任何静态凭据字面量。
     return {
