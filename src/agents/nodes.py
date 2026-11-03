@@ -888,7 +888,8 @@ def planner(state: AssistantState) -> dict[str, Any]:
 
 
 # 意图 → 必需检索源（planner 确定性底线，见 planner 内 DEF-006 注释）
-_INTENT_REQUIRED_SOURCES: dict[str, str] = {    "产品咨询": SOURCE_PRODUCT,
+_INTENT_REQUIRED_SOURCES: dict[str, str] = {
+    "产品咨询": SOURCE_PRODUCT,
     "法规咨询": SOURCE_REGULATION,
     "规则审查": SOURCE_REGULATION,
     "研报观点": SOURCE_REPORT,
