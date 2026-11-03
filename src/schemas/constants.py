@@ -205,6 +205,30 @@ UserRole = Literal[
 ]
 
 # ══════════════════════════════════════════════════════════════════════
+# answer_status 对外业务终态（plan.md Product Contract 五态）
+# ══════════════════════════════════════════════════════════════════════
+
+ANSWER_STATUS_ANSWERED: Final = "answered"
+ANSWER_STATUS_NO_EVIDENCE: Final = "no_evidence"
+ANSWER_STATUS_PERMISSION_DENIED: Final = "permission_denied"
+ANSWER_STATUS_NEEDS_CLARIFICATION: Final = "needs_clarification"
+ANSWER_STATUS_BLOCKED: Final = "blocked"
+
+AnswerStatus = Literal[
+    ANSWER_STATUS_ANSWERED,
+    ANSWER_STATUS_NO_EVIDENCE,
+    ANSWER_STATUS_PERMISSION_DENIED,
+    ANSWER_STATUS_NEEDS_CLARIFICATION,
+    ANSWER_STATUS_BLOCKED,
+]
+
+# answer_status 映射所依据的 verification issues 业务标记
+# （nodes.py 终态产出与 src/utils/answer_status.py 映射共用，勿手写字符串）
+VERIFICATION_ISSUE_PERMISSION_DENIED: Final = "permission_denied"
+VERIFICATION_ISSUE_NO_RETRIEVAL_RESULTS: Final = "no_retrieval_results"
+VERIFICATION_ISSUE_TOOL_LIMIT_EXCEEDED: Final = "tool_limit_exceeded"
+
+# ══════════════════════════════════════════════════════════════════════
 # confidence 枚举  (SCHEMA-REFERENCE §2.3)
 # ══════════════════════════════════════════════════════════════════════
 

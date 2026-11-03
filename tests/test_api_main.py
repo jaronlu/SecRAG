@@ -184,7 +184,10 @@ async def test_assistant_qa_cache_hit_returns_stored_compliance_snapshot(monkeyp
         "citations",
         "confidence",
         "compliance",
+        "answer_status",
     }
+    # 缓存只存验证与合规均通过的成功答案，命中路径固定为 answered
+    assert response.answer_status == "answered"
 
 
 @pytest.mark.asyncio

@@ -26,6 +26,7 @@ from src.api.deps import _conversation_http_error, _get_agent_app, _get_conversa
 from src.config import config
 from src.schemas.constants import (
     AGENT_RECURSION_LIMIT,
+    ANSWER_STATUS_ANSWERED,
     API_ROUTE_ASSISTANT_QA,
     API_ROUTE_ASSISTANT_QA_STREAM,
     AUDIT_REQUEST_ID,
@@ -49,6 +50,7 @@ from src.schemas.constants import (
 from src.schemas.request_response import AssistantQARequest, AssistantQAResponse
 from src.schemas.models import AuditEntry
 from src.schemas.typed_dicts import AnswerOutcome, AuditQuery, AuditReasoning, AuditResponse, AuditRetrieval
+from src.utils.answer_status import answer_status_from_state
 from src.utils.rate_limit import check_rate_limit, get_rate_limit_key
 from src.utils.semantic_cache import CacheBinding, build_cache_binding, get_semantic_cache
 from src.utils.langfuse_adapter import (
@@ -224,6 +226,7 @@ def _qa_response_from_outcome(
         citations=outcome["citations"],
         confidence=outcome["confidence"],
         compliance=outcome["compliance"],
+        answer_status=outcome["answer_status"],
     )
 
 
@@ -341,6 +344,8 @@ async def assistant_qa(
                 citations=cache_hit["citations"],
                 confidence=cache_hit["confidence"],
                 compliance=cache_hit["compliance"],
+                # 缓存只存验证与合规均通过的成功答案，命中路径固定为 answered
+                answer_status=ANSWER_STATUS_ANSWERED,
             )
             return _qa_response_from_outcome(outcome, thread_id, turn_id)
 
@@ -417,6 +422,8 @@ async def assistant_qa(
             citations=result[STATE_CITATIONS],
             confidence=result[STATE_CONFIDENCE],
             compliance=result[STATE_COMPLIANCE],
+            # 图终态按固定优先级解析五态：澄清 → 权限 → 无证据 → 拦截 → 已回答
+            answer_status=answer_status_from_state(result),
         )
         return _qa_response_from_outcome(
             outcome,
@@ -517,6 +524,12 @@ async def assistant_qa_stream(
             # 进度节点集合由图模块声明，传输层不解释节点语义
             from src.agents.graph import CLIENT_PROGRESS_NODES
 
+            # 外层图节点更新累积快照：answer_status 由终态输出与此前节点
+            # （verify/compliance_check）的验证/合规结果合并后解析，
+            # 使 SSE 与同步端点走同一个映射函数（终态 compose 的节点输出
+            # 本身不含 verification/compliance 键）
+            state_snapshot: dict[str, Any] = {}
+
             try:
                 # 流式获取节点状态更新与 reason 节点 LLM token；整条流受请求级
                 # 总超时约束（issues.md 一.8：SSE 此前没有总超时包装）。
@@ -561,6 +574,9 @@ async def assistant_qa_stream(
                         for node_name, node_output in data.items():
                             if not isinstance(node_output, dict):
                                 continue
+                            # 先并入快照：终态解析需要 verify/compliance_check
+                            # 等前置节点的累积结果
+                            state_snapshot.update(node_output)
                             # 只发送图模块声明的客户端可见节点进度，避免事件过多
                             if node_name in CLIENT_PROGRESS_NODES:
                                 yield (
@@ -576,6 +592,11 @@ async def assistant_qa_stream(
                                     "answer": node_output[STATE_FINAL_ANSWER],
                                     "citations": node_output.get(STATE_CITATIONS, []),
                                     "confidence": node_output.get(STATE_CONFIDENCE, "unknown"),
+                                    # 与同步端点同一映射：失败终态不得伪装成 answered
+                                    "answer_status": answer_status_from_state({
+                                        **state_snapshot,
+                                        **node_output,
+                                    }),
                                     "thread_id": thread_id,
                                     "turn_id": turn_id,
                                 }, ensure_ascii=False)
