@@ -394,31 +394,32 @@ class TestReasonPromptCaliberRules:
         assert "研报转述" in prompt
 
 
-def test_planner_injects_stock_code_filter_for_report_search():
+def test_planner_injects_stock_code_filter_for_report_search(monkeypatch):
     """ISSUE-11：planner 不再调用 LLM，只规范化 query_understand 产出的原始计划。"""
+    from src.config import config
+
+    # 本测试覆盖研报角色层语义（股票代码过滤），固定 full profile 隔离默认收紧
+    monkeypatch.setattr(config, "product_profile", "full")
 
     class _ForbiddenLLM:
         def invoke(self, messages):
             raise AssertionError("planner 不得再发起 LLM 调用")
 
-    monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr("src.agents.nodes.llm", _ForbiddenLLM())
-    try:
-        state = _state(**{
-            STATE_USER_ROLE: ROLE_ADVISOR,
-            STATE_ORIGINAL_QUERY: "贵州茅台评级",
-            STATE_REWRITTEN_QUERY: "贵州茅台600519研报评级",
-            STATE_INTENT: "研报观点",
-            STATE_QUERY_TYPE: "report_inquiry",
-            STATE_ENTITIES: {"stock_code": "600519.SH"},
-            STATE_RETRIEVAL_PLAN_RAW: [
-                {PLAN_SOURCE: SOURCE_REPORT, PLAN_QUERY: "贵州茅台研报", PLAN_TOP_K: 5}
-            ],
-        })
 
-        result = planner(state)
-    finally:
-        monkeypatch.undo()
+    state = _state(**{
+        STATE_USER_ROLE: ROLE_ADVISOR,
+        STATE_ORIGINAL_QUERY: "贵州茅台评级",
+        STATE_REWRITTEN_QUERY: "贵州茅台600519研报评级",
+        STATE_INTENT: "研报观点",
+        STATE_QUERY_TYPE: "report_inquiry",
+        STATE_ENTITIES: {"stock_code": "600519.SH"},
+        STATE_RETRIEVAL_PLAN_RAW: [
+            {PLAN_SOURCE: SOURCE_REPORT, PLAN_QUERY: "贵州茅台研报", PLAN_TOP_K: 5}
+        ],
+    })
+
+    result = planner(state)
 
     assert result[STATE_RETRIEVAL_PLAN][0][PLAN_FILTERS] == {"stock_code": "600519"}
 
@@ -428,6 +429,13 @@ class TestPlannerDateFilters:
 
     ISSUE-11 后 planner 只做规范化：原始计划来自 state 的 retrieval_plan_raw。
     """
+
+    @pytest.fixture(autouse=True)
+    def _pin_full_profile(self, monkeypatch):
+        """本类测角色层日期过滤语义，固定 full profile 隔离默认 profile 收紧。"""
+        from src.config import config
+
+        monkeypatch.setattr(config, "product_profile", "full")
 
     def _state(self, **overrides: Any) -> AssistantState:
         return _state(**{
@@ -513,6 +521,13 @@ class TestPlannerIntentSourceFloor:
     按意图补齐必需源，主题源缺席会让干净拒绝（全 denied 短路）与一手来源
     召回同时失效。
     """
+
+    @pytest.fixture(autouse=True)
+    def _pin_full_profile(self, monkeypatch):
+        """本类测意图补源的角色层底线语义，固定 full profile 隔离默认收紧。"""
+        from src.config import config
+
+        monkeypatch.setattr(config, "product_profile", "full")
 
     def _state(self, **overrides: Any) -> AssistantState:
         return _state(**{
@@ -1574,6 +1589,13 @@ class TestRoleAwareTools:
         _get_bound_reason_model.cache_clear()  # pyright: ignore[reportFunctionMemberAccess]
         yield
         _get_bound_reason_model.cache_clear()  # pyright: ignore[reportFunctionMemberAccess]
+
+    @pytest.fixture(autouse=True)
+    def _pin_full_profile(self, monkeypatch):
+        """本类测角色工具矩阵语义（ROLE_ALLOWED_SOURCES），固定 full profile。"""
+        from src.config import config
+
+        monkeypatch.setattr(config, "product_profile", "full")
 
     def test_technical_role_gets_all_design_allowed_retrieval_tools(self):
         from src.agents.tools import get_tools_for_role
@@ -2786,6 +2808,13 @@ class TestToolErrorHandling:
     """
 
     @pytest.fixture(autouse=True)
+    def _pin_full_profile(self, monkeypatch):
+        """本类测真实工具异常链路（含 sql_query），固定 full profile。"""
+        from src.config import config
+
+        monkeypatch.setattr(config, "product_profile", "full")
+
+    @pytest.fixture(autouse=True)
     def _reset_circuit_breaker(self):
         import src.agents.nodes as nodes_module
 
@@ -2841,3 +2870,188 @@ class TestToolErrorHandling:
 
         assert result[STATE_TOOL_CALLS][0]["tool"] == SOURCE_SQL
         assert result[STATE_TOOL_CALLS][0]["success"] is False
+
+
+class TestProfilePlanFilter:
+    """产品 profile 收敛：planner 产出计划后按 profile 白名单二次过滤。"""
+
+    def test_profile_filter_removes_out_of_profile_sources(self):
+        from src.agents.nodes import restrict_plan_to_profile
+
+        plan = [
+            {PLAN_SOURCE: SOURCE_SQL, PLAN_QUERY: "毛利率", PLAN_TOP_K: 5, PLAN_FILTERS: None},
+            {PLAN_SOURCE: SOURCE_FAQ, PLAN_QUERY: "操作流程", PLAN_TOP_K: 5, PLAN_FILTERS: None},
+        ]
+
+        filtered = restrict_plan_to_profile(plan, profile="knowledge_qa")
+
+        assert [step[PLAN_SOURCE] for step in filtered] == [SOURCE_FAQ]
+
+    def test_profile_filter_all_removed_falls_back_to_faq_step(self):
+        """全部步骤被移除时补一个 FAQ 步：图进入既有 no-result 终态而非扩大范围。"""
+        from src.agents.nodes import restrict_plan_to_profile
+
+        plan = [
+            {PLAN_SOURCE: SOURCE_SQL, PLAN_QUERY: "毛利率", PLAN_TOP_K: 5, PLAN_FILTERS: None},
+            {PLAN_SOURCE: SOURCE_REPORT, PLAN_QUERY: "目标价", PLAN_TOP_K: 5, PLAN_FILTERS: None},
+        ]
+
+        filtered = restrict_plan_to_profile(plan, profile="knowledge_qa")
+
+        assert [step[PLAN_SOURCE] for step in filtered] == [SOURCE_FAQ]
+        # 兜底步沿用计划里已消解的查询
+        assert filtered[0][PLAN_QUERY] == "毛利率"
+        assert filtered[0][PLAN_TOP_K] == 5
+
+    def test_profile_filter_keeps_plan_for_full_profile(self):
+        from src.agents.nodes import restrict_plan_to_profile
+
+        plan = [
+            {PLAN_SOURCE: SOURCE_SQL, PLAN_QUERY: "毛利率", PLAN_TOP_K: 7, PLAN_FILTERS: None},
+            {PLAN_SOURCE: SOURCE_REPORT, PLAN_QUERY: "目标价", PLAN_TOP_K: 5, PLAN_FILTERS: None},
+        ]
+
+        assert restrict_plan_to_profile(plan, profile="full") == plan
+
+    def test_profile_filter_empty_plan_falls_back_to_faq_step(self):
+        from src.agents.nodes import restrict_plan_to_profile
+
+        filtered = restrict_plan_to_profile([], profile="knowledge_qa")
+
+        assert [step[PLAN_SOURCE] for step in filtered] == [SOURCE_FAQ]
+        assert filtered[0][PLAN_QUERY] == ""
+
+
+class TestPlannerProfileFilter:
+    """planner 在角色过滤与意图补源之后执行 profile 过滤（计划收口）。"""
+
+    def _state(self, **overrides: Any) -> AssistantState:
+        return _state(**{
+            STATE_USER_ROLE: ROLE_ADVISOR,
+            STATE_ORIGINAL_QUERY: "内部制度对客户数据导出申请的操作流程有什么要求？",
+            STATE_REWRITTEN_QUERY: "内部制度 客户数据导出申请 操作流程",
+            STATE_INTENT: "法规咨询",
+            STATE_QUERY_TYPE: "regulation_inquiry",
+            STATE_ENTITIES: {},
+            **overrides,
+        })
+
+    def test_planner_strips_out_of_profile_sources_under_knowledge_qa(self):
+        """角色允许但 profile 外的源在计划收口时被剥离。"""
+        result = planner(self._state(**{
+            STATE_RETRIEVAL_PLAN_RAW: [
+                {PLAN_SOURCE: SOURCE_PRODUCT, PLAN_QUERY: "客户数据导出", PLAN_TOP_K: 3},
+            ]
+        }))
+
+        sources = [s[PLAN_SOURCE] for s in result[STATE_RETRIEVAL_PLAN]]
+        # 意图底线补的 regulation 步被 profile 过滤剥离，只留 profile 内的 product
+        assert sources == [SOURCE_PRODUCT]
+
+    def test_planner_all_out_of_profile_falls_back_to_faq_step(self):
+        result = planner(self._state(**{
+            STATE_RETRIEVAL_PLAN_RAW: [
+                {PLAN_SOURCE: SOURCE_REGULATION, PLAN_QUERY: "客户数据导出", PLAN_TOP_K: 3},
+            ]
+        }))
+
+        sources = [s[PLAN_SOURCE] for s in result[STATE_RETRIEVAL_PLAN]]
+        assert sources == [SOURCE_FAQ]
+        # 兜底步沿用首个被剥离步骤自带的查询（planner 规范化时保留步骤 query）
+        assert result[STATE_RETRIEVAL_PLAN][0][PLAN_QUERY] == "客户数据导出"
+
+
+class TestProfileToolAuthorization:
+    """默认 Agent 不能绕过产品范围：模型请求 profile 外工具必须被授权层拒绝。"""
+
+    @pytest.fixture(autouse=True)
+    def _reset_reason_state(self):
+        import src.agents.nodes as nodes_module
+
+        nodes_module._tool_circuit_breaker.clear()
+        _get_bound_reason_model.cache_clear()  # pyright: ignore[reportFunctionMemberAccess]
+        yield
+        nodes_module._tool_circuit_breaker.clear()
+        _get_bound_reason_model.cache_clear()  # pyright: ignore[reportFunctionMemberAccess]
+
+    def test_model_requested_sql_tool_is_rejected_under_knowledge_qa(self, monkeypatch):
+        """模型直接请求 sql_query：绑定列表不含它、授权层拒绝执行，SQL 不落库。"""
+        from langchain_core.messages import AIMessage, ToolMessage
+
+        bound_tool_names: list[set[str]] = []
+
+        class FakeLLM:
+            def bind_tools(self, tools):
+                bound_tool_names.append({tool.name for tool in tools})
+                return self
+
+            def invoke(self, messages):
+                if isinstance(messages[-1], ToolMessage):
+                    return AIMessage(content="无法完成该查询。")
+                return AIMessage(
+                    content="",
+                    tool_calls=[{
+                        "name": SOURCE_SQL,
+                        "args": {"query": "SELECT gross_margin FROM financial_ratios"},
+                        "id": "call-profile-sql",
+                    }],
+                )
+
+        monkeypatch.setattr("src.agents.nodes.llm", FakeLLM())
+        result = build_reason_subgraph().invoke(_state(**{
+            STATE_USER_ROLE: ROLE_OPERATIONS,
+            STATE_ORIGINAL_QUERY: "查一下所有产品的毛利率",
+        }))
+
+        # 模型绑定列表只含 profile 白名单内的两个工具
+        assert bound_tool_names[0] == {SOURCE_PRODUCT, SOURCE_FAQ}
+        # sql_query 调用被授权层拒绝：错误 ToolMessage + success=False
+        assert result[STATE_TOOL_CALLS][0]["tool"] == SOURCE_SQL
+        assert result[STATE_TOOL_CALLS][0]["success"] is False
+        assert "无权调用" in result[STATE_TOOL_CALLS][0]["output"]
+
+    def test_profile_allowed_retrieval_tool_still_executes(self, monkeypatch):
+        """knowledge_qa 允许的两个检索工具仍能经授权层正常调用。"""
+        from langchain_core.messages import AIMessage, ToolMessage
+
+        received_plans: list[list[dict]] = []
+
+        class FakeRetriever:
+            def __init__(self, user_role="", data_permissions=None):
+                pass
+
+            def retrieve(self, plan):
+                received_plans.append(plan)
+                return [{
+                    "content": "FAQ：赎回流程为 T+1 确认。",
+                    "metadata": {"title": "赎回FAQ", "doc_type": "faq"},
+                    "score": 0.9,
+                    "denied": False,
+                }]
+
+        class FakeLLM:
+            def bind_tools(self, tools):
+                return self
+
+            def invoke(self, messages):
+                if isinstance(messages[-1], ToolMessage):
+                    return AIMessage(content="赎回流程为 T+1 确认。")
+                return AIMessage(
+                    content="",
+                    tool_calls=[{
+                        "name": SOURCE_FAQ,
+                        "args": {"query": "赎回流程"},
+                        "id": "call-profile-faq",
+                    }],
+                )
+
+        monkeypatch.setattr("src.agents.nodes.llm", FakeLLM())
+        monkeypatch.setattr("src.agents.tools.HybridRetriever", FakeRetriever)
+        result = build_reason_subgraph().invoke(_state(**{
+            STATE_USER_ROLE: ROLE_OPERATIONS,
+            STATE_ORIGINAL_QUERY: "赎回流程是什么？",
+        }))
+
+        assert result[STATE_TOOL_CALLS][0]["tool"] == SOURCE_FAQ
+        assert result[STATE_TOOL_CALLS][0]["success"] is True
+        assert received_plans[0][0]["source"] == SOURCE_FAQ
