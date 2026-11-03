@@ -334,6 +334,61 @@ def test_tc020_llm_provider_unavailable_returns_503(qa_api):
     assert "OPENAI_API_BASE" in detail or "Ollama" in detail
 
 
+class _ExpiredSubscriptionAgentApp:
+    """Ark CodingPlan 订阅失效：400 InvalidSubscription（2026-11-03 实测形态）。
+
+    openai SDK 抛出时 body 已被解包为拍平的 {code, message}。
+    """
+
+    def invoke(self, state, config=None):
+        import httpx
+        from openai import BadRequestError
+
+        request = httpx.Request("POST", "https://ark.cn-beijing.volces.com/api/coding/v3")
+        response = httpx.Response(400, request=request)
+        raise BadRequestError(
+            "Error code: 400 - InvalidSubscription",
+            response=response,
+            body={
+                "code": "InvalidSubscription",
+                "message": "Your account does not have a valid CodingPlan subscription.",
+            },
+        )
+
+
+def test_tc020_expired_subscription_returns_503(qa_api):
+    """TC-020 补充：订阅失效的 400 也归 provider 不可用 → 503 + 订阅排查指引。"""
+    qa_api["agent"] = _ExpiredSubscriptionAgentApp()
+
+    res = qa_api["client"].post(API_ROUTE_ASSISTANT_QA, json={"query": "货币基金风险"})
+
+    assert res.status_code == 503
+    assert "subscription" in res.json()["detail"]
+
+
+def test_tc020_subscription_body_shapes_both_recognized():
+    """原始 error 信封与 SDK 拍平两种 body 形态都必须识别为 provider 不可用。"""
+    import httpx
+    from openai import BadRequestError
+
+    from src.api.qa import _is_provider_unavailable
+
+    request = httpx.Request("POST", "https://ark.example/v3")
+    response = httpx.Response(400, request=request)
+    enveloped = BadRequestError(
+        "Error code: 400",
+        response=response,
+        body={"error": {"code": "InvalidSubscription", "message": "expired"}},
+    )
+    flattened = BadRequestError(
+        "Error code: 400",
+        response=response,
+        body={"code": "InvalidSubscription", "message": "expired"},
+    )
+    assert _is_provider_unavailable(enveloped)
+    assert _is_provider_unavailable(flattened)
+
+
 # ══════════════════════════════════════════════════════════════════════
 # TC-021 限流
 # ══════════════════════════════════════════════════════════════════════

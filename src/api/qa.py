@@ -64,6 +64,24 @@ audit_logger = logging.getLogger("secrag.audit")
 router = APIRouter()
 
 
+def _provider_error_code(exc: Exception) -> str:
+    """提取 OpenAI 兼容错误体里的 error.code（无 body 或结构不符时为空串）。
+
+    body 兼容两种形态：openai SDK 抛出时已解包信封的 {code, message}
+    （2026-11-03 实测 1.x 客户端拍平 Ark 响应），以及原始响应的
+    {error: {code, message}} 包装（手工构造/直连 httpx 时出现）。
+    """
+    body = getattr(exc, "body", None)
+    if isinstance(body, dict):
+        error = body.get("error")
+        if isinstance(error, dict):
+            body = error
+        code = body.get("code")
+        if isinstance(code, str):
+            return code
+    return ""
+
+
 def _is_provider_unavailable(exc: Exception) -> bool:
     if isinstance(exc, (httpx.TimeoutException, httpx.TransportError)):
         return True
@@ -73,9 +91,13 @@ def _is_provider_unavailable(exc: Exception) -> bool:
 
     if isinstance(exc, APIStatusError):
         status_code = getattr(exc, "status_code", None)
-        return status_code in {401, 403, 408, 409, 429} or (
+        if status_code in {401, 403, 408, 409, 429} or (
             status_code is not None and status_code >= 500
-        )
+        ):
+            return True
+        # Ark CodingPlan 订阅缺失/过期返回 400 InvalidSubscription（2026-11-03
+        # 实测）：账号状态问题属 provider 侧，按 503 给排查指引而非 500
+        return status_code == 400 and _provider_error_code(exc) == "InvalidSubscription"
 
     return False
 
@@ -354,7 +376,8 @@ async def assistant_qa(
                     status_code=503,
                     detail=(
                         "LLM provider unavailable. Check OPENAI_API_BASE, OPENAI_API_KEY, "
-                        "network/proxy settings, or start a local Ollama service and set "
+                        "network/proxy settings, and LLM subscription status "
+                        "(e.g. Ark CodingPlan), or start a local Ollama service and set "
                         "LLM_PROVIDER=ollama."
                     ),
                 ) from exc
