@@ -51,6 +51,11 @@ class AssistantState(TypedDict):
     pii_detected: list[dict[str, str]]  # STATE_PII_DETECTED；detect_pii 结果 [{type, match, position}]
     language: str  # STATE_LANGUAGE；detect_language 结果（zh/en/mixed）
 
+    # P1-8 澄清终态 — STATE_CLARIFICATION_NEEDED。clarify 节点产出后需要
+    # 跨节点保留到终态，API 层据此把终态映射为 needs_clarification；
+    # 未声明进 state 会被 LangGraph 静默丢弃（MVP 验收集发现的真实缺口）
+    clarification_needed: bool
+
     # 检索计划 — STATE_RETRIEVAL_PLAN / STATE_RETRIEVAL_PLAN_RAW / STATE_RETRIEVAL_ATTEMPTS
     # retrieval_plan_raw 是 query_understand 合并 LLM 调用（ISSUE-11）产出的
     # 未规范化计划（LLM 原始 dict，不可信）；planner 节点规范化后写 retrieval_plan
