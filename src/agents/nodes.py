@@ -174,6 +174,29 @@ def _build_llm():
     )
 
 
+def _warn_if_plan_budget_starved(response: Any) -> None:
+    """理解/规划调用输出预算耗尽且正文为空时告警，而不是静默走兜底计划。
+
+    典型根因：配置了思考 token 计入 max_tokens 的强制 reasoning 模型
+    （2026-10-13 实测 glm-5.3-flash：640 预算全被思考链消耗，正文恒为空，
+    每次理解/规划调用空转 13s+ 后退化为单源兜底）。langchain-openai 的
+    ChatOpenAI 不透传第三方 reasoning 字段，只能从 finish_reason=length
+    加空正文识别该故障。
+    """
+    content = getattr(response, "content", None)
+    metadata = getattr(response, "response_metadata", None)
+    finish_reason = metadata.get("finish_reason") if isinstance(metadata, dict) else None
+    if isinstance(content, str) and not content.strip() and finish_reason == "length":
+        _audit_node_logger.warning(
+            "理解/规划调用输出预算（plan_max_tokens=%d）耗尽且正文为空"
+            "（finish_reason=length），已退化为兜底检索计划。当前模型 %s 可能是"
+            "思考 token 计入 max_tokens 的 reasoning 模型，请更换模型或调大 "
+            "LLM_PLAN_MAX_TOKENS",
+            config.llm.plan_max_tokens,
+            config.llm.model,
+        )
+
+
 def _invoke_with_plan_budget(messages: list[HumanMessage]) -> Any:
     """理解/计划合并调用的统一入口：限定输出预算并支持分层小模型。
 
@@ -186,8 +209,11 @@ def _invoke_with_plan_budget(messages: list[HumanMessage]) -> Any:
         # ISSUE-20：配置了分层小模型时以请求级参数覆盖主模型
         if config.llm.plan_model:
             kwargs["model"] = config.llm.plan_model
-        return llm.invoke(messages, **kwargs)
-    return llm.invoke(messages)
+        response = llm.invoke(messages, **kwargs)
+    else:
+        response = llm.invoke(messages)
+    _warn_if_plan_budget_starved(response)
+    return response
 
 
 # 模块级 LLM 实例，所有节点共享（避免每个节点重复创建）
