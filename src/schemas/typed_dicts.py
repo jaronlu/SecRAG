@@ -4,6 +4,8 @@ from typing import Any
 
 from typing_extensions import TypedDict
 
+from src.schemas.constants import AnswerStatus
+
 
 class RetrievalPlanStep(TypedDict, total=False):
     """Single retrieval plan step stored under STATE_RETRIEVAL_PLAN."""
@@ -118,12 +120,15 @@ class AnswerOutcome(TypedDict):
     缓存命中、正常回答、合规拦截都收敛为这一种结果对象再对外返回，
     传输层不得分别解释业务（AssistantQAResponse 是它的序列化投影）。
     所有构造点（缓存命中、图执行终态）均填全字段，故键为必填。
+    answer_status 固定由构造点显式填充：命中路径为 answered，图终态经
+    answer_status_from_state 解析，失败终态不得伪装成成功答案。
     """
 
     answer: str
     citations: list[CitationDict]
     confidence: str
     compliance: ComplianceResult
+    answer_status: AnswerStatus
 
 
 class ConversationThreadDict(TypedDict):

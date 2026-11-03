@@ -118,10 +118,11 @@ export default function ChatPage() {
             ),
           )
         } else if (event.type === 'answer') {
-          // 后端 answer 事件承载完整终态：answer 文本 + 引用 + 置信度
+          // 后端 answer 事件承载完整终态：answer 文本 + 引用 + 置信度 + 业务终态
           const text = event.answer ?? ''
           const citations = event.citations
           const confidence = event.confidence
+          const answerStatus = event.answer_status
           // 自动创建会话后，把 thread_id 回写，后续问题沿用同一会话
           if (event.thread_id) {
             setCurrentThreadId(event.thread_id)
@@ -130,7 +131,9 @@ export default function ChatPage() {
           // 拒答/澄清/拦截文案只经 answer 事件到达）
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === assistantId ? { ...m, content: text, citations, confidence, streaming: false } : m,
+              m.id === assistantId
+                ? { ...m, content: text, citations, confidence, answer_status: answerStatus, streaming: false }
+                : m,
             ),
           )
         } else if (event.type === 'error') {

@@ -40,6 +40,14 @@ def test_frontend_stream_event_types_declare_answer_delta():
     assert "'answer_delta'" in text
 
 
+def test_frontend_stream_event_types_declare_answer_status():
+    """answer_status 随 SSE answer 终态事件到达，前端类型必须声明五个取值。"""
+    text = FRONTEND_TYPES_PATH.read_text(encoding="utf-8")
+    for status in ("answered", "no_evidence", "permission_denied", "needs_clarification", "blocked"):
+        assert f"'{status}'" in text
+    assert "answer_status" in text
+
+
 def test_frontend_chat_page_consumes_answer_delta_without_fake_typewriter():
     """ISSUE-9：ChatPage 消费真流增量；拿到全文再假打字机的渲染必须移除。"""
     page_path = Path(__file__).resolve().parents[1] / "frontend" / "src" / "pages" / "ChatPage.tsx"

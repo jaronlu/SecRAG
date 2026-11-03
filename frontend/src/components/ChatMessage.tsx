@@ -1,10 +1,35 @@
 import { useState } from 'react'
-import type { ChatMessage as ChatMessageType } from '../types'
+import type { AnswerStatus, ChatMessage as ChatMessageType } from '../types'
 import { formatAnswerHTML } from '../utils/markdown'
 
 interface ChatMessageProps {
   message: ChatMessageType
 }
+
+// 对外业务终态的中文标签：状态标签必须有文字，不展示原始枚举
+const ANSWER_STATUS_LABELS: Record<AnswerStatus, string> = {
+  answered: '已回答',
+  no_evidence: '未找到资料',
+  permission_denied: '无权访问',
+  needs_clarification: '需要补充信息',
+  blocked: '已拦截',
+}
+
+// 失败终态的标签配色；answered 单独用绿色
+const ANSWER_STATUS_STYLES: Record<AnswerStatus, string> = {
+  answered: 'bg-emerald-100 text-emerald-700',
+  no_evidence: 'bg-slate-100 text-slate-600',
+  permission_denied: 'bg-amber-100 text-amber-700',
+  needs_clarification: 'bg-amber-100 text-amber-700',
+  blocked: 'bg-red-100 text-red-700',
+}
+
+// 无证据/无权限/拦截不得伪装成成功答案：不展示置信度评分
+const STATUS_HIDE_CONFIDENCE: ReadonlySet<AnswerStatus> = new Set([
+  'no_evidence',
+  'permission_denied',
+  'blocked',
+])
 
 const docTypeColors: Record<string, string> = {
   product: 'bg-blue-100 text-blue-700',
@@ -17,6 +42,10 @@ const docTypeColors: Record<string, string> = {
 export default function ChatMessage({ message }: ChatMessageProps) {
   const [showCitations, setShowCitations] = useState(false)
   const isUser = message.role === 'user'
+  const answerStatus = message.answer_status
+  const statusLabel = answerStatus ? ANSWER_STATUS_LABELS[answerStatus] : undefined
+  const statusStyle = answerStatus ? ANSWER_STATUS_STYLES[answerStatus] : undefined
+  const hideConfidence = answerStatus !== undefined && STATUS_HIDE_CONFIDENCE.has(answerStatus)
 
   return (
     <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
@@ -67,13 +96,20 @@ export default function ChatMessage({ message }: ChatMessageProps) {
             />
           )}
 
-          {/* 置信度和合规 */}
-          {!isUser && message.confidence && (
-            <div className="flex gap-2 mt-2 text-[11px]">
-              <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-600">
-                置信度: {message.confidence}
-              </span>
-              {message.compliance && (
+          {/* 业务终态标签 + 置信度和合规：失败终态隐藏置信度评分 */}
+          {!isUser && (statusLabel || (!hideConfidence && message.confidence)) && (
+            <div className="flex gap-2 mt-2 text-[11px] flex-wrap">
+              {statusLabel && (
+                <span className={`px-2 py-0.5 rounded font-medium ${statusStyle}`}>
+                  {statusLabel}
+                </span>
+              )}
+              {!hideConfidence && message.confidence && (
+                <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                  置信度: {message.confidence}
+                </span>
+              )}
+              {!hideConfidence && message.compliance && (
                 <span
                   className={`px-2 py-0.5 rounded ${
                     message.compliance.passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
@@ -86,8 +122,8 @@ export default function ChatMessage({ message }: ChatMessageProps) {
           )}
         </div>
 
-        {/* 引用 */}
-        {!isUser && message.citations && message.citations.length > 0 && (
+        {/* 引用：只在 answered 且引用数组非空时展示；失败终态不带引用 */}
+        {!isUser && message.answer_status === 'answered' && message.citations && message.citations.length > 0 && (
           <div className="mt-2 text-left">
             <button
               onClick={() => setShowCitations(!showCitations)}

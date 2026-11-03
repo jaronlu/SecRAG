@@ -19,11 +19,13 @@ from src.schemas.constants import (
     API_ROUTE_ASSISTANT_THREADS,
     ROLE_TECHNICAL,
     STATE_CITATIONS,
+    STATE_COMPLIANCE,
     STATE_CONFIDENCE,
     STATE_FINAL_ANSWER,
     STATE_INTENT,
     STATE_RETRIEVAL_PLAN,
     STATE_TERMINAL,
+    STATE_VERIFICATION,
 )
 from src.config import config
 from src.product_scope import get_product_profile
@@ -336,6 +338,9 @@ def test_qa_stream_emits_terminal_event_protocol(qa_client, monkeypatch):
     assert answer["confidence"] == "high"
     assert answer["thread_id"]
     assert answer["turn_id"]
+    # SSE answer 事件必须携带 answer_status；替身终态未带验证/合规结果，
+    # 缺信息按 fail closed 收敛为 blocked，不得伪装成 answered
+    assert answer["answer_status"] == "blocked"
 
 
 def _parse_sse_events(res) -> list[tuple[str, dict]]:
@@ -382,6 +387,101 @@ def test_qa_stream_emits_answer_delta_for_reason_tokens(qa_client, monkeypatch):
     assert answer["answer"] == "货币基金风险等级为低。"
     # 非 reason 节点的 token 不得出现在任何 delta 中
     assert "SHOULD_NOT_LEAK" not in "".join(deltas)
+
+
+# ══════════════════════════════════════════════════════════════════════
+# answer_status 对外契约：同步响应与 SSE answer 事件都携带明确终态，
+# 无证据/无权限/澄清/合规拦截不得伪装成成功答案
+# ══════════════════════════════════════════════════════════════════════
+
+
+class _VerifiedAgentApp:
+    """图终态带通过验证与合规的完整 state。"""
+
+    def invoke(self, state, config=None):
+        return {
+            **state,
+            STATE_FINAL_ANSWER: "货币基金风险等级为低。",
+            STATE_CITATIONS: [{"source": "a.pdf"}],
+            STATE_CONFIDENCE: "high",
+            STATE_VERIFICATION: {"passed": True, "issues": [], "confidence": "high"},
+            STATE_COMPLIANCE: {"passed": True, "flags": [], "risk_disclosure": ""},
+        }
+
+
+class _SnapshotStreamingAgentApp:
+    """产出 verify/compliance_check 前置更新 + compose 终态，覆盖快照解析。"""
+
+    async def astream(self, initial_state, config=None, stream_mode="updates", subgraphs=False):
+        yield ((), "updates", {"query_understand": {STATE_INTENT: "FAQ"}})
+        yield ((), "updates", {
+            "verify": {STATE_VERIFICATION: {"passed": True, "issues": [], "confidence": "high"}},
+        })
+        yield ((), "updates", {
+            "compliance_check": {STATE_COMPLIANCE: {"passed": True, "flags": []}},
+        })
+        yield ((), "updates", {
+            "compose": {
+                STATE_FINAL_ANSWER: "货币基金风险等级为低。",
+                STATE_TERMINAL: True,
+                STATE_CITATIONS: [{"source": "a.pdf"}],
+                STATE_CONFIDENCE: "high",
+            },
+        })
+
+
+class _DeniedStreamingAgentApp:
+    """权限拒绝短路终态：verification.issues 携带 permission_denied。"""
+
+    async def astream(self, initial_state, config=None, stream_mode="updates", subgraphs=False):
+        yield ((), "updates", {
+            "permission_denied_response": {
+                STATE_FINAL_ANSWER: "当前角色无权限访问完成该请求所需的数据源。",
+                STATE_TERMINAL: True,
+                STATE_CITATIONS: [],
+                STATE_CONFIDENCE: "low",
+                STATE_VERIFICATION: {
+                    "passed": False,
+                    "issues": ["permission_denied"],
+                    "confidence": "low",
+                },
+            },
+        })
+
+
+def _collect_answer_event(qa_client, app, monkeypatch) -> dict:
+    monkeypatch.setattr("src.api.qa._get_agent_app", lambda: app())
+    with qa_client.stream(
+        "POST", API_ROUTE_ASSISTANT_QA_STREAM, json={"query": "货币基金风险"}
+    ) as res:
+        assert res.status_code == 200
+        events = _parse_sse_events(res)
+    return next(data for name, data in events if name == "answer")
+
+
+def test_qa_response_carries_answer_status(qa_client, monkeypatch):
+    """同步响应携带 answer_status；验证与合规都通过时为 answered。"""
+    monkeypatch.setattr("src.api.qa._get_agent_app", lambda: _VerifiedAgentApp())
+
+    res = qa_client.post(API_ROUTE_ASSISTANT_QA, json={"query": "货币基金风险"})
+
+    assert res.status_code == 200
+    body = res.json()
+    assert body["answer_status"] == "answered"
+
+
+def test_qa_stream_answer_status_uses_accumulated_state(qa_client, monkeypatch):
+    """SSE answer_status 由终态输出 + 前置 verify/compliance 更新合并解析。"""
+    answer = _collect_answer_event(qa_client, _SnapshotStreamingAgentApp, monkeypatch)
+
+    assert answer["answer_status"] == "answered"
+
+
+def test_qa_stream_permission_denied_maps_to_permission_denied(qa_client, monkeypatch):
+    answer = _collect_answer_event(qa_client, _DeniedStreamingAgentApp, monkeypatch)
+
+    assert answer["answer_status"] == "permission_denied"
+    assert answer["citations"] == []
 
 
 def test_qa_stream_records_time_to_first_token_once(qa_client, monkeypatch):

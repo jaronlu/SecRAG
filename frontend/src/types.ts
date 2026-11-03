@@ -123,6 +123,8 @@ export interface StreamEvent {
   answer?: string
   citations?: Citation[]
   confidence?: string
+  // 对外业务终态（Product Contract 五态），随 answer 终态事件到达
+  answer_status?: AnswerStatus
   thread_id?: string
   turn_id?: string
   detail?: string

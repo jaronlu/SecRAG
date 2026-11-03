@@ -10,6 +10,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.schemas.constants import AnswerStatus
 from src.schemas.typed_dicts import CitationDict, ComplianceResult
 
 
@@ -33,6 +34,9 @@ class AssistantQAResponse(BaseModel):
     citations: list[CitationDict]  # 序列化 Citation（SCHEMA-REFERENCE §3.1）
     confidence: str  # SCHEMA-REFERENCE §2.3
     compliance: ComplianceResult
+    # 对外业务终态（plan.md Product Contract 五态）：
+    # no_evidence/permission_denied/needs_clarification/blocked 不得伪装成成功答案
+    answer_status: AnswerStatus
 
 
 class CurrentUserResponse(BaseModel):
