@@ -39,6 +39,26 @@
 - 分工不变：TC 集 = 链路级 E2E 执行证据（2026-09-25/26 战役收官记录）；DC 集 = 领域纵深、
   设计准入映射与缺口登记（本集）。交叉点 DC 集只引用 TC 编号，不重述案例。
 
+### 演进备注（2026-11 产品收敛，plan.md Task 1~9）
+
+默认 `PRODUCT_PROFILE=knowledge_qa`（非法值 fail closed）落地后的领域影响，涉及本集
+工具矩阵 / 权限 / 契约类案例的理解口径：
+
+- 工具白名单：默认 profile 下 `get_tools_for_role` 只暴露 `product_search` / `faq_search`
+  （角色过滤 → 意图补源 → profile 收口，顺序固定）；calculator / 行情 / SQL / 财务指标 /
+  suitability / rerank 属 `full` profile，相关角色矩阵案例在 `PRODUCT_PROFILE=full` 下执行
+  （tests/test_agents.py 已按语义 pin profile）。
+- 检索计划：planner 产出后经 `restrict_plan_to_profile` 收口；全部剥离时以 FAQ 兜底步进入
+  既有 no-result/权限终态，不扩大数据源范围。
+- 对外契约：同步响应与 SSE `answer` 事件携带 `answer_status` 五态
+  （answered/no_evidence/permission_denied/needs_clarification/blocked），映射优先级固定，
+  缺验证/合规信息 fail closed 为 blocked；澄清终态依赖
+  `AssistantState.clarification_needed` 通道（本次收敛中补齐的真实缺口）。
+- MVP 验收集：`tests/evaluation/mvp_knowledge_qa.json` + `tests/test_mvp_contract.py`
+  （8 场景，真实 Agent Graph + 替身，不依赖外部 provider）作为 knowledge_qa 收敛的
+  最小验收守护，与两集互补；2026-11-04 复核：定向矩阵 244 passed + MVP 契约 10 passed
+  （仅既有 ollama proxy 环境失败与本批无关）。
+
 ---
 
 ## 一、案例索引

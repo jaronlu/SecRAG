@@ -11,6 +11,17 @@
 > deadline 等）；校订点在受影响案例以「演进备注」标注，历史执行证据原样保留。批次之后新增的领域
 > 能力案例见 [agent-domain-test-cases.md](./agent-domain-test-cases.md)（DC-001~058），两集互补不重复。
 
+> **演进备注（2026-11 产品收敛，plan.md Task 1~9）**：默认 `PRODUCT_PROFILE=knowledge_qa`
+> 收敛后，与本文相关的行为变化——(1) 问答前端只有流式主流程，SSE 对外消费
+> answer_delta/answer/error/done（progress 事件后端仍发送、前端忽略），内部节点进度条与
+> 同步/流式开关已删除；(2) 身份由 `/v1/assistant/me` 服务端派生，前端无角色选择器与
+> Token 编辑入口（TC 集环节 A 的角色切换 UI 用例按此理解）；(3) SSE `answer` 事件与同步
+> 响应新增 `answer_status` 五态，失败终态不携带引用/成功置信度；(4) `/admin` 不再从问答页
+> 链接，管理接口服务端角色校验不变。MVP 验收契约新增守护
+> `tests/test_mvp_contract.py`（8 场景，真实图 + 替身）；工具/角色矩阵类案例在
+> `PRODUCT_PROFILE=full` 下执行。2026-11-04 复核证据：定向矩阵 244 passed +
+> tests/test_mvp_contract.py 10 passed（仅既有 ollama proxy 环境失败与本批无关）。
+
 ## 一、链路梳理结论（以代码为准）
 
 ```

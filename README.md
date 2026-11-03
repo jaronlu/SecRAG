@@ -289,6 +289,31 @@ uv run pytest
 当前测试覆盖 Agent 节点与路由、身份和权限、检索、数据摄入、会话、合规、工具、API、持仓存储
 以及每日扫描与事件分级。
 
+### knowledge_qa 产品收敛的最小验证矩阵
+
+改动产品 profile、`answer_status` 契约或问答前端时，按 `plan.md`（2026-11 收敛）运行以下
+定向验证，不要求默认跑全量：
+
+```bash
+# 双 profile 工具矩阵
+PRODUCT_PROFILE=knowledge_qa uv run pytest tests/test_tools.py tests/test_agents.py -q
+PRODUCT_PROFILE=full uv run pytest tests/test_tools.py tests/test_agents.py -q
+
+# API / 认证 / MVP 验收契约
+uv run pytest tests/test_product_scope.py tests/test_api_auth.py \
+  tests/test_api_routes.py tests/test_mvp_contract.py \
+  tests/test_stream_progress_contract.py -q
+
+# 静态检查与前端构建
+uv run ruff check src tests
+cd frontend && npm run build
+```
+
+MVP 验收契约见 `tests/evaluation/mvp_knowledge_qa.json`（8 类场景：answered×2、
+no_evidence、needs_clarification、permission_denied、blocked、同会话追问隔离、
+服务不可用不伪装成回答），由 `tests/test_mvp_contract.py` 以真实 Agent Graph +
+测试替身执行，不依赖外部 provider，不修改 `data/*.db`。
+
 ## 项目结构
 
 ```text

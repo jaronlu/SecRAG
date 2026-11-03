@@ -1,0 +1,100 @@
+{
+  "description": "SecRAG MVP（knowledge_qa profile）验收契约：8 类场景。查询与稳定事实来自 data/raw/demo_knowledge_base 的虚构演示语料（产品风险等级 R2、FAQ 密码重置流程）。expected_status 取值与后端 answer_status 五态一一对应；required_source_types 指该场景计划必须使用的检索源。本文件只声明场景，契约由 tests/test_mvp_contract.py 以真实 Agent Graph + 测试替身执行验证。",
+  "contract": {
+    "answer_status_values": [
+      "answered",
+      "no_evidence",
+      "permission_denied",
+      "needs_clarification",
+      "blocked"
+    ],
+    "invariants": [
+      "no_evidence / permission_denied / needs_clarification / blocked 不得返回引用或成功置信度",
+      "answer_status 由 src/utils/answer_status.py 的固定优先级映射：澄清 → 权限 → 无证据 → 拦截 → 已回答",
+      "测试使用 mock LLM/检索 fixture，不调用外部 provider，不修改 data/*.db"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "S1_answered_product_risk_level",
+      "query": "示例稳健增利理财产品的风险等级是多少？",
+      "user_role": "operations",
+      "expected_status": "answered",
+      "required_source_types": ["product_search"],
+      "stable_fact": "示例理财产品风险揭示书：风险等级评定为 R2（中低风险）",
+      "expect_citations": true
+    },
+    {
+      "id": "S2_answered_faq_operation_flow",
+      "query": "内部系统登录密码忘记后如何重置？",
+      "user_role": "operations",
+      "expected_status": "answered",
+      "required_source_types": ["faq_search"],
+      "stable_fact": "示例内部系统操作 FAQ：联系技术支持通过工号验证后重置（忘记原密码时）",
+      "expect_citations": true
+    },
+    {
+      "id": "S3_no_evidence_market_quote",
+      "query": "今天上证指数的实时行情涨跌幅是多少？",
+      "user_role": "operations",
+      "expected_status": "no_evidence",
+      "required_source_types": [],
+      "notes": "知识库只有静态演示语料，没有实时行情；检索耗尽必须明确拒答",
+      "expect_citations": false
+    },
+    {
+      "id": "S4_needs_clarification_ambiguous_term",
+      "query": "这款产品的PE是多少？",
+      "user_role": "operations",
+      "expected_status": "needs_clarification",
+      "required_source_types": [],
+      "notes": "产品简称/指标缩写歧义：理解节点输出 ambiguity 非空即触发澄清终态",
+      "expect_citations": false
+    },
+    {
+      "id": "S5_permission_denied_restricted_doc",
+      "query": "重大资产重组内部草稿目前进展如何？",
+      "user_role": "operations",
+      "expected_status": "permission_denied",
+      "required_source_types": [],
+      "notes": "机密研报草稿的 allowed_roles 不含 operations，全部结果被权限过滤",
+      "expect_citations": false
+    },
+    {
+      "id": "S6_blocked_investment_advice",
+      "query": "这款产品现在适合买入吗？给我一个操作建议。",
+      "user_role": "operations",
+      "expected_status": "blocked",
+      "required_source_types": ["product_search"],
+      "notes": "答案触发投资建议规则（建议买入）→ 合规拦截，输出安全兜底文案",
+      "expect_citations": false
+    },
+    {
+      "id": "S7_followup_same_thread_no_cross_user_leak",
+      "user_role": "operations",
+      "turns": [
+        {
+          "query": "示例稳健增利理财产品的风险等级是多少？",
+          "expected_status": "answered"
+        },
+        {
+          "query": "它的适当性匹配要求是什么？",
+          "expected_status": "answered"
+        }
+      ],
+      "cross_user_check": "第二位用户在同一 thread_id 上追问时，不得看到第一位用户的会话内容",
+      "required_source_types": ["product_search"],
+      "notes": "两轮都带 answer_status；会话历史按 user_id 隔离",
+      "expect_citations": true
+    },
+    {
+      "id": "S8_service_unavailable_never_answered",
+      "query": "示例稳健增利理财产品的风险等级是多少？",
+      "user_role": "operations",
+      "expected_status": "transport_error",
+      "required_source_types": [],
+      "notes": "LLM provider 不可用 → HTTP 503；请求超时 → 504；错误不得渲染成 answered",
+      "expect_citations": false
+    }
+  ]
+}
