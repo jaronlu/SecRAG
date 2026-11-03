@@ -25,6 +25,9 @@ from src.schemas.constants import (
     STATE_RETRIEVAL_PLAN,
     STATE_TERMINAL,
 )
+from src.config import config
+from src.product_scope import get_product_profile
+from src.schemas.constants import ROLE_OPERATIONS
 from src.utils.audit import SQLiteAuditStore
 from src.utils.conversation import SQLiteConversationStore
 
@@ -39,6 +42,60 @@ def test_health_endpoint_reachable(client):
     assert res.status_code == 200
     body = res.json()
     assert body["status"] == "ok"
+
+
+# ══════════════════════════════════════════════════════════════════════
+# /v1/assistant/me：角色由 Bearer token 服务端派生，请求体不参与身份
+# ══════════════════════════════════════════════════════════════════════
+
+
+def test_current_user_returns_server_derived_role(client):
+    response = client.get(
+        "/v1/assistant/me",
+        headers={"Authorization": "Bearer demo-ops"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["role"] == ROLE_OPERATIONS
+    assert response.json()["department"] == "ops"
+    assert response.json()["product_profile"] == config.product_profile
+
+
+def test_current_user_exposes_no_identity_beyond_role_department_profile(client):
+    """对外只暴露 role/department/product_profile；user_id、token、权限列表不得出现。"""
+    response = client.get(
+        "/v1/assistant/me",
+        headers={"Authorization": "Bearer demo-ops"},
+    )
+
+    assert response.status_code == 200
+    assert set(response.json()) == {"role", "department", "product_profile"}
+
+
+def test_current_user_requires_bearer_token(client):
+    response = client.get("/v1/assistant/me")
+
+    assert response.status_code == 401
+
+
+def test_current_user_rejects_unknown_token(client):
+    response = client.get(
+        "/v1/assistant/me",
+        headers={"Authorization": "Bearer not-a-known-token"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_current_user_product_profile_matches_active_profile(client):
+    """profile 字段与配置解析结果一致，非法配置在启动期已 fail closed。"""
+    response = client.get(
+        "/v1/assistant/me",
+        headers={"Authorization": "Bearer demo-ops"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["product_profile"] == get_product_profile()
 
 
 def test_metrics_endpoint_reachable(client):

@@ -2,17 +2,23 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import ChatMessage from '../components/ChatMessage'
 import StreamingProgress from '../components/StreamingProgress'
-import { askQuestion, streamQuestion, createThread, listThreads, deleteThread } from '../api'
-import type { ChatMessage as ChatMessageType, StreamEvent } from '../types'
+import { askQuestion, streamQuestion, createThread, getCurrentUser, listThreads, deleteThread } from '../api'
+import type { ChatMessage as ChatMessageType, CurrentUser, StreamEvent } from '../types'
 
-// 角色取值必须与后端 TOKEN_USER_BINDINGS 一致（issues.md 一.3）
-const ROLES = [
-  { value: 'demo-advisor', label: '投资顾问', desc: '可查看产品和研报' },
-  { value: 'demo-sales', label: '机构销售', desc: '可查看研报和市场信息' },
-  { value: 'demo-compliance', label: '合规', desc: '可查看法规和制度' },
-  { value: 'demo-ops', label: '运营支持', desc: '可查看FAQ和流程' },
-  { value: 'demo-tech', label: '技术支持', desc: '可查看技术文档' },
-]
+// 角色取值与后端 TOKEN_USER_BINDINGS 一致；未知角色统一显示"已认证用户"，
+// 不把原始枚举值当文案展示
+const ROLE_LABELS: Record<string, string> = {
+  advisor: '投资顾问',
+  institutional_sales: '机构销售',
+  compliance: '合规',
+  operations: '运营支持',
+  technical: '技术支持',
+}
+
+function roleLabelOf(user: CurrentUser | null): string {
+  if (!user) return '已认证用户'
+  return ROLE_LABELS[user.role] ?? '已认证用户'
+}
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessageType[]>([])
@@ -23,7 +29,7 @@ export default function ChatPage() {
   const [progressCompleted, setProgressCompleted] = useState(false)
   const [threads, setThreads] = useState<{ thread_id: string; title: string }[]>([])
   const [currentThreadId, setCurrentThreadId] = useState<string | undefined>()
-  const [token, setToken] = useState(localStorage.getItem('secrag_token') || 'demo-advisor')
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -43,10 +49,12 @@ export default function ChatPage() {
       .catch(() => {})
   }, [])
 
-  const handleTokenChange = (newToken: string) => {
-    setToken(newToken)
-    localStorage.setItem('secrag_token', newToken)
-  }
+  // 身份由服务端从 Bearer token 派生，页面不提供角色选择或 Token 编辑
+  useEffect(() => {
+    getCurrentUser()
+      .then(setCurrentUser)
+      .catch(() => {})
+  }, [])
 
   const handleNewThread = async () => {
     try {
@@ -243,32 +251,10 @@ export default function ChatPage() {
           )}
         </div>
 
-        {/* 角色和设置 */}
+        {/* 身份信息：由服务端派生，页面不提供编辑入口 */}
         <div className="p-3 border-t border-slate-700">
-          <div className="mb-2">
-            <label className="text-xs text-slate-400 block mb-1">当前角色</label>
-            <select
-              value={token}
-              onChange={(e) => handleTokenChange(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-sm"
-            >
-              {ROLES.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400">流式输出</span>
-            <button
-              onClick={() => setStreamEnabled(!streamEnabled)}
-              className={`w-10 h-5 rounded-full transition-colors ${streamEnabled ? 'bg-blue-500' : 'bg-slate-600'}`}
-            >
-              <div
-                className={`w-4 h-4 bg-white rounded-full transition-transform ${streamEnabled ? 'translate-x-5' : 'translate-x-0.5'}`}
-              />
-            </button>
+          <div className="text-xs text-slate-400">
+            当前身份：{roleLabelOf(currentUser)}
           </div>
         </div>
       </div>
@@ -285,7 +271,7 @@ export default function ChatPage() {
               ☰
             </button>
             <h2 className="font-medium text-slate-700">
-              {ROLES.find((r) => r.value === token)?.label || '对话'}
+              {roleLabelOf(currentUser)}
             </h2>
           </div>
           <button
@@ -367,15 +353,6 @@ export default function ChatPage() {
           <div className="bg-white rounded-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-bold text-lg mb-4">设置</h3>
             <div className="space-y-4">
-              <div>
-                <label className="text-sm text-slate-600 block mb-1">API Token</label>
-                <input
-                  type="text"
-                  value={token}
-                  onChange={(e) => handleTokenChange(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-slate-600">流式输出</span>
                 <button

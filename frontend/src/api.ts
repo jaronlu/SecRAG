@@ -3,6 +3,7 @@
 import type {
   AssistantQAResponse,
   ConversationThread,
+  CurrentUser,
   DocumentInfo,
   DocumentStats,
   ChunkInfo,
@@ -14,7 +15,8 @@ import type {
 const API_BASE = ''
 
 function getToken(): string {
-  return localStorage.getItem('secrag_token') || 'demo-advisor'
+  // 开发客户端兜底 token：仅用于本地联调请求头，不在页面显示或允许编辑
+  return localStorage.getItem('secrag_token') || 'demo-ops'
 }
 
 function authHeaders(): Record<string, string> {
@@ -41,6 +43,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 // ============ 对话相关 ============
+
+export async function getCurrentUser(): Promise<CurrentUser> {
+  return request<CurrentUser>('/v1/assistant/me')
+}
 
 export async function createThread(title: string): Promise<ConversationThread> {
   return request<ConversationThread>('/v1/assistant/threads', {
