@@ -2925,6 +2925,13 @@ class TestProfilePlanFilter:
 class TestPlannerProfileFilter:
     """planner 在角色过滤与意图补源之后执行 profile 过滤（计划收口）。"""
 
+    @pytest.fixture(autouse=True)
+    def _pin_knowledge_qa_profile(self, monkeypatch):
+        """本类测 knowledge_qa 收敛语义，固定 profile 与进程环境解耦。"""
+        from src.config import config
+
+        monkeypatch.setattr(config, "product_profile", "knowledge_qa")
+
     def _state(self, **overrides: Any) -> AssistantState:
         return _state(**{
             STATE_USER_ROLE: ROLE_ADVISOR,
@@ -2963,6 +2970,13 @@ class TestPlannerProfileFilter:
 
 class TestProfileToolAuthorization:
     """默认 Agent 不能绕过产品范围：模型请求 profile 外工具必须被授权层拒绝。"""
+
+    @pytest.fixture(autouse=True)
+    def _pin_knowledge_qa_profile(self, monkeypatch):
+        """本类测 knowledge_qa 授权语义，固定 profile 与进程环境解耦。"""
+        from src.config import config
+
+        monkeypatch.setattr(config, "product_profile", "knowledge_qa")
 
     @pytest.fixture(autouse=True)
     def _reset_reason_state(self):

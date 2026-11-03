@@ -1,7 +1,6 @@
 // SecRAG API 客户端
 
 import type {
-  AssistantQAResponse,
   ConversationThread,
   CurrentUser,
   DocumentInfo,
@@ -65,16 +64,6 @@ export async function getThreadMessages(threadId: string): Promise<{ messages: u
 
 export async function deleteThread(threadId: string): Promise<void> {
   await request(`/v1/assistant/threads/${threadId}`, { method: 'DELETE' })
-}
-
-export async function askQuestion(
-  query: string,
-  threadId?: string,
-): Promise<AssistantQAResponse> {
-  return request<AssistantQAResponse>('/v1/assistant/qa', {
-    method: 'POST',
-    body: JSON.stringify({ query, thread_id: threadId }),
-  })
 }
 
 // ============ 流式输出 ============
@@ -156,10 +145,6 @@ export async function searchKnowledgeBase(query: string, topK = 5): Promise<{ qu
 
 export async function getCacheStats(): Promise<CacheStats> {
   return request('/v1/admin/cache/stats')
-}
-
-export async function clearCache(expiredOnly = false): Promise<{ cleared: number; mode: string }> {
-  return request(`/v1/admin/cache/clear?clear_expired_only=${expiredOnly}`, { method: 'POST' })
 }
 
 // ============ 健康检查 ============
