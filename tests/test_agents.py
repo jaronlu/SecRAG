@@ -1075,6 +1075,25 @@ class TestVerify:
         result = verify(state)
         assert result[STATE_VERIFICATION].get("passed") is True
 
+    def test_tool_limit_terminal_skips_reverification_and_keeps_marker(self):
+        state = _state(**{
+            STATE_FINAL_ANSWER: "工具调用次数达到上限，无法安全完成当前请求。",
+            STATE_RETRIEVAL_RESULTS: [],
+            STATE_VERIFICATION: {
+                "passed": False,
+                "issues": ["tool_limit_exceeded"],
+                "confidence": CONFIDENCE_LOW,
+            },
+            STATE_REASON_ATTEMPTS: 1,
+        })
+        result = verify(state)
+        verification = result[STATE_VERIFICATION]
+        # 兜底文案不走验证器；tool_limit_exceeded 标记必须保留，
+        # 供 should_reason_again 停止无效重推、compose 输出对应兜底文案
+        assert verification["issues"] == ["tool_limit_exceeded"]
+        assert verification["passed"] is False
+        assert [s["round"] for s in verification["attempts"]] == [1]
+
 
 class TestVerificationAttemptSnapshots:
     """ISSUE-25：每轮验证留痕（轮次 + failure_kind + issues），可定位首轮失败原因。"""
@@ -2492,6 +2511,13 @@ class TestShouldReasonAgain:
 
     def test_not_passed_stops_after_max_reason_attempts(self):
         state = _state(**{STATE_VERIFICATION: {"passed": False}, STATE_REASON_ATTEMPTS: 2})
+        assert should_reason_again(state) == "continue"
+
+    def test_tool_limit_terminal_does_not_retry(self):
+        state = _state(**{
+            STATE_VERIFICATION: {"passed": False, "issues": ["tool_limit_exceeded"]},
+            STATE_REASON_ATTEMPTS: 1,
+        })
         assert should_reason_again(state) == "continue"
 
 
