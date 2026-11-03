@@ -1140,7 +1140,8 @@ def _build_reason_system_prompt(state: AssistantState) -> str:
 
 【用户角色】{role}
 
-如果需要计算或查询更多信息，可以使用工具。
+仅当检索结果不足以回答时才调用工具；检索结果已能回答时必须直接作答，不得反复调用工具。
+调用工具后应尽快依据工具输出或检索结果给出最终回答，不要为交叉验证而重复调用工具。
 只有当前轮存在文档检索结果时，回答才允许并必须附对应的数字编号引用，例如 [来源1]；
 必须把编号替换为上方检索结果的实际序号，禁止原样输出 [来源N]。纯工具回答不得编造文档引用。
 数字必须来自检索结果或成功的工具输出，禁止编造。
@@ -1503,12 +1504,19 @@ def extract_citations(state: AssistantState) -> dict[str, Any]:
 
 def verify(state: AssistantState) -> dict[str, Any]:
     """Run source, number, caliber, consistency, and hallucination verification."""
-    verification = _VERIFIER.verify(
-        answer=state.get(STATE_FINAL_ANSWER, ""),
-        citations=state.get(STATE_CITATIONS, []),
-        retrieval_results=state.get(STATE_RETRIEVAL_RESULTS, []),
-        tool_calls=state.get(STATE_TOOL_CALLS, []),
-    )
+    prior_issues = list(state.get(STATE_VERIFICATION, {}).get("issues", []))
+    if "tool_limit_exceeded" in prior_issues:
+        # 工具上限终态的兜底文案无需再走验证器；保留标记供 should_reason_again
+        # 停止无效重推、compose 输出对应兜底文案（此前覆写丢失标记，
+        # compose 的 tool_limit_exceeded 分支不可达）
+        verification = dict(state.get(STATE_VERIFICATION, {}))
+    else:
+        verification = _VERIFIER.verify(
+            answer=state.get(STATE_FINAL_ANSWER, ""),
+            citations=state.get(STATE_CITATIONS, []),
+            retrieval_results=state.get(STATE_RETRIEVAL_RESULTS, []),
+            tool_calls=state.get(STATE_TOOL_CALLS, []),
+        )
 
     role = state.get(STATE_USER_ROLE)
     issues = list(verification.get("issues", []))

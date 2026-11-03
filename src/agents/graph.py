@@ -241,6 +241,10 @@ RETRIEVAL_RETRY_ROUTES: Final[dict[str, str]] = {
 def should_reason_again(state: AssistantState) -> Literal["retry", "continue"]:
     """判断验证是否通过；失败重推受 MAX_REASON_ATTEMPTS 显式限制。"""
     verification = state.get(STATE_VERIFICATION, {})
+    # 工具上限终态：本尝试的工具预算已耗尽，重推 reason 只会再次撞上限
+    # 而整轮白烧 30-70s（实测两连撞），直接走 compose 输出 fail-closed 兜底文案
+    if "tool_limit_exceeded" in verification.get("issues", []):
+        return "continue"
     attempts = state.get(STATE_REASON_ATTEMPTS, 0)
     if not verification.get("passed", False) and attempts < MAX_REASON_ATTEMPTS:
         return "retry"
