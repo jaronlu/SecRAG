@@ -43,6 +43,14 @@ export interface CurrentUser {
   product_profile: 'knowledge_qa' | 'full'
 }
 
+// 对外业务终态（与后端 Product Contract 的五个 answer_status 一一对应）
+export type AnswerStatus =
+  | 'answered'
+  | 'no_evidence'
+  | 'permission_denied'
+  | 'needs_clarification'
+  | 'blocked'
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
@@ -53,6 +61,9 @@ export interface ChatMessage {
   timestamp?: string
   streaming?: boolean
   cached?: boolean
+  // 传输/服务层失败标记：独立错误态渲染，不把异常正文拼进回答
+  error?: boolean
+  answer_status?: AnswerStatus
 }
 
 export interface DocTypeBadge {

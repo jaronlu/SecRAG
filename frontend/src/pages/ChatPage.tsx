@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import ChatMessage from '../components/ChatMessage'
-import StreamingProgress from '../components/StreamingProgress'
-import { askQuestion, streamQuestion, createThread, getCurrentUser, listThreads, deleteThread } from '../api'
+import { streamQuestion, createThread, getCurrentUser, listThreads, deleteThread } from '../api'
 import type { ChatMessage as ChatMessageType, CurrentUser, StreamEvent } from '../types'
 
 // 角色取值与后端 TOKEN_USER_BINDINGS 一致；未知角色统一显示"已认证用户"，
@@ -24,13 +23,9 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessageType[]>([])
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
-  const [streamEnabled, setStreamEnabled] = useState(true)
-  const [currentNode, setCurrentNode] = useState<string | null>(null)
-  const [progressCompleted, setProgressCompleted] = useState(false)
   const [threads, setThreads] = useState<{ thread_id: string; title: string }[]>([])
   const [currentThreadId, setCurrentThreadId] = useState<string | undefined>()
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
-  const [showSettings, setShowSettings] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -93,106 +88,65 @@ export default function ChatPage() {
     setMessages((prev) => [...prev, userMessage])
     setInput('')
     setIsStreaming(true)
-    setCurrentNode(null)
-    setProgressCompleted(false)
 
     const assistantId = (Date.now() + 1).toString()
 
-    if (streamEnabled) {
-      // 流式输出
-      setMessages((prev) => [
-        ...prev,
-        { id: assistantId, role: 'assistant', content: '', streaming: true },
-      ])
+    // 唯一主流程：始终走 SSE 流式；进度/内部节点不外显
+    setMessages((prev) => [
+      ...prev,
+      { id: assistantId, role: 'assistant', content: '', streaming: true },
+    ])
 
-      try {
-        await streamQuestion(input.trim(), currentThreadId, (event: StreamEvent) => {
-          if (event.type === 'progress' && event.node) {
-            setCurrentNode(event.node)
-          } else if (event.type === 'answer_delta' && event.delta) {
-            // ISSUE-9：真流式——reason 节点 token 增量直接上屏
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantId ? { ...m, content: m.content + event.delta } : m,
-              ),
-            )
-          } else if (event.type === 'answer') {
-            // 后端 answer 事件承载完整终态：answer 文本 + 引用 + 置信度
-            const text = event.answer ?? ''
-            const citations = event.citations
-            const confidence = event.confidence
-            // 自动创建会话后，把 thread_id 回写，后续问题沿用同一会话
-            if (event.thread_id) {
-              setCurrentThreadId(event.thread_id)
-            }
-            // 终态文本为权威内容：覆盖已流出的增量（未走 LLM 流式的
-            // 拒答/澄清/拦截文案只经 answer 事件到达）
-            setProgressCompleted(true)
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantId ? { ...m, content: text, citations, confidence } : m,
-              ),
-            )
-          } else if (event.type === 'error') {
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantId
-                  ? { ...m, content: `错误: ${event.detail ?? '未知错误'}`, streaming: false }
-                  : m,
-              ),
-            )
-          } else if (event.type === 'done') {
-            setCurrentNode(null)
-          }
-        })
-      } catch (err) {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId
-              ? { ...m, content: `错误: ${err instanceof Error ? err.message : '未知错误'}`, streaming: false }
-              : m,
-          ),
-        )
-      }
-
-      // 流式结束后，标记完成
+    // 传输或服务层失败的统一错误态：固定可操作文案，不拼底层异常
+    const markFailed = () => {
       setMessages((prev) =>
-        prev.map((m) => (m.id === assistantId ? { ...m, streaming: false } : m)),
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: '请求未完成，请稍后重试。', streaming: false, error: true }
+            : m,
+        ),
       )
-    } else {
-      // 同步输出
-      try {
-        const result = await askQuestion(input.trim(), currentThreadId)
-        // 未显式新建会话时，问答会自动创建会话——回写 thread_id 保证连续对话
-        if (result.thread_id) {
-          setCurrentThreadId(result.thread_id)
-        }
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: assistantId,
-            role: 'assistant',
-            content: result.answer,
-            citations: result.citations,
-            confidence: result.confidence,
-            compliance: result.compliance,
-            cached: result.cached,
-          },
-        ])
-      } catch (err) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: assistantId,
-            role: 'assistant',
-            content: `错误: ${err instanceof Error ? err.message : '未知错误'}`,
-          },
-        ])
-      }
     }
 
+    try {
+      await streamQuestion(input.trim(), currentThreadId, (event: StreamEvent) => {
+        if (event.type === 'answer_delta' && event.delta) {
+          // ISSUE-9：真流式——reason 节点 token 增量直接上屏
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, content: m.content + event.delta } : m,
+            ),
+          )
+        } else if (event.type === 'answer') {
+          // 后端 answer 事件承载完整终态：answer 文本 + 引用 + 置信度
+          const text = event.answer ?? ''
+          const citations = event.citations
+          const confidence = event.confidence
+          // 自动创建会话后，把 thread_id 回写，后续问题沿用同一会话
+          if (event.thread_id) {
+            setCurrentThreadId(event.thread_id)
+          }
+          // 终态文本为权威内容：覆盖已流出的增量（未走 LLM 流式的
+          // 拒答/澄清/拦截文案只经 answer 事件到达）
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, content: text, citations, confidence, streaming: false } : m,
+            ),
+          )
+        } else if (event.type === 'error') {
+          markFailed()
+        }
+        // progress 事件后端可能仍发送：前端不消费，内部节点不外显
+      })
+    } catch {
+      markFailed()
+    }
+
+    // 流式结束后，标记完成（错误态已带终稿文本，不再覆盖）
+    setMessages((prev) =>
+      prev.map((m) => (m.id === assistantId ? { ...m, streaming: false } : m)),
+    )
     setIsStreaming(false)
-    setCurrentNode(null)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -274,12 +228,6 @@ export default function ChatPage() {
               {roleLabelOf(currentUser)}
             </h2>
           </div>
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="text-slate-400 hover:text-slate-600 text-sm"
-          >
-            ⚙
-          </button>
         </div>
 
         {/* 消息列表 */}
@@ -306,13 +254,6 @@ export default function ChatPage() {
               </div>
             ) : (
               messages.map((m) => <ChatMessage key={m.id} message={m} />)
-            )}
-
-            {/* 流式进度 */}
-            {isStreaming && streamEnabled && messages.length > 0 && (
-              <div className="max-w-[80%]">
-                <StreamingProgress currentNode={currentNode} completed={progressCompleted} />
-              </div>
             )}
 
             <div ref={messagesEndRef} />
@@ -346,29 +287,6 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
-
-      {/* 设置弹窗 */}
-      {showSettings && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowSettings(false)}>
-          <div className="bg-white rounded-xl p-6 w-96" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-bold text-lg mb-4">设置</h3>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">流式输出</span>
-                <button
-                  onClick={() => setStreamEnabled(!streamEnabled)}
-                  className={`w-10 h-5 rounded-full transition-colors ${streamEnabled ? 'bg-blue-500' : 'bg-slate-300'}`}
-                >
-                  <div className={`w-4 h-4 bg-white rounded-full transition-transform ${streamEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                </button>
-              </div>
-            </div>
-            <button onClick={() => setShowSettings(false)} className="w-full mt-6 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm">
-              关闭
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
