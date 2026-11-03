@@ -1,21 +1,35 @@
 # SecRAG
 
-面向机构内部投研场景的 Agentic RAG 原型。系统通过角色权限、多源检索、工具调用、
-引用验证、合规检查和审计记录，将知识问答组织为一条受约束、可追踪的工作流。
+面向机构内部运营/支持场景的带引用知识问答系统（Agentic RAG）。默认产品形态（`knowledge_qa`
+profile）只暴露产品文档与 FAQ 检索：运营人员输入产品、FAQ 或操作流程问题，得到带 1–3 条原文
+引用的答案；检索耗尽、权限不足、歧义和合规拦截都以明确的 `answer_status` 呈现，不伪装成成功
+回答。权限、引用、合规检查和审计记录组成一条受约束、可追踪的工作流。
 
 > 这是个人独立完成的架构验证项目，不是生产系统，不包含任何客户数据或客户定制代码。
 
-## 核心能力
+## 核心能力（默认产品范围：knowledge_qa）
 
-- **身份与权限绑定**：服务端根据 Bearer token 派生用户和角色，不信任请求体中的身份信息。
-- **多层检索权限**：Planner、检索执行层和文档 chunk 元数据共同限制可访问的数据源与内容。
+- **带引用回答**：答案基于检索到的原文生成，正文标注 `[来源N]`，可展开查看引用原文。
+- **明确的业务终态**：`answered` / `no_evidence` / `permission_denied` / `needs_clarification`
+  / `blocked` 五态；失败终态不携带成功置信度或未经验证的引用。
+- **身份与权限绑定**：服务端根据 Bearer token 派生用户和角色（默认试点角色 `operations`），
+  不信任请求体中的身份信息；角色层权限先于产品 profile 执行。
+- **多层检索权限**：角色白名单先过滤，产品 profile 白名单再收口，检索执行层和 chunk 元数据
+  继续限制可访问的数据源与内容；非公开内容缺少 `allowed_roles` 时默认拒绝。
 - **可控 Agent 工作流**：LangGraph 负责条件路由、有限重试和明确的拒绝终态。
-- **ReAct 工具调用**：检索、计算器、适当性检查、行情、SQL 和财务指标工具按角色动态开放。
-- **可信输出**：回答依次经过引用提取、来源与数字验证、合规检查，再生成最终响应。
-- **会话与审计**：SQLite 保存会话、审计记录和入库任务状态。
-- **增量入库**：支持稳定文档 ID、内容哈希、版本管理、更新跳过和旧 chunk 清理。
-- **持仓与关注池**：每位用户维护自己的持仓与关注标的，所有读写按 `user_id` 隔离，越权按不存在处理。
-- **每日增量扫描与事件分级**：对持仓标的扫描抓取产物生成事件卡片，按 P0 / P1 / P2 分级，每张卡片保留判定依据。
+- **会话与审计**：SQLite 保存会话、审计记录和入库任务状态；内部节点、工具参数、SQL 与完整
+  审计轨迹只在服务端留存，问答界面只展示回答、引用和业务状态。
+
+### 开发回退（full profile）
+
+设置 `PRODUCT_PROFILE=full` 恢复完整工具路径：检索、计算器、适当性检查、行情、SQL 和财务
+指标工具按角色动态开放。用于开发、评估与收敛前对比，可随时切回。
+
+### 后续候选（deferred capabilities）
+
+以下能力保留完整实现与测试，但不在默认产品路径内，属于后续候选：行情数据接口、SQL 财务
+查询、财务指标、持仓与关注池、每日增量扫描与事件分级、文档运维 UI（`/admin` 仍作为技术
+入口保留）。
 
 ## 工作流
 
@@ -82,6 +96,9 @@ LLM_MODEL=llama3.1:8b
 
 首次运行 embedding 时可能需要下载 `BAAI/bge-small-zh-v1.5`。
 
+产品 profile 默认 `PRODUCT_PROFILE=knowledge_qa`（只暴露产品文档与 FAQ 检索）；开发/评估
+需要完整工具路径时设为 `full`，非法取值会在启动时报错。
+
 ### 3. 入库示例数据
 
 ```bash
@@ -103,9 +120,10 @@ uv run uvicorn src.api.main:app --host 127.0.0.1 --port 8000
 
 | 入口 | 用途 |
 |---|---|
-| `http://127.0.0.1:8000/` | 问答和文档入库 UI |
+| `http://127.0.0.1:8000/` | 知识问答（默认产品入口） |
+| `http://127.0.0.1:8000/admin` | 文档运维 UI（technical 角色技术入口） |
 | `http://127.0.0.1:8000/docs` | OpenAPI / Swagger UI |
-| `POST /v1/assistant/qa` | 唯一问答接口 |
+| `POST /v1/assistant/qa` | 同步问答接口（SSE 流式为 `/v1/assistant/qa/stream`） |
 | `/v1/assistant/threads*` | 会话创建、消息查询和删除 |
 | `/v1/admin/ingestion/*` | technical 角色的入库管理接口 |
 
@@ -180,14 +198,15 @@ SecRAG 用 [Langfuse](https://langfuse.com) 观测 Agent / LLM 链路（节点�
 
 ## 身份验证
 
-问答、会话和入库接口都要求 `Authorization: Bearer <token>`。仓库内置以下 demo token：
+问答、会话和入库接口都要求 `Authorization: Bearer <token>`。仓库内置以下 demo token
+（默认试点角色为 `operations`，前端问答页不提供角色选择或 Token 编辑）：
 
 | Token | 角色 |
 |---|---|
 | `demo-advisor` | advisor |
 | `demo-sales` | institutional_sales |
 | `demo-compliance` | compliance |
-| `demo-ops` | operations |
+| `demo-ops` | operations（默认） |
 | `demo-tech` | technical |
 
 请求示例：
@@ -195,8 +214,8 @@ SecRAG 用 [Langfuse](https://langfuse.com) 观测 Agent / LLM 链路（节点�
 ```bash
 curl -X POST http://127.0.0.1:8000/v1/assistant/qa \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer demo-tech' \
-  -d '{"query":"系统操作流程怎么查？"}'
+  -H 'Authorization: Bearer demo-ops' \
+  -d '{"query":"货币基金的风险等级是什么？"}'
 ```
 
 这些固定 token 只用于本地演示，不能替代生产环境中的 IdP、签名 token 和授权策略。
@@ -236,10 +255,10 @@ uv run --with akshare --with efinance --with baostock \
 
 外部数据接口可能限流、断连或变更，仓库中的固定样本用于保证本地解析与入库验证不依赖实时抓取。
 
-### 每日扫描与分级
+### 每日扫描与分级（deferred）
 
 对每位用户的持仓与关注标的扫描上述产物，生成事件卡片并分级。目前只有 Python 调用入口，尚未
-提供 CLI 或 HTTP 接口。
+提供 CLI 或 HTTP 接口。此能力不在默认产品路径内（见"后续候选"）。
 
 ```python
 from pathlib import Path
