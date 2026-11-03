@@ -7,8 +7,9 @@ import {
   deleteDocument,
   searchKnowledgeBase,
   getCacheStats,
+  getCurrentUser,
 } from '../api'
-import type { DocumentInfo, DocumentStats, ChunkInfo, SearchResult, CacheStats } from '../types'
+import type { CurrentUser, DocumentInfo, DocumentStats, ChunkInfo, SearchResult, CacheStats } from '../types'
 
 const docTypeColors: Record<string, string> = {
   product: 'bg-blue-100 text-blue-700',
@@ -23,6 +24,9 @@ export default function AdminPage() {
   const [stats, setStats] = useState<DocumentStats | null>(null)
   const [cacheStats, setCacheStats] = useState<CacheStats | null>(null)
   const [loading, setLoading] = useState(true)
+  // 身份守卫：非 technical 角色不调用任何文档/缓存/chunk 接口
+  const [roleDenied, setRoleDenied] = useState(false)
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [selectedDoc, setSelectedDoc] = useState<DocumentInfo | null>(null)
   const [chunks, setChunks] = useState<ChunkInfo[]>([])
   const [chunksLoading, setChunksLoading] = useState(false)
@@ -33,6 +37,13 @@ export default function AdminPage() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
+      const user = await getCurrentUser()
+      setCurrentUser(user)
+      if (user.role !== 'technical') {
+        // 服务端仍执行独立认证与角色校验；前端守卫只避免无意义的失败请求
+        setRoleDenied(true)
+        return
+      }
       const [docsData, statsData, cacheData] = await Promise.all([
         listDocuments(),
         getDocumentStats(),
@@ -107,6 +118,27 @@ export default function AdminPage() {
       </header>
 
       <main className="max-w-6xl mx-auto p-6">
+        {/* 身份守卫：非 technical 角色不展示、也不调用管理接口 */}
+        {roleDenied ? (
+          <div
+            role="alert"
+            className="bg-white rounded-xl shadow-sm p-10 text-center"
+          >
+            <div className="text-4xl mb-4">🔒</div>
+            <h2 className="text-lg font-bold text-slate-700 mb-2">当前账号没有知识库管理权限</h2>
+            <p className="text-slate-500 text-sm mb-6">
+              此页面仅供技术/运维角色使用，请联系管理员开通。
+              {currentUser ? '' : '（身份信息未加载）'}
+            </p>
+            <Link
+              to="/"
+              className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm"
+            >
+              返回知识问答
+            </Link>
+          </div>
+        ) : (
+        <>
         {/* 统计卡片 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <StatCard label="文档总数" value={stats?.total_documents ?? '-'} />
@@ -214,6 +246,8 @@ export default function AdminPage() {
             )}
           </div>
         </div>
+        </>
+        )}
       </main>
 
       {/* Chunk 详情弹窗 */}

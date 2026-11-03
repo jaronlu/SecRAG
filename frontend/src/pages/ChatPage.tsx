@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Link } from 'react-router-dom'
 import ChatMessage from '../components/ChatMessage'
 import { streamQuestion, createThread, getCurrentUser, listThreads, deleteThread } from '../api'
 import type { ChatMessage as ChatMessageType, CurrentUser, StreamEvent } from '../types'
@@ -166,12 +165,7 @@ export default function ChatPage() {
         className={`${sidebarOpen ? 'w-64' : 'w-0'} bg-slate-900 text-white flex flex-col transition-all duration-200 overflow-hidden`}
       >
         <div className="p-4 border-b border-slate-700">
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-lg font-bold">SecRAG</h1>
-            <Link to="/admin" className="text-xs text-slate-400 hover:text-white">
-              管理后台
-            </Link>
-          </div>
+          <h1 className="text-lg font-bold mb-3">SecRAG</h1>
           <button
             onClick={handleNewThread}
             className="w-full py-2 px-3 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"

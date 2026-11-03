@@ -100,6 +100,59 @@ def test_current_user_product_profile_matches_active_profile(client):
     assert response.json()["product_profile"] == get_product_profile()
 
 
+# ══════════════════════════════════════════════════════════════════════
+# 管理路由边界：非 technical 角色 403（服务端独立校验，前端隐藏入口不算权限）
+# ════════════════════════════════════════════════════════════════════
+
+
+def test_admin_document_routes_reject_non_technical_roles(client):
+    """文档管理/缓存运维接口对非 technical 角色返回 403（角色校验先于业务逻辑）。"""
+    for token in ("demo-advisor", "demo-ops"):
+        headers = {"Authorization": f"Bearer {token}"}
+        assert client.get("/v1/admin/documents", headers=headers).status_code == 403
+        assert client.get("/v1/admin/documents/stats", headers=headers).status_code == 403
+        assert client.get("/v1/admin/cache/stats", headers=headers).status_code == 403
+        # 危险操作同样先被角色校验拦截
+        assert client.post("/v1/admin/cache/clear", headers=headers).status_code == 403
+
+
+def test_admin_document_routes_allow_technical_role(client, monkeypatch):
+    """technical 角色可以访问文档管理接口（业务依赖打桩，不触碰真实知识库）。"""
+
+    class _FakeKBManager:
+        def list_documents(self, doc_type=None, limit=100, offset=0):
+            return {"total": 0, "documents": []}
+
+        def get_stats(self):
+            return {"total_chunks": 0, "total_documents": 0}
+
+        def get_document_chunks(self, source, limit=50, offset=0):
+            return {"source": source, "total_chunks": 0, "chunks": []}
+
+        def search_documents(self, query, top_k=5):
+            return []
+
+    class _FakeCache:
+        def get_stats(self):
+            return {"total_entries": 0}
+
+    monkeypatch.setattr("src.utils.knowledge_base.get_kb_manager", lambda: _FakeKBManager())
+    monkeypatch.setattr("src.api.admin.get_semantic_cache", lambda: _FakeCache())
+
+    headers = {"Authorization": "Bearer demo-tech"}
+    assert client.get("/v1/admin/documents", headers=headers).status_code == 200
+    assert client.get("/v1/admin/documents/stats", headers=headers).status_code == 200
+    assert (
+        client.get("/v1/admin/documents/chunks", headers=headers, params={"source": "a.pdf"}).status_code
+        == 200
+    )
+    assert (
+        client.get("/v1/admin/documents/search", headers=headers, params={"query": "货币基金"}).status_code
+        == 200
+    )
+    assert client.get("/v1/admin/cache/stats", headers=headers).status_code == 200
+
+
 def test_metrics_endpoint_reachable(client):
     res = client.get("/metrics")
     assert res.status_code == 200
