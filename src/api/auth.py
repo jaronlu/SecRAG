@@ -25,6 +25,7 @@ from src.schemas.constants import (
     STATE_CITATIONS,
     STATE_CHAT_HISTORY,
     STATE_CLIENT_ID,
+    STATE_CLARIFICATION_NEEDED,
     STATE_COMPLIANCE,
     STATE_CONVERSATION_SUMMARY,
     STATE_CONFIDENCE,
@@ -135,6 +136,9 @@ def build_assistant_initial_state(
         STATE_ENTITIES: {},
         STATE_AMBIGUITY: [],
         STATE_QUERY_TYPE: "",
+        # P1-8 澄清标记逐轮复位：checkpointer 按 thread 保留通道值，不复位会让
+        # 上一轮的澄清终态泄漏进本轮（final review F1），误标 needs_clarification
+        STATE_CLARIFICATION_NEEDED: False,
         STATE_RETRIEVAL_ATTEMPTS: 0,
         STATE_RETRIEVAL_PLAN: [],
         STATE_RETRIEVAL_RESULTS: [],

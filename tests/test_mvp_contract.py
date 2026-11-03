@@ -405,6 +405,27 @@ def test_ambiguous_scenario_terminates_in_clarification(
     assert "为了给您更准确的回答" in state["final_answer"]
 
 
+def test_clarification_does_not_leak_into_followup_turn_on_persistent_graph(
+    fake_llm, isolated_stores, fake_retriever
+):
+    """生产 API 使用进程级单例图 + thread 级 checkpointer：同线程澄清后的下一轮
+    正常提问不得残留 clarification_needed（final review F1）。"""
+    fake_retriever["results"] = _make_product_results()
+    graph = build_agent_with_checkpoint()
+    thread_id = _thread(isolated_stores)
+
+    def _run(state: dict[str, Any]) -> dict[str, Any]:
+        return dict(graph.invoke(state, {"configurable": {"thread_id": state[STATE_THREAD_ID]}}))
+
+    fake_llm.understand["ambiguity"] = ["产品简称不明确：请确认您指的是哪一款产品或哪个指标。"]
+    turn1 = _run(_operations_state("这款产品的PE是多少？", thread_id))
+    assert answer_status_from_state(turn1) == "needs_clarification"
+
+    fake_llm.understand["ambiguity"] = []
+    turn2 = _run(_operations_state("示例稳健增利理财产品的风险等级是多少？", thread_id))
+    assert answer_status_from_state(turn2) == "answered"
+
+
 # ── 场景 S5：受限文档 → permission_denied，无引用 ──
 
 
