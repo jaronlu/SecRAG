@@ -1,10 +1,16 @@
 import json
 from typing import Optional, cast
 
-from langchain_core.tools import tool
+from langchain_core.tools import BaseTool, tool
 from langchain.tools import ToolRuntime
 
 from src.agents.state import AssistantState
+from src.product_scope import (
+    ProductProfile,
+    allowed_sources_for_profile,
+    allowed_tools_for_profile,
+    get_product_profile,
+)
 from src.retrieval.hybrid_retriever import HybridRetriever
 from src.schemas.constants import (
     DEFAULT_TOP_K,
@@ -185,8 +191,16 @@ _NON_RETRIEVAL_TOOL_WHITELIST: set[str] = {
 def get_tools_for_role(
     user_role: str,
     excluded_retrieval_sources: set[str] | None = None,
-):
-    """Return tools visible to the ReAct agent for the given role."""
+    *,
+    profile: ProductProfile | None = None,
+) -> list[BaseTool]:
+    """Return tools visible to the ReAct agent for the given role and profile.
+
+    profile 未显式传入时按配置解析（默认 knowledge_qa）。先执行既有
+    ROLE_ALLOWED_SOURCES 角色过滤，再与 profile 的源/工具白名单求交集，
+    保证默认产品路径不把实验工具暴露给模型；授权层复用同一过滤结果。
+    """
+    effective_profile = get_product_profile(profile)
     allowed_sources = set(ROLE_ALLOWED_SOURCES.get(user_role, []))
     excluded_sources = excluded_retrieval_sources or set()
     # ISSUE-10/ISSUE-19：数据源未配置的工具摘除出白名单——恒失败工具反复
@@ -197,12 +211,24 @@ def get_tools_for_role(
         non_retrieval_whitelist.discard(rerank_tool.name)
     if not market_data_available():
         non_retrieval_whitelist.discard(market_data_tool.name)
-    return [
-        tool_item
-        for tool_item in tools
-        if (
-            _RETRIEVAL_TOOL_SOURCES.get(tool_item.name) in allowed_sources
-            and _RETRIEVAL_TOOL_SOURCES.get(tool_item.name) not in excluded_sources
-        )
-        or tool_item.name in non_retrieval_whitelist
-    ]
+
+    profile_sources = allowed_sources_for_profile(effective_profile)
+    profile_tools = allowed_tools_for_profile(effective_profile)
+
+    def _visible(tool_item: BaseTool) -> bool:
+        name = tool_item.name
+        source = _RETRIEVAL_TOOL_SOURCES.get(name)
+        role_visible = (
+            source in allowed_sources and source not in excluded_sources
+        ) or name in non_retrieval_whitelist
+        if not role_visible:
+            return False
+        # profile 白名单：knowledge_qa 只保留产品文档/FAQ 两个知识检索工具；
+        # full profile 两项均为 None，完全沿用既有角色过滤结果
+        if profile_sources is not None and source not in profile_sources:
+            return False
+        if profile_tools is not None and name not in profile_tools:
+            return False
+        return True
+
+    return [tool_item for tool_item in tools if _visible(tool_item)]

@@ -17,6 +17,11 @@ from langgraph.types import Command
 
 from src.agents.state import AssistantState
 from src.config import config
+from src.product_scope import (
+    ProductProfile,
+    allowed_sources_for_profile,
+    get_product_profile,
+)
 from src.retrieval import result_cache
 from src.retrieval.hybrid_retriever import HybridRetriever
 from src.schemas.constants import (
@@ -873,12 +878,17 @@ def planner(state: AssistantState) -> dict[str, Any]:
         if step is not None:
             filtered_plan.append(enrich(step))
 
+    # 产品 profile 计划收口：在角色过滤与意图补源之后执行，knowledge_qa
+    # 剥离 profile 外的源；全部移除时以 FAQ 兜底步进入既有 no-result 终态
+    filtered_plan = restrict_plan_to_profile(
+        filtered_plan, profile=get_product_profile()
+    )
+
     return {STATE_RETRIEVAL_PLAN: filtered_plan}
 
 
 # 意图 → 必需检索源（planner 确定性底线，见 planner 内 DEF-006 注释）
-_INTENT_REQUIRED_SOURCES: dict[str, str] = {
-    "产品咨询": SOURCE_PRODUCT,
+_INTENT_REQUIRED_SOURCES: dict[str, str] = {    "产品咨询": SOURCE_PRODUCT,
     "法规咨询": SOURCE_REGULATION,
     "规则审查": SOURCE_REGULATION,
     "研报观点": SOURCE_REPORT,
@@ -898,6 +908,34 @@ def _intent_required_source(intent: str, query_type: str) -> str:
     return _INTENT_REQUIRED_SOURCES.get(
         intent, _QUERY_TYPE_REQUIRED_SOURCES.get(query_type, "")
     )
+
+
+def restrict_plan_to_profile(
+    plan: list[RetrievalPlanStep],
+    *,
+    profile: ProductProfile,
+) -> list[RetrievalPlanStep]:
+    """按 profile 白名单收敛检索计划（在角色权限过滤之后执行）。
+
+    knowledge_qa 只保留产品文档/FAQ 检索步骤；若全部步骤被移除，返回一个
+    沿用已消解查询的 FAQ 兜底步，让图进入既有 no-result/权限终态，
+    而不是静默扩大检索范围。
+    """
+    profile_sources = allowed_sources_for_profile(profile)
+    if profile_sources is None:
+        return plan
+    kept = [step for step in plan if step.get(PLAN_SOURCE) in profile_sources]
+    if kept:
+        return kept
+    fallback_query = plan[0].get(PLAN_QUERY, "") if plan else ""
+    return [
+        RetrievalPlanStep(
+            source=SOURCE_FAQ,
+            query=fallback_query,
+            top_k=DEFAULT_TOP_K,
+            filters=None,
+        )
+    ]
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -1209,21 +1247,30 @@ def _excluded_retrieval_sources(state: AssistantState) -> tuple[str, ...]:
 
 
 def _reason_tools(state: AssistantState):
-    """Resolve the tools visible and executable for the current state."""
+    """Resolve the tools visible and executable for the current state.
+
+    与授权层、模型绑定使用同一 profile 过滤结果（默认按配置解析 profile）。
+    """
     from src.agents.tools import get_tools_for_role
 
     return get_tools_for_role(
         state.get(STATE_USER_ROLE, ROLE_OPERATIONS),
         excluded_retrieval_sources=set(_excluded_retrieval_sources(state)),
+        profile=get_product_profile(),
     )
 
 
 @lru_cache(maxsize=64)
-def _get_bound_reason_model(role: str, excluded_sources: tuple[str, ...]):
-    """Cache immutable tool bindings; prompts remain state-dependent."""
+def _get_bound_reason_model(role: str, excluded_sources: tuple[str, ...], profile: str):
+    """Cache immutable tool bindings; prompts remain state-dependent.
+
+    profile 参与缓存键，避免 profile 切换（如测试/部署回退）后复用过期绑定。
+    """
     from src.agents.tools import get_tools_for_role
 
-    tools = get_tools_for_role(role, excluded_retrieval_sources=set(excluded_sources))
+    tools = get_tools_for_role(
+        role, excluded_retrieval_sources=set(excluded_sources), profile=profile
+    )
     return llm.bind_tools(tools)
 
 
@@ -1279,7 +1326,9 @@ def call_reason_model(state: AssistantState) -> dict[str, Any]:
     # 让终态/会话保存/审计照常收敛（issues.md 一.8）
     if _request_deadline_exceeded(state):
         return {STATE_MESSAGES: [AIMessage(content="请求处理已超时，本轮生成已停止。")]}
-    bound_model = _get_bound_reason_model(role, _excluded_retrieval_sources(state))
+    bound_model = _get_bound_reason_model(
+        role, _excluded_retrieval_sources(state), get_product_profile()
+    )
     started = time.perf_counter()
     # Langfuse LLM span：metadata 只含模型名/耗时/token/尝试序号；
     # 系统提示词、检索证据与用户问题原文不进 payload

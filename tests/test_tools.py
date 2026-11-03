@@ -232,7 +232,7 @@ def test_market_data_tool_hidden_while_unconfigured(monkeypatch):
     monkeypatch.setattr("src.agents.tools.market_data_available", lambda: False)
 
     for role in ("advisor", "technical", "operations"):
-        names = {tool_item.name for tool_item in get_tools_for_role(role)}
+        names = {tool_item.name for tool_item in get_tools_for_role(role, profile="full")}
         assert "market_data_tool" not in names
 
 
@@ -241,8 +241,59 @@ def test_market_data_tool_visible_when_configured(monkeypatch):
 
     monkeypatch.setattr("src.agents.tools.market_data_available", lambda: True)
 
-    names = {tool_item.name for tool_item in get_tools_for_role("technical")}
+    names = {tool_item.name for tool_item in get_tools_for_role("technical", profile="full")}
     assert "market_data_tool" in names
+
+
+def test_knowledge_qa_profile_exposes_only_knowledge_search_tools():
+    """knowledge_qa 下只暴露两个知识检索工具，实验工具不得进入默认工具列表。"""
+    from src.agents.tools import get_tools_for_role
+
+    names = {tool.name for tool in get_tools_for_role("operations", profile="knowledge_qa")}
+
+    assert names == {"product_search", "faq_search"}
+
+
+def test_full_profile_preserves_existing_role_filtering():
+    """full profile 保留既有角色过滤：技术角色仍可见完整白名单工具。"""
+    from src.agents.tools import get_tools_for_role
+
+    names = {tool.name for tool in get_tools_for_role("technical", profile="full")}
+
+    assert "product_search" in names
+    assert "faq_search" in names
+    assert "calculator" in names
+
+
+def test_unknown_profile_value_fails_closed():
+    """工具层同样 fail closed：非法 profile 抛 ValueError，不静默放宽。"""
+    from src.agents.tools import get_tools_for_role
+
+    with pytest.raises(ValueError):
+        get_tools_for_role("operations", profile="unknown")
+
+
+def test_default_profile_resolution_uses_configured_profile(monkeypatch):
+    """profile 未显式传入时按配置解析（默认 knowledge_qa）——默认 Agent 不能绕过产品范围。"""
+    from src.agents.tools import get_tools_for_role
+    from src.config import config
+
+    monkeypatch.setattr(config, "product_profile", "knowledge_qa")
+
+    names = {tool.name for tool in get_tools_for_role("technical")}
+    assert names == {"product_search", "faq_search"}
+
+
+def test_default_profile_resolution_honors_full_config(monkeypatch):
+    """配置为 full 时，未显式传 profile 的调用恢复完整角色矩阵。"""
+    from src.agents.tools import get_tools_for_role
+    from src.config import config
+
+    monkeypatch.setattr(config, "product_profile", "full")
+
+    names = {tool.name for tool in get_tools_for_role("technical")}
+    assert "calculator" in names
+    assert "product_search" in names
 
 
 def test_financial_ratios_tool_returns_phase2_skeleton():
