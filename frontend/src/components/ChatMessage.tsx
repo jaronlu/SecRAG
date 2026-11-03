@@ -42,11 +42,19 @@ export default function ChatMessage({ message }: ChatMessageProps) {
           )}
 
           {/* 回答内容：AI 消息按 markdown 渲染（formatAnswerHTML 内部先转义 HTML，
-              输出中唯一 HTML 来自渲染器本身，流式光标也是常量字符串） */}
+              输出中唯一 HTML 来自渲染器本身，流式光标也是常量字符串）。
+              错误态用独立 alert 块纯文本渲染，不进 markdown/HTML 通道 */}
           {isUser ? (
             <div className="text-sm leading-relaxed whitespace-pre-wrap">
               {message.content}
               {message.streaming && <span className="cursor-blink">▋</span>}
+            </div>
+          ) : message.error ? (
+            <div
+              role="alert"
+              className="text-sm leading-relaxed text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2"
+            >
+              {message.content}
             </div>
           ) : (
             <div
