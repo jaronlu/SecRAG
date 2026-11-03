@@ -35,6 +35,14 @@ class AssistantQAResponse(BaseModel):
     compliance: ComplianceResult
 
 
+class CurrentUserResponse(BaseModel):
+    """当前认证上下文的最小暴露面：不含 user_id、token 或权限列表。"""
+
+    role: str
+    department: str
+    product_profile: str  # knowledge_qa | full（src/product_scope.py）
+
+
 class ConversationThreadCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

@@ -36,6 +36,13 @@ export interface ConversationThread {
   [key: string]: unknown
 }
 
+// 当前认证上下文：角色由 Bearer token 服务端派生，前端不提供选择或编辑入口
+export interface CurrentUser {
+  role: string
+  department: string
+  product_profile: 'knowledge_qa' | 'full'
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'

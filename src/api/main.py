@@ -1,7 +1,7 @@
 """FastAPI 应用组装：lifespan 预热、中间件与各路由域 router 注册。
 
 路由实现按域拆分：ingestion.py / admin.py / conversation.py / qa.py /
-health.py / frontend.py；跨域共享的懒加载单例在 deps.py。
+profile.py / health.py / frontend.py；跨域共享的懒加载单例在 deps.py。
 """
 
 import asyncio
@@ -18,6 +18,7 @@ from src.api.deps import _get_agent_app
 from src.api.frontend import mount_frontend, router as frontend_router
 from src.api.health import router as health_router
 from src.api.ingestion import router as ingestion_router
+from src.api.profile import router as profile_router
 from src.api.qa import router as qa_router
 from src.config import config
 
@@ -103,4 +104,5 @@ app.include_router(health_router)
 app.include_router(admin_router)
 app.include_router(conversation_router)
 app.include_router(qa_router)
+app.include_router(profile_router)
 app.include_router(frontend_router)
