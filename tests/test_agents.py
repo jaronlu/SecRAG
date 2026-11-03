@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, cast
@@ -778,6 +779,42 @@ class TestUnderstandAndPlanSingleRoundTrip:
         query_understand(self._first_pass_state())
 
         assert seen == [{"max_tokens": 1024, "model": "doubao-seed-1-6-flash"}]
+
+    def test_starved_plan_budget_warns_instead_of_silent_fallback(self, monkeypatch, caplog):
+        """Reasoning 模型烧光输出预算（空正文 + finish_reason=length）时必须告警。
+
+        2026-10-13 超时事故根因：glm-5.3-flash 思考 token 计入 max_tokens，
+        640 预算全被思考链消耗、正文恒为空，静默退化为单源兜底计划；
+        ChatOpenAI 不透传 reasoning_content，故障只能从本条件识别。
+        """
+        from types import SimpleNamespace
+
+        class _StarvedLLM:
+            def invoke(self, messages, **kwargs):
+                response = MagicMock()
+                response.content = ""
+                response.response_metadata = {"finish_reason": "length"}
+                return response
+
+        monkeypatch.setattr("src.agents.nodes.llm", _StarvedLLM())
+        monkeypatch.setattr(
+            "src.agents.nodes.config",
+            SimpleNamespace(
+                llm=SimpleNamespace(
+                    provider="openai",
+                    plan_max_tokens=640,
+                    plan_model="",
+                    model="glm-5.3-flash",
+                )
+            ),
+        )
+
+        with caplog.at_level(logging.WARNING, logger="secrag.audit_node"):
+            result = query_understand(self._first_pass_state())
+
+        # 兜底计划仍生效（不阻断流程），但降级必须留下可定位的告警
+        assert result[STATE_RETRIEVAL_PLAN_RAW], "空正文仍须走单源兜底计划"
+        assert any("正文为空" in record.getMessage() for record in caplog.records)
 
 
 class TestPlanCallLatencyAccounting:
