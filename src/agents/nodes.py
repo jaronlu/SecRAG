@@ -1948,22 +1948,38 @@ def audit_log(state: AssistantState) -> dict[str, Any]:
 
 
 # ══════════════════════════════════════════════════════════════════════
-# Data Flow
+# Data Flow（与 build_agent_graph 的节点与条件路由一一对应）
 # ══════════════════════════════════════════════════════════════════════
 
 #
 # User Query
 #   -> load_conversation_context
 #   -> resolve_followup_query
-#   -> query_understand
-#   -> planner
+#   -> query_understand（理解+计划一次 LLM 往返，ISSUE-11）
+#        ├─ clarify                     （P1-8：ambiguity 非空，返回澄清问题）
+#        ├─ advice_blocked_response     （ISSUE-31：建议索取意图确定性拦截）
+#        └─ continue -> planner
+#   -> planner（规范化计划：角色过滤/补必需源/profile 收口，不调 LLM）
 #   -> retrieve
-#   -> grade_and_filter
-#   -> reason (may call tools)
+#   -> grade_and_filter（阈值过滤 → 去重 → BGE 重排 → 一手来源优先）
+#        ├─ denied     -> permission_denied_response（全部结果无权限，提前终止）
+#        ├─ no_results -> no_results_response（ISSUE-3：轮次耗尽仍 0 召回）
+#        ├─ widen      -> retrieve（ISSUE-24：低召回只放宽 top_k 重跑检索）
+#        ├─ retrieve   -> query_understand（多跳重试轮只补计划，ISSUE-11）
+#        └─ continue   -> reason
+#   -> reason（ReAct 子图：prepare_reason -> call_reason_model
+#              ⇄ execute_reason_tools -> record_tool_results；
+#              ├─ finalize_reason（产出终答）
+#              └─ tool_limit_response（P1-8：工具次数超限 fail-closed））
 #   -> extract_citations
-#   -> verify
-#   -> compliance_check
-#   -> compose
+#   -> verify（四层验证；失败可重推）
+#        ├─ retry    -> reason（受 MAX_REASON_ATTEMPTS 限制）
+#        └─ continue
+#   -> compliance_check -> compose（合规拦截也走 compose，附风险提示）
 #   -> persist_conversation_turn
 #   -> audit_log
 #   -> Final Answer
+#
+# 短路终态（clarify / advice_blocked / permission_denied / no_results）不进
+# compose，直接落到 persist_conversation_turn -> audit_log 收尾；tool_limit
+# 随 reason 子图正常走完 verify -> compose（兜底文案在 compose 保留原文）
