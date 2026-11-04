@@ -319,7 +319,8 @@ def test_ingest_document_skips_unchanged_file(monkeypatch, tmp_path):
     monkeypatch.setattr(pipeline, "load_sample_metadata", lambda _: metadata)
     monkeypatch.setattr(pipeline, "get_embedding_model", lambda _: _fake_embedding_model())
     monkeypatch.setattr(pipeline, "upsert_chunks", lambda **_: None)
-    monkeypatch.setattr(pipeline, "list_chunk_ids_by_doc_id", lambda **_: [])
+    # ISSUE-36：skip 前与向量库对账；mock 返回非空表示 chunk 在库，允许跳过
+    monkeypatch.setattr(pipeline, "list_chunk_ids_by_doc_id", lambda **_: ["chunk-1"])
     monkeypatch.setattr(pipeline, "delete_chunk_ids", lambda **_: None)
     monkeypatch.setattr(
         pipeline,
@@ -349,6 +350,60 @@ def test_ingest_document_skips_unchanged_file(monkeypatch, tmp_path):
 
     assert first_action == "created"
     assert second_action == "skipped"
+
+
+def test_ingest_document_rebuilds_when_vector_store_missing_chunks(monkeypatch, tmp_path):
+    """ISSUE-36：registry 有记录但向量库无 chunk 时不得幂等跳过（检索会静默为空）。
+
+    实机踩中场景：只清 chroma 目录而保留 registry.db，重跑 ingest 全部 skipped，
+    0 chunks 状态下检索空转。对账后发现 chunk 缺失必须走重建路径。
+    """
+    file_path = tmp_path / "stable.csv"
+    file_path.write_text("code,year\n600519,2026\n", encoding="utf-8")
+    registry = DocumentRegistryStore(tmp_path / "registry.db")
+    run_id = "run-1"
+    metadata = {
+        META_DOC_TYPE: DOC_TYPE_FINANCIAL_DATA,
+        META_DOC_ID: "dataset:manual:stable-id",
+        META_TITLE: "stable",
+    }
+
+    monkeypatch.setattr(pipeline, "load_sample_metadata", lambda _: metadata)
+    monkeypatch.setattr(pipeline, "get_embedding_model", lambda _: _fake_embedding_model())
+    upsert_calls: list[dict] = []
+    monkeypatch.setattr(pipeline, "upsert_chunks", lambda **kwargs: upsert_calls.append(kwargs))
+    # 向量库始终查不到该 doc 的 chunk（registry 与向量库失配）
+    monkeypatch.setattr(pipeline, "list_chunk_ids_by_doc_id", lambda **_: [])
+    monkeypatch.setattr(pipeline, "delete_chunk_ids", lambda **_: None)
+    monkeypatch.setattr(
+        pipeline,
+        "load_documents",
+        lambda _: [Document(page_content="code: 600519", metadata={})],
+    )
+    registry.start_run(
+        run_id, tmp_path.as_uri(), full_scan=False, started_at="2026-07-07T00:00:00Z"
+    )
+
+    first_action = ingest_document(
+        file_path,
+        DOC_TYPE_FINANCIAL_DATA,
+        registry_store=registry,
+        run_id=run_id,
+        root_dir=tmp_path,
+        persist_directory=str(tmp_path / "chroma"),
+    )
+    second_action = ingest_document(
+        file_path,
+        DOC_TYPE_FINANCIAL_DATA,
+        registry_store=registry,
+        run_id=run_id,
+        root_dir=tmp_path,
+        persist_directory=str(tmp_path / "chroma"),
+    )
+
+    assert first_action == "created"
+    assert second_action == "replaced", "registry 声称有 chunk 而向量库为空时必须重建"
+    assert len(upsert_calls) == 2
 
 
 def test_chunker_version_bump_forces_reingest(monkeypatch, tmp_path):

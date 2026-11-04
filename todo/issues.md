@@ -153,6 +153,16 @@ frontend build，全部通过）。服务：8000 端口 uvicorn 直跑，Ark cod
 
 ### ISSUE-36（低，环境/运维）：Chroma 遗留空 collection + ingest 幂等跳过不校验向量库
 
+> **已修复（fix: reconcile registry chunks against vector store and drop stale collection）**：
+> ① `secrag_documents` 空 collection 已删除（删前断言 count=0，现仅剩
+> `securities_docs` 3,566 chunks）；② 根因同步修复——`knowledge_base.py` 硬编码旧
+> collection 名（admin 文档接口因此读空数据），改用 `CHROMA_COLLECTION_NAME` 常量；
+> ③ `ingest_document` 幂等跳过前与向量库对账：registry 声称有 chunk 而向量库查不到时
+> 放弃跳过、走重建路径（覆盖 --full-scan 与增量所有路径）；④ 新增对账测试
+> （registry/向量库失配 → rebuilt）并调整既有 skip 测试 mock。验证：
+> test_ingest_metadata + test_ingestion_service + test_ingestion_api 34 passed、
+> e2e ingestion 11 passed（TC-004 验证对账不误伤正常 skip）、ruff/basedpyright 全绿。
+
 - **现象**：`secrag_documents` 空壳 collection 残留（历史常量改名遗留，现行
   `CHROMA_COLLECTION_NAME="securities_docs"`）。ingest 对已登记文档按 path 哈希跳过，
   不校验向量库中 chunk 实际存在——若只清 chroma 目录而保留 registry，入库会全部跳过，
