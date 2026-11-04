@@ -8,6 +8,7 @@ GET /health、GET /metrics 等接口。直接调用 health_check() 无法发现�
 import asyncio
 import json
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -326,6 +327,25 @@ def test_qa_endpoint_timeout_returns_504(qa_client, monkeypatch):
     res = qa_client.post(API_ROUTE_ASSISTANT_QA, json={"query": "货币基金风险"})
 
     assert res.status_code == 504
+
+
+class _ProviderUnavailableAgentApp:
+    """模拟 provider 侧连接故障（httpx 层，如系统代理/网络不可达）。"""
+
+    def invoke(self, state, config=None):
+        raise httpx.ConnectTimeout("The handshake operation timed out")
+
+
+def test_qa_endpoint_provider_unavailable_returns_503_with_underlying(qa_client, monkeypatch):
+    """503 fail-closed 文案必须携带底层异常类型（2026-11-04 归因陷阱）：
+    reranker 的 HuggingFace 在线校验超时与 LLM 连接错误同落此分支，
+    只写 LLM 指引会把排查方向带偏。"""
+    monkeypatch.setattr("src.api.qa._get_agent_app", lambda: _ProviderUnavailableAgentApp())
+
+    res = qa_client.post(API_ROUTE_ASSISTANT_QA, json={"query": "货币基金风险"})
+
+    assert res.status_code == 503
+    assert "[underlying: ConnectTimeout" in res.json()["detail"]
 
 
 def test_qa_endpoint_cache_hit_returns_stored_compliance(qa_client, monkeypatch):
