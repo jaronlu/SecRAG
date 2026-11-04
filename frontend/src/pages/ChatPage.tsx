@@ -41,11 +41,15 @@ export default function ChatPage() {
   }, [messages, scrollToBottom])
 
   // 加载会话列表
-  useEffect(() => {
+  const refreshThreads = useCallback(() => {
     listThreads()
       .then((data) => setThreads((data.threads || []).slice(0, 20)))
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    refreshThreads()
+  }, [refreshThreads])
 
   // 身份由服务端从 Bearer token 派生，页面不提供角色选择或 Token 编辑
   useEffect(() => {
@@ -129,7 +133,13 @@ export default function ChatPage() {
           const answerStatus = event.answer_status
           // 自动创建会话后，把 thread_id 回写，后续问题沿用同一会话
           if (event.thread_id) {
+            // ISSUE-35：本轮自动创建的会话（此前无 thread_id）立即进侧栏，
+            // 否则进行中的会话在列表里不可见，只能点"新建对话"后才出现
+            const isNewThread = !currentThreadId
             setCurrentThreadId(event.thread_id)
+            if (isNewThread) {
+              refreshThreads()
+            }
           }
           // 终态文本为权威内容：覆盖已流出的增量（未走 LLM 流式的
           // 拒答/澄清/拦截文案只经 answer 事件到达）
