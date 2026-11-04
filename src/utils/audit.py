@@ -35,6 +35,7 @@ from src.schemas.constants import (
     STATE_INTERMEDIATE_STEPS,
     STATE_LANGUAGE,
     STATE_ORIGINAL_QUERY,
+    STATE_PLAN_FALLBACK,
     STATE_PII_DETECTED,
     STATE_QUERY_SANITIZED,
     STATE_QUERY_TYPE,
@@ -117,6 +118,7 @@ class AuditLogger:
                 sanitized=bool(state.get(STATE_QUERY_SANITIZED, False)),
                 pii=state.get(STATE_PII_DETECTED, []),
                 language=state.get(STATE_LANGUAGE, ""),
+                plan_fallback=state.get(STATE_PLAN_FALLBACK, ""),
             ),
             retrieval=AuditRetrieval(
                 plan=state.get(STATE_RETRIEVAL_PLAN, []),

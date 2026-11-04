@@ -50,6 +50,9 @@ class AssistantState(TypedDict):
     query_sanitized: bool  # STATE_QUERY_SANITIZED；查询命中注入指令并已加固时为 True
     pii_detected: list[dict[str, str]]  # STATE_PII_DETECTED；detect_pii 结果 [{type, match, position}]
     language: str  # STATE_LANGUAGE；detect_language 结果（zh/en/mixed）
+    # STATE_PLAN_FALLBACK；理解/规划退化兜底计划的原因（ISSUE-29），
+    # 值域 budget_starved | invalid_json | invalid_plan，空串表示未退化
+    plan_fallback: str
 
     # P1-8 澄清终态 — STATE_CLARIFICATION_NEEDED。clarify 节点产出后需要
     # 跨节点保留到终态，API 层据此把终态映射为 needs_clarification；
