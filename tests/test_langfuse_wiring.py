@@ -430,7 +430,10 @@ def test_call_reason_model_span_carries_model_and_usage(bound_fake_llm):
     assert "问题" not in json.dumps(kwargs["metadata"], ensure_ascii=False)
 
 
-def test_tool_span_created_after_authorization():
+def test_tool_span_created_after_authorization(monkeypatch):
+    # calculator 属 full profile 工具矩阵（默认 knowledge_qa 不暴露）；
+    # 本测试验证授权后 span 机制，钉 full profile 走既有工具路径（ISSUE-41）。
+    monkeypatch.setattr(config, "product_profile", "full")
     from src.agents.tools import calculator
 
     tool_name = calculator.name

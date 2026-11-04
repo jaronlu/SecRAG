@@ -28,7 +28,7 @@ from langchain_core.runnables.config import RunnableConfig, var_child_runnable_c
 
 from src.agents import nodes as agent_nodes
 from src.agents.graph import build_agent_with_checkpoint
-from src.config import LangfuseConfig
+from src.config import LangfuseConfig, config
 from src.schemas.constants import ROLE_ADVISOR
 from src.utils.langfuse_adapter import (
     ROOT_TRACE_NAME,
@@ -248,8 +248,10 @@ def _serialized_payloads(client: FakeLangfuseClient) -> str:
 
 
 def test_callbacks_reach_llm_and_tool_calls_and_node_spans_attach_to_root(
-    tool_calling_llm, isolated_stores, fake_retriever_factory
+    monkeypatch, tool_calling_llm, isolated_stores, fake_retriever_factory
 ):
+    # calculator 工具链路属 full profile 能力矩阵，钉 full 验证工具 span/回调传播（ISSUE-41）。
+    monkeypatch.setattr(config, "product_profile", "full")
     client = FakeLangfuseClient()
     adapter = _wired_adapter(client)
     trace = adapter.start_request_trace("req-accept", "thread-accept")
@@ -294,8 +296,10 @@ def test_callbacks_reach_llm_and_tool_calls_and_node_spans_attach_to_root(
 
 
 def test_canary_data_never_reaches_langfuse_payload(
-    tool_calling_llm, isolated_stores, fake_retriever_factory
+    monkeypatch, tool_calling_llm, isolated_stores, fake_retriever_factory
 ):
+    # 同上：工具执行路径需 full profile（ISSUE-41）。
+    monkeypatch.setattr(config, "product_profile", "full")
     # 注入金丝雀：问题、chunk 文本、最终回答全部带标记
     ToolCallingChatModel.final_content = FINAL_CONTENT_WITH_CANARY
     canary_result = make_fund_result()
