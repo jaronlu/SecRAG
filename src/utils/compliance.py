@@ -95,6 +95,46 @@ def matches_investment_advice(text: str) -> list[str]:
     return matched
 
 
+# ══════════════════════════════════════════════════════════════════════
+# ISSUE-31：投资建议索取意图的确定性识别（query 层，不依赖生成文本）。
+# 真实 LLM 会自律规避"建议买入"类表述，答案文本规则永不触发，blocked 终态
+# 在默认链路不可达。PRD §合规"投顾不得输出投资建议"+ impl-08 §3.2"必须拦截
+# 系统自身的建议性改写"要求系统行为确定性优先：查询本身索取买卖时点/操作
+# 建议时，直接以 blocked 终态拦截，不再进入推理。模式刻意收敛为高置信问法，
+# 知识型咨询（"什么是买入评级""投资建议有哪些类型"）不得误伤。
+# ══════════════════════════════════════════════════════════════════════
+ADVICE_SEEKING_INTENT_REGEXES: tuple[re.Pattern[str], ...] = (
+    re.compile(r"适合.{0,4}买"),  # 适合买入吗 / 适合现在买入吗
+    re.compile(r"值得.{0,4}(买|入手)"),  # 值得买吗 / 值得入手吗
+    re.compile(r"(该|要|能|可[以不]).{0,3}买(吗|么|不)"),  # 该买吗 / 能买吗 / 可以买不
+    re.compile(r"(现在|马上|立刻|及时).{0,3}(买|买入|加仓|建仓)"),  # 现在买入合适吗
+    re.compile(r"(加仓|建仓|清仓|抄底)"),  # 时点操作词在问答中出现即索取操作指引
+    re.compile(r"(给我|请|帮忙|帮).{0,6}(操作|投资|买卖|交易)建议"),  # 给我一个操作建议
+)
+
+# 防空格绕过与 matches_investment_advice 相同：匹配前去除全部空白
+_ADVICE_INTENT_FLAG_PREFIX = "advice_intent"
+
+
+def matches_advice_seeking_intent(query: str) -> list[str]:
+    """检测查询中的投资建议索取意图，返回命中的意图名列表（ISSUE-31）。
+
+    与 matches_investment_advice（答案文本层）互补：本函数在查询理解后
+    确定性命中"索取操作建议"的问法，不依赖 LLM 是否自律规避建议表述。
+    """
+    normalized = re.sub(r"\s+", "", query)
+    return [
+        regex.pattern
+        for regex in ADVICE_SEEKING_INTENT_REGEXES
+        if regex.search(normalized)
+    ]
+
+
+def advice_intent_flags(query: str) -> list[str]:
+    """把意图命中转成 compliance flags（审计层可见，前缀 advice_intent）。"""
+    return [f"{_ADVICE_INTENT_FLAG_PREFIX}:{pattern}" for pattern in matches_advice_seeking_intent(query)]
+
+
 class ComplianceChecker:
     """检查回答中的敏感信息、业务建议、引用精度和适当性提示。"""
 

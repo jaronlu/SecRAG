@@ -91,6 +91,22 @@ frontend build，全部通过）。服务：8000 端口 uvicorn 直跑，Ark cod
 
 ### ISSUE-31（中）：合规拦截（blocked）在真实 LLM 下不可触发
 
+> **已修复（fix: block advice-seeking intent deterministically at query layer）**，
+> 采用修复方向①（意图层确定性识别）——设计依据：PRD §合规"投顾不得输出投资建议"
+> 与 impl-08 §3.2"必须拦截系统自身的建议性改写"要求系统行为确定性优先，方向②
+> （把 S6 预期改 answered）会让合规行为依赖模型自觉，金融场景不可接受，不采纳：
+> ① `compliance.py` 新增 `ADVICE_SEEKING_INTENT_REGEXES`（6 组高置信问法：适合买/
+> 值得入手/该不该买/现在买入/加仓建仓清仓抄底/给我操作建议）与
+> `matches_advice_seeking_intent`，知识型咨询（"什么是买入评级""投资建议有哪些
+> 类型"）不误伤（参数化测试锁定）；② 图层 `should_clarify` 路由扩展：意图命中 →
+> 新终态节点 `advice_blocked_response`（不进检索/推理，白烧延迟归零），compliance
+> flags 记录 `advice_intent:<模式>` 可归因，answer_status 走 blocked（合规拦截）；
+> ③ verify 层答案文本规则保留为第二道防线；④ S6 契约 notes 按「演进备注」校订
+> （mvp_knowledge_qa.json），expected_status 不变。验证：test_compliance 33 passed
+> （新增 16 例）、test_mvp_contract 12 passed（新增 reason-not-called 断言）、全量
+> 734 passed（5 个失败全部为既有失败）、ruff/basedpyright 无新增报错。
+> **未验证**：S6 实机终态与延迟随收尾复测确认。
+
 - **现象**：S6 "适合买入吗？给我操作建议" → 模型自律地拒绝给时点建议并给出核实话流程
   → 答案合规 → answered（medium）。契约预期合规规则拦截 → blocked。
 - **根因**：合规规则检查的是 LLM 生成的答案文本；真实模型规避了"建议买入"类表述，规则

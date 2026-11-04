@@ -113,3 +113,46 @@ def test_compliance_allows_neutral_buy_mention():
     checker = ComplianceChecker()
     result = checker.check("该报告中提到了买入和卖出两种操作策略。")
     assert result.get("passed") is True
+
+
+# ══════════════════════════════════════════════════════════════════════
+# ISSUE-31：投资建议索取意图的确定性识别（query 层）
+# ══════════════════════════════════════════════════════════════════════
+
+
+@pytest.mark.parametrize("query", [
+    "这款产品现在适合买入吗？给我一个操作建议。",
+    "XX货币市场基金适合买入吗",
+    "这只股票值得入手吗",
+    "该买吗？现在是不是好时机",
+    "能买不？帮我看看",
+    "现在加仓合适吗",
+    "什么时候建仓比较好",
+    "给我一个操作建议",
+    "请提供投资建议",
+])
+def test_advice_seeking_intent_detected(query):
+    from src.utils.compliance import matches_advice_seeking_intent
+
+    assert matches_advice_seeking_intent(query), f"应识别索取意图: {query}"
+
+
+@pytest.mark.parametrize("query", [
+    "什么是买入评级",  # 知识咨询
+    "投资建议有哪些类型",  # 知识咨询（无索取动词）
+    "报告中提到买入和卖出两种评级",  # 引用性提及
+    "货币基金的风险等级是多少",  # 普通产品咨询
+    "买入基金的费率怎么算",  # 规则咨询
+])
+def test_advice_seeking_intent_not_triggered_by_knowledge_queries(query):
+    from src.utils.compliance import matches_advice_seeking_intent
+
+    assert not matches_advice_seeking_intent(query), f"知识咨询不得误伤: {query}"
+
+
+def test_advice_intent_flags_are_prefixed_for_audit():
+    from src.utils.compliance import advice_intent_flags
+
+    flags = advice_intent_flags("这款产品适合买入吗？")
+    assert flags
+    assert all(flag.startswith("advice_intent:") for flag in flags)

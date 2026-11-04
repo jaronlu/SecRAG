@@ -486,6 +486,31 @@ def test_investment_advice_scenario_blocked(fake_llm, isolated_stores, fake_retr
     )
 
 
+def test_advice_intent_blocks_before_reasoning(fake_llm, isolated_stores, fake_retriever):
+    """ISSUE-31：建议索取意图在理解后确定性拦截，不进入检索与推理。
+
+    真实 LLM 会自律规避建议表述，答案文本规则永不触发；合规行为必须
+    不依赖模型自觉（确定性优先），且拦截发生在白烧延迟之前。
+    """
+    scenario = _load_scenarios()["S6_blocked_investment_advice"]
+    assert scenario["expected_status"] == "blocked"
+
+    fake_llm.reason_content = "## 结论\n\n该产品当前表现稳健，建议买入该产品锁定收益[来源1]。"
+    fake_retriever["results"] = _make_product_results()
+
+    state = _run_graph(_operations_state(scenario["query"], _thread(isolated_stores)))
+
+    assert answer_status_from_state(state) == "blocked"
+    # 确定性短路：reason 与检索都不应被触发
+    assert "reason" not in fake_llm.calls
+    assert state[STATE_CITATIONS] == []
+    compliance_flags = state[STATE_COMPLIANCE].get("flags") or []
+    assert any(flag.startswith("advice_intent:") for flag in compliance_flags)
+    # 合规层真实拦截（区别于 ISSUE-30 的验证兜底误映射）：flags 可归因
+    assert state[STATE_COMPLIANCE].get("passed") is False
+    assert "停止输出" in state["final_answer"]
+
+
 # ── 场景 S7：同会话两轮追问 + 跨用户隔离 ──
 
 

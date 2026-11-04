@@ -123,6 +123,7 @@ from src.utils.compliance import (
     INVESTMENT_ADVICE_PATTERNS,
     TARGET_PRICE_PATTERN,
     ComplianceChecker,
+    advice_intent_flags,
     matches_investment_advice,
 )
 from src.utils.dates import parse_date_day
@@ -1739,6 +1740,42 @@ def permission_denied_response(state: AssistantState) -> dict[str, Any]:
         STATE_COMPLIANCE: {
             "passed": False,
             "flags": ["permission_denied"],
+            "risk_disclosure": "",
+        },
+    }
+
+
+def advice_blocked_response(state: AssistantState) -> dict[str, Any]:
+    """投资建议索取意图的确定性拦截终态（ISSUE-31）。
+
+    查询本身索取买卖时点/操作建议时，不再进入检索与推理——真实 LLM 会自律
+    规避建议表述，答案文本规则无法触发，blocked 终态在默认链路不可达
+    （S6 实测失配）。本节点在理解后立即短路：文案给出可替代的咨询路径，
+    compliance 置失败（flags 记录命中的意图模式），审计可归因；
+    answer_status 映射为 blocked（合规拦截优先于验证失败兜底）。
+    """
+    query = (
+        state.get(STATE_RESOLVED_QUERY)
+        or state.get(STATE_ORIGINAL_QUERY, "")
+    )
+    flags = advice_intent_flags(query)
+    return {
+        STATE_FINAL_ANSWER: _structure_answer(
+            "根据合规要求，本系统不提供买卖时点或操作建议，相关请求已停止输出。"
+            "您可以咨询产品的风险等级、条款与适当性信息，或查看历史研报的既有观点。"
+        ),
+        STATE_TERMINAL: True,
+        STATE_CITATIONS: [],
+        STATE_CONFIDENCE: CONFIDENCE_LOW,
+        STATE_RISK_DISCLOSURE: "",
+        STATE_VERIFICATION: {
+            "passed": False,
+            "issues": [],
+            "confidence": CONFIDENCE_LOW,
+        },
+        STATE_COMPLIANCE: {
+            "passed": False,
+            "flags": flags or ["advice_intent:unmatched"],
             "risk_disclosure": "",
         },
     }
