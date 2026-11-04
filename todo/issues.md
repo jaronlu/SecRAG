@@ -128,6 +128,14 @@ frontend build，全部通过）。服务：8000 端口 uvicorn 直跑，Ark cod
 
 ### ISSUE-34（低）：引用展开不显示原文
 
+> **已修复（fix: show citation quotes and mask source paths）**：
+> ① 前端引用展开区渲染 `quote` 原文摘句（后端 CitationExtractor 一直产出该字段，
+> 此前前端只读不存在的 `content` 字段），空时回退 `content` 兼容；② 服务端绝对路径
+> 脱敏：`qa.py` 新增 `_sanitize_citation_sources`，REST 响应与 SSE answer 事件两个
+> 出口的 `citation.source` 只保留文件名（内部引用/对账路径不动）；③ 新增 REST 出口
+> 脱敏+透传断言测试。验证：test_api_routes.py 25 passed、`npm run build` 成功、
+> basedpyright 0 错误。**未验证**：实机引用展开的 UI 呈现随收尾复测确认。
+
 - **现象**：引用区展开后只有 `[1] product` + 源文件绝对路径，无 chunk 原文文本；README
   承诺"可展开查看引用原文"。运营人员无法就地核对引用内容。
 - **备注**：源文件绝对路径直接暴露给前端（`/Users/ryan/...`），生产环境属信息泄露面。

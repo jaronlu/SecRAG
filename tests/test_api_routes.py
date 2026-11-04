@@ -523,6 +523,35 @@ def test_qa_response_carries_answer_status(qa_client, monkeypatch):
     assert body["answer_status"] == "answered"
 
 
+def test_qa_response_sanitizes_citation_source_path(qa_client, monkeypatch):
+    """ISSUE-34：对外 payload 的 citation.source 只含文件名，不泄露服务端绝对路径。"""
+    from src.api.qa import _qa_response_from_outcome
+    from src.schemas.typed_dicts import AnswerOutcome
+
+    outcome = AnswerOutcome(
+        answer="货币基金风险等级为低。",
+        citations=[
+            {
+                "citation_id": "cite_001",
+                "source": "/Users/ryan/workspace/data/raw/faq/货币基金FAQ.pdf",
+                "doc_type": "faq",
+                "quote": "货币基金的风险等级为低风险。",
+            }
+        ],
+        confidence="high",
+        compliance={"passed": True, "flags": []},
+        answer_status="answered",
+    )
+
+    response = _qa_response_from_outcome(outcome, "thread-1", "turn-1")
+
+    citation = response.citations[0]
+    assert citation["source"] == "货币基金FAQ.pdf"
+    # 原文摘句与编号原样透传，供前端就地核对引用
+    assert citation["quote"] == "货币基金的风险等级为低风险。"
+    assert citation["citation_id"] == "cite_001"
+
+
 def test_qa_stream_answer_status_uses_accumulated_state(qa_client, monkeypatch):
     """SSE answer_status 由终态输出 + 前置 verify/compliance 更新合并解析。"""
     answer = _collect_answer_event(qa_client, _SnapshotStreamingAgentApp, monkeypatch)
