@@ -153,7 +153,13 @@ export default function ChatMessage({ message }: ChatMessageProps) {
                         )}
                       </div>
                       <div className="text-slate-600 truncate">{c.source}</div>
-                      {c.content && <div className="text-slate-500 mt-1 line-clamp-2">{c.content}</div>}
+                      {/* ISSUE-34：展示引用原文摘句，运营人员可就地核对引用内容；
+                          后端 quote 为空时回退旧 content 字段保持兼容 */}
+                      {(c.quote || c.content) && (
+                        <div className="text-slate-500 mt-1 whitespace-pre-wrap line-clamp-3">
+                          {c.quote || c.content}
+                        </div>
+                      )}
                     </div>
                   )
                 })}

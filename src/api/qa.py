@@ -8,6 +8,7 @@ import logging
 import time
 import uuid
 from datetime import datetime, timezone
+from pathlib import PurePosixPath
 from typing import Any, cast
 
 import httpx
@@ -49,7 +50,14 @@ from src.schemas.constants import (
 )
 from src.schemas.request_response import AssistantQARequest, AssistantQAResponse
 from src.schemas.models import AuditEntry
-from src.schemas.typed_dicts import AnswerOutcome, AuditQuery, AuditReasoning, AuditResponse, AuditRetrieval
+from src.schemas.typed_dicts import (
+    AnswerOutcome,
+    AuditQuery,
+    AuditReasoning,
+    AuditResponse,
+    AuditRetrieval,
+    CitationDict,
+)
 from src.utils.answer_status import answer_status_from_state
 from src.utils.rate_limit import check_rate_limit, get_rate_limit_key
 from src.utils.semantic_cache import CacheBinding, build_cache_binding, get_semantic_cache
@@ -213,6 +221,24 @@ def _persist_cache_hit_audit_event(
         _write_audit_outbox(dataclasses.asdict(entry), str(exc))
 
 
+def _sanitize_citation_sources(
+    citations: list[CitationDict],
+) -> list[CitationDict]:
+    """对外 payload 的 citation.source 只保留文件名，不泄露服务端绝对路径（ISSUE-34）。
+
+    内部 citation.source 沿用入库时的文件路径（检索/对账依赖），只在 REST 响应
+    与 SSE answer 事件两个出口脱敏；quote/编号等字段原样透传供前端展示原文。
+    """
+    sanitized: list[CitationDict] = []
+    for citation in citations:
+        item = dict(citation)
+        source = str(item.get("source", ""))
+        if source:
+            item["source"] = PurePosixPath(source.replace("\\", "/")).name
+        sanitized.append(cast(CitationDict, item))
+    return sanitized
+
+
 def _qa_response_from_outcome(
     outcome: AnswerOutcome, thread_id: str, turn_id: str
 ) -> AssistantQAResponse:
@@ -223,7 +249,7 @@ def _qa_response_from_outcome(
         thread_id=thread_id,
         turn_id=turn_id,
         answer=outcome["answer"],
-        citations=outcome["citations"],
+        citations=_sanitize_citation_sources(outcome["citations"]),
         confidence=outcome["confidence"],
         compliance=outcome["compliance"],
         answer_status=outcome["answer_status"],
@@ -590,7 +616,10 @@ async def assistant_qa_stream(
                                 answer_data = json.dumps({
                                     "type": "answer",
                                     "answer": node_output[STATE_FINAL_ANSWER],
-                                    "citations": node_output.get(STATE_CITATIONS, []),
+                                    # ISSUE-34：对外只暴露文件名，不泄露服务端绝对路径
+                                    "citations": _sanitize_citation_sources(
+                                        node_output.get(STATE_CITATIONS, [])
+                                    ),
                                     "confidence": node_output.get(STATE_CONFIDENCE, "unknown"),
                                     # 与同步端点同一映射：失败终态不得伪装成 answered
                                     "answer_status": answer_status_from_state({
