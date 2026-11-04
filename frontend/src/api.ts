@@ -9,6 +9,7 @@ import type {
   SearchResult,
   CacheStats,
   StreamEvent,
+  ThreadMessage,
 } from './types'
 
 const API_BASE = ''
@@ -58,7 +59,7 @@ export async function listThreads(): Promise<{ threads: ConversationThread[] }> 
   return request('/v1/assistant/threads')
 }
 
-export async function getThreadMessages(threadId: string): Promise<{ messages: unknown[] }> {
+export async function getThreadMessages(threadId: string): Promise<{ messages: ThreadMessage[] }> {
   return request(`/v1/assistant/threads/${threadId}/messages`)
 }
 

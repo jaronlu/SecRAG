@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import ChatMessage from '../components/ChatMessage'
-import { streamQuestion, createThread, getCurrentUser, listThreads, deleteThread } from '../api'
+import { streamQuestion, createThread, getCurrentUser, listThreads, deleteThread, getThreadMessages } from '../api'
 import type { ChatMessage as ChatMessageType, CurrentUser, StreamEvent } from '../types'
 
 // 角色取值与后端 TOKEN_USER_BINDINGS 一致；未知角色统一显示"已认证用户"，
@@ -30,6 +30,11 @@ export default function ChatPage() {
   const [currentThreadId, setCurrentThreadId] = useState<string | undefined>()
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  // BUG-2：正在查看历史会话（点击侧栏进入）与全新会话的空态不同——
+  // 前者按 impl-07 §7 显示“暂无会话消息”，后者显示欢迎页
+  const [isViewingHistory, setIsViewingHistory] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = useCallback(() => {
@@ -62,11 +67,39 @@ export default function ChatPage() {
     try {
       const thread = await createThread('新对话')
       setCurrentThreadId(thread.thread_id)
+      setIsViewingHistory(false)
       setMessages([])
       setThreads((prev) => [{ thread_id: thread.thread_id, title: '新对话' }, ...prev])
     } catch {
       setCurrentThreadId(undefined)
+      setIsViewingHistory(false)
       setMessages([])
+    }
+  }
+
+  // BUG-2：点击历史会话时从服务端加载消息列表（impl-07 §7「会话记录…展示
+  // 消息列表」，GET /threads/{id}/messages 已存在但此前从未被调用）；
+  // 加载失败必须显式提示，不得冒充“暂无会话消息”误导用户以为记录丢失
+  const handleSelectThread = async (threadId: string) => {
+    setCurrentThreadId(threadId)
+    setIsViewingHistory(true)
+    setHistoryLoading(true)
+    setHistoryError(false)
+    try {
+      const data = await getThreadMessages(threadId)
+      // list_messages 按 created_at DESC 返回，聊天视图恢复时间正序
+      const history = [...(data.messages || [])].reverse().map((m) => ({
+        id: m.message_id,
+        role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
+        content: m.content,
+        timestamp: m.created_at,
+      }))
+      setMessages(history)
+    } catch {
+      setMessages([])
+      setHistoryError(true)
+    } finally {
+      setHistoryLoading(false)
     }
   }
 
@@ -77,6 +110,7 @@ export default function ChatPage() {
       setThreads((prev) => prev.filter((t) => t.thread_id !== threadId))
       if (currentThreadId === threadId) {
         setCurrentThreadId(undefined)
+        setIsViewingHistory(false)
         setMessages([])
       }
     } catch {
@@ -198,10 +232,7 @@ export default function ChatPage() {
             threads.map((t) => (
               <div
                 key={t.thread_id}
-                onClick={() => {
-                  setCurrentThreadId(t.thread_id)
-                  setMessages([])
-                }}
+                onClick={() => void handleSelectThread(t.thread_id)}
                 className={`group flex items-center justify-between p-2 rounded-lg cursor-pointer text-sm mb-1 ${
                   currentThreadId === t.thread_id ? 'bg-slate-700' : 'hover:bg-slate-800'
                 }`}
@@ -246,7 +277,19 @@ export default function ChatPage() {
         {/* 消息列表 */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="max-w-3xl mx-auto space-y-6">
-            {messages.length === 0 ? (
+            {messages.length > 0 ? (
+              messages.map((m) => <ChatMessage key={m.id} message={m} />)
+            ) : isViewingHistory ? (
+              <div className="text-center py-20">
+                <div className="text-slate-500 text-sm">
+                  {historyLoading
+                    ? '正在加载会话消息...'
+                    : historyError
+                      ? '会话消息加载失败，请稍后重试'
+                      : '暂无会话消息'}
+                </div>
+              </div>
+            ) : (
               <div className="text-center py-20">
                 <div className="text-5xl mb-4">📊</div>
                 <h2 className="text-xl font-bold text-slate-700 mb-2">证券智能问答</h2>
@@ -272,8 +315,6 @@ export default function ChatPage() {
                   ))}
                 </div>
               </div>
-            ) : (
-              messages.map((m) => <ChatMessage key={m.id} message={m} />)
             )}
 
             <div ref={messagesEndRef} />

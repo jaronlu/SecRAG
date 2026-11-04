@@ -71,6 +71,18 @@ export interface ChatMessage {
   answer_status?: AnswerStatus
 }
 
+// 会话历史消息（GET /v1/assistant/threads/{id}/messages，impl-07 §7）
+export interface ThreadMessage {
+  message_id: string
+  thread_id: string
+  turn_id: string
+  role: string
+  content: string
+  sequence: number
+  created_at: string
+  request_id?: string | null
+}
+
 export interface DocTypeBadge {
   type: string
   label: string
