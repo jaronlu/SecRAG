@@ -9,8 +9,12 @@
 > [todo/model-tiering-report-20260929.md](./model-tiering-report-20260929.md)）。
 > 历史批次（2026-09-25 共 13 项、2026-09-28 演练 ISSUE-1~4、2026-09-28 晚 ISSUE-5~8）
 > 均已修复，记录见 git 历史（446c9f1 / d96b35b / 457286c 等）。
-> 最新批次：**2026-11-04 Knowledge QA MVP 实机测试（ISSUE-29~38）已登记，未修复**，
-> 见下文「2026-11-04 Knowledge QA MVP 实机测试」。
+> 最新批次：**2026-11-04 Knowledge QA MVP 实机测试（ISSUE-29~38）已全部处理完毕**
+>（一题一提交，2026-11-04）：37fe9f3 登记 / b8a7a33 ISSUE-29 / d448e49 ISSUE-30 /
+> cb0a5b7 ISSUE-38 / 8c4602b ISSUE-33 / dc931e6 ISSUE-34 / c684b76 ISSUE-35 /
+> 39a6074 ISSUE-36 / 5b104ec ISSUE-37 / c354472 ISSUE-31。
+> ISSUE-32 无独立代码改动（根因即 ISSUE-29 兜底 plan，已修），与各条目的实机终态
+> 复测（S2/S3/S4/S5/S6 + 推荐问题 + 输入上限 UI）待起服务执行，见各节「未验证」。
 
 ---
 
@@ -115,6 +119,11 @@ frontend build，全部通过）。服务：8000 端口 uvicorn 直跑，Ark cod
   或接受"模型自律优先"并在设计文档中修正 S6 预期。需设计决策。
 
 ### ISSUE-32（高，安全演示失真）：permission_denied 终态在默认链路不可达
+
+> **已随 ISSUE-29 修复（b8a7a33）**：本条无独立代码改动——根因是兜底 plan 永远
+> 只查 product_search，受限源不进 plan；默认模型恢复 deepseek-v4-flash 后真实
+> 规划可产出 research_report 步骤，"全部越权 → 权限拒绝"路径恢复输入。
+> **待实机复测**：S5 机密重组草稿问题须复现 permission_denied 终态（起服务执行）。
 
 - **现象**：S5 机密重组草稿问题（allowed_roles 不含 operations）→ no_evidence 而非
   permission_denied。
