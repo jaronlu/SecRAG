@@ -142,6 +142,12 @@ frontend build，全部通过）。服务：8000 端口 uvicorn 直跑，Ark cod
 
 ### ISSUE-35（低）：进行中会话不出现在侧栏
 
+> **已修复（fix: refresh thread list on auto-created threads）**：
+> 会话列表加载提取为 `refreshThreads` 回调；answer 事件回写 `thread_id` 且本轮
+> 此前无会话（自动创建）时立即刷新侧栏，条目带后端真实标题（query 前 100 字）。
+> 已有会话的追问轮不重复刷新。验证：`npm run build` 成功。**未验证**：实机侧栏
+> 呈现随收尾复测确认。
+
 - **现象**：整轮 7 次问答期间侧栏一直"暂无会话"；点"+ 新建对话"后才出现条目。threads
   API 数据正常（两个 thread 都在）——纯前端列表刷新缺陷，历史会话在会话中不可找回。
 
