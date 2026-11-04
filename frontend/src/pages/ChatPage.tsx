@@ -13,6 +13,10 @@ const ROLE_LABELS: Record<string, string> = {
   technical: '技术支持',
 }
 
+// ISSUE-33：与后端 AssistantQARequest.query max_length=500 对齐，
+// 前端先拦截超长输入，避免提交后才收到 422
+const MAX_QUERY_LENGTH = 500
+
 function roleLabelOf(user: CurrentUser | null): string {
   if (!user) return '已认证用户'
   return ROLE_LABELS[user.role] ?? '已认证用户'
@@ -96,13 +100,14 @@ export default function ChatPage() {
       { id: assistantId, role: 'assistant', content: '', streaming: true },
     ])
 
-    // 传输或服务层失败的统一错误态：固定可操作文案，不拼底层异常
-    const markFailed = () => {
+    // 传输或服务层失败的统一错误态：固定可操作文案，不拼底层异常。
+    // ISSUE-33：可恢复的输入契约错误（422 等）用 api 层给出的具体文案，
+    // 避免渲染"稍后重试"误导用户（重试永远无效）
+    const markFailed = (message?: string) => {
+      const text = message?.trim() || '请求未完成，请稍后重试。'
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === assistantId
-            ? { ...m, content: '请求未完成，请稍后重试。', streaming: false, error: true }
-            : m,
+          m.id === assistantId ? { ...m, content: text, streaming: false, error: true } : m,
         ),
       )
     }
@@ -140,8 +145,9 @@ export default function ChatPage() {
         }
         // progress 事件后端可能仍发送：前端不消费，内部节点不外显
       })
-    } catch {
-      markFailed()
+    } catch (err) {
+      // ISSUE-33：422 等输入契约错误携带具体文案，其余回退统一兜底文案
+      markFailed(err instanceof Error ? err.message : undefined)
     }
 
     // 流式结束后，标记完成（错误态已带终稿文本，不再覆盖）
@@ -268,6 +274,7 @@ export default function ChatPage() {
                 placeholder="输入你的问题...（Enter 发送，Shift+Enter 换行）"
                 className="flex-1 border border-slate-300 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                 rows={1}
+                maxLength={MAX_QUERY_LENGTH}
                 disabled={isStreaming}
               />
               <button
@@ -278,8 +285,12 @@ export default function ChatPage() {
                 {isStreaming ? '思考中...' : '发送'}
               </button>
             </div>
-            <div className="text-center text-xs text-slate-400 mt-2">
-              SecRAG 证券智能问答 · 内容仅供参考，不构成投资建议
+            <div className="flex justify-between items-center text-xs text-slate-400 mt-2">
+              <span>SecRAG 证券智能问答 · 内容仅供参考，不构成投资建议</span>
+              {/* ISSUE-33：与后端 query max_length=500 对齐；接近上限时提示 */}
+              <span className={input.length >= MAX_QUERY_LENGTH ? 'text-amber-600' : ''}>
+                {input.length}/{MAX_QUERY_LENGTH}
+              </span>
             </div>
           </div>
         </div>
