@@ -254,7 +254,14 @@ export default function ChatPage() {
                   基于 RAG + Agent 的证券知识问答系统，支持产品咨询、法规查询、研报解读
                 </p>
                 <div className="flex flex-wrap gap-2 justify-center">
-                  {['货币基金风险等级', '股票质押式回购新规', '什么是量化交易'].map((q) => (
+                  {/* ISSUE-37：推荐问题必须与当前演示语料对应（理财产品揭示书/
+                    内部系统 FAQ/适当性制度），否则点击必然 no_evidence，
+                    首触体验失真；语料更换时需同步调整 */}
+                {[
+                  '示例稳健增利理财产品的风险等级是多少？',
+                  '如何重置内部系统的密码？',
+                  '客户适当性管理制度的基本要求是什么？',
+                ].map((q) => (
                     <button
                       key={q}
                       onClick={() => setInput(q)}

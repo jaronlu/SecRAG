@@ -172,6 +172,13 @@ frontend build，全部通过）。服务：8000 端口 uvicorn 直跑，Ark cod
 
 ### ISSUE-37（低）：UI 推荐问题与 knowledge_qa 语料失配
 
+> **已修复（fix: align suggested questions with demo corpus）**：
+> 欢迎页推荐问题改为与演示语料一一对应的三个：示例稳健增利理财产品风险等级
+> （product_search，S1 实测 ✅）、内部系统密码重置（faq_search，S2 契约场景）、
+> 客户适当性管理制度（regulation_search），三个源均在 operations 演示身份白名单内。
+> 代码注释标注语料更换时需同步调整。验证：`npm run build` 成功。**未验证**：三问
+> 实机终态随收尾复测确认。
+
 - **现象**：欢迎页推荐问题为"货币基金风险等级 / 股票质押式回购新规 / 什么是量化交易"，
   当前演示语料为理财产品揭示书/FAQ/合规制度，点击必然 no_evidence，首触体验失真。
 
