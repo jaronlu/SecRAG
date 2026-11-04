@@ -399,17 +399,22 @@ async def assistant_qa(
                 error_type = "provider_unavailable"
                 _record_metrics("provider_unavailable")
                 audit_logger.warning(
-                    "Assistant provider unavailable: thread_id=%s error=%s",
+                    "Assistant provider unavailable: thread_id=%s error=%s detail=%s",
                     thread_id,
                     exc.__class__.__name__,
+                    str(exc)[:200],
                 )
+                # 归因提示：任何 httpx 超时/传输错误都会落到本分支（2026-11-04
+                # 实测 reranker 的 HuggingFace 在线校验挂死也在此伪装成 LLM 故障，
+                # 排查被误导一轮），detail 附带底层异常类型与摘要以定位真实组件
                 raise HTTPException(
                     status_code=503,
                     detail=(
                         "LLM provider unavailable. Check OPENAI_API_BASE, OPENAI_API_KEY, "
                         "network/proxy settings, and LLM subscription status "
                         "(e.g. Ark CodingPlan), or start a local Ollama service and set "
-                        "LLM_PROVIDER=ollama."
+                        "LLM_PROVIDER=ollama. "
+                        f"[underlying: {exc.__class__.__name__}: {str(exc)[:160]}]"
                     ),
                 ) from exc
 
