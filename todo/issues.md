@@ -109,6 +109,16 @@ frontend build，全部通过）。服务：8000 端口 uvicorn 直跑，Ark cod
 
 ### ISSUE-33（中）：前后端输入长度契约脱节 + 422 错误文案误导
 
+> **已修复（fix: align frontend query limit and surface 422 copy）**：
+> ① 前端 textarea `maxLength=500`（`MAX_QUERY_LENGTH` 常量对齐后端
+> `AssistantQARequest.query max_length=500`）+ 输入框右下角字数计数
+> （到上限变琥珀色）；② `api.ts` 新增 `toRequestError`：422 按 pydantic
+> `detail[].type === "string_too_long"`（已实测确认）区分文案"输入超过 500 字
+> 上限，请精简问题后重试"，其余校验错误给通用可操作文案，不再把可恢复的
+> 输入错误渲染成"稍后重试"；③ `ChatPage.markFailed` 支持携带具体文案。
+> 验证：`npm run build` 成功。**未验证**：实机超长输入的 UI 文案需随收尾
+> 复测确认（前端项目无测试框架，未新增依赖）。
+
 - **现象**：前端 textarea 无长度限制（maxLength=-1），5306 字符可输入并提交；后端
   QARequest `query max_length=500` 返回 422；前端把所有错误统一渲染为
   "请求未完成，请稍后重试。"（重试永远无效，误导用户）。

@@ -68,6 +68,24 @@ export async function deleteThread(threadId: string): Promise<void> {
 
 // ============ 流式输出 ============
 
+// ISSUE-33：请求级非 2xx 转成用户可读错误。422 按 pydantic 校验类型区分文案；
+// 其他状态保持通用消息（调用方统一渲染兜底文案）。
+async function toRequestError(res: Response): Promise<Error> {
+  if (res.status === 422) {
+    try {
+      const payload = (await res.json()) as { detail?: Array<{ type?: string }> }
+      const issues = Array.isArray(payload.detail) ? payload.detail : []
+      if (issues.some((issue) => issue.type === 'string_too_long')) {
+        return new Error('输入超过 500 字上限，请精简问题后重试。')
+      }
+      return new Error('请求格式不正确，请调整后重试。')
+    } catch {
+      return new Error('请求格式不正确，请调整后重试。')
+    }
+  }
+  return new Error(`HTTP ${res.status}`)
+}
+
 export async function streamQuestion(
   query: string,
   threadId: string | undefined,
@@ -80,7 +98,9 @@ export async function streamQuestion(
   })
 
   if (!res.ok) {
-    throw new Error(`HTTP ${res.status}`)
+    // ISSUE-33：422 是可恢复的输入契约错误（如超长），给出可操作文案，
+    // 不能与传输故障一起渲染成"稍后重试"（重试永远无效，误导用户）
+    throw await toRequestError(res)
   }
 
   const reader = res.body?.getReader()
