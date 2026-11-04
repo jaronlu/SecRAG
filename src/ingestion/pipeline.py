@@ -98,21 +98,34 @@ def ingest_document(
     existing = registry_store.get_document(doc_id)
 
     if _should_skip(existing, file_hash, metadata_hash, embedding_model_name):
-        registry_store.mark_seen(doc_id, seen_at)
-        registry_store.record_run_item(
-            run_id=run_id,
+        # ISSUE-36：registry 与向量库对账——只清 chroma 目录而保留 registry 时，
+        # 幂等跳过会让全部文档跳过重建，检索静默为空。registry 声称有 chunk
+        # 而向量库查不到时，放弃跳过、走下方重建路径。
+        existing_chunk_ids = list_chunk_ids_by_doc_id(
             doc_id=doc_id,
-            source_uri=source_uri,
-            action=INGEST_ACTION_SKIPPED,
-            previous_hash=existing.file_hash if existing else "",
-            new_hash=file_hash,
-            chunk_count=existing.chunk_count if existing else 0,
-            sequence=sequence,
-            relative_path=relative,
-            processed_at=seen_at,
+            persist_directory=persist_directory,
+            embedding_model=resolved_embedding_model,
         )
-        print(f"  跳过未变化文档: {doc_id}")
-        return INGEST_ACTION_SKIPPED
+        if existing is not None and existing.chunk_count > 0 and not existing_chunk_ids:
+            print(
+                f"  registry 记录 {existing.chunk_count} 个 chunk 但向量库无对应数据，重建: {doc_id}"
+            )
+        else:
+            registry_store.mark_seen(doc_id, seen_at)
+            registry_store.record_run_item(
+                run_id=run_id,
+                doc_id=doc_id,
+                source_uri=source_uri,
+                action=INGEST_ACTION_SKIPPED,
+                previous_hash=existing.file_hash if existing else "",
+                new_hash=file_hash,
+                chunk_count=existing.chunk_count if existing else 0,
+                sequence=sequence,
+                relative_path=relative,
+                processed_at=seen_at,
+            )
+            print(f"  跳过未变化文档: {doc_id}")
+            return INGEST_ACTION_SKIPPED
 
     previous_hash = existing.file_hash if existing else ""
     action = INGEST_ACTION_CREATED if existing is None else INGEST_ACTION_REPLACED

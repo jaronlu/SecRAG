@@ -17,6 +17,7 @@ from typing import Any
 
 from src.config import config
 from src.schemas.constants import (
+    CHROMA_COLLECTION_NAME,
     META_DOC_ID,
     META_DOC_TYPE,
     META_SOURCE,
@@ -32,13 +33,19 @@ class KnowledgeBaseManager:
         self._collection = None
 
     def _get_collection(self):
-        """懒加载 ChromaDB collection。"""
+        """懒加载 ChromaDB collection。
+
+        collection 名必须与入库流水线（CHROMA_COLLECTION_NAME）一致：
+        此前硬编码旧名 secrag_documents，常量改名 securities_docs 后本模块
+        仍在 get_or_create 一个空 collection，admin 文档接口读到空数据
+        （ISSUE-36 遗留根因）。
+        """
         if self._collection is None:
             import chromadb
 
             client = chromadb.PersistentClient(path=self.persist_directory)
             self._collection = client.get_or_create_collection(
-                name="secrag_documents",
+                name=CHROMA_COLLECTION_NAME,
                 metadata={"hnsw:space": "cosine"},
             )
         return self._collection
