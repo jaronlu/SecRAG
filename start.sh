@@ -26,6 +26,19 @@ if [ ! -f ".env" ]; then
   exit 1
 fi
 
+# 模型与网络环境固化（2026-11-04 网络故障定案）：
+# - HF_HUB_OFFLINE / TRANSFORMERS_OFFLINE：reranker 与 embedding 权重已本地化，
+#   不设 OFFLINE 时 AutoTokenizer/from_pretrained 仍会向 huggingface.co 发在线
+#   校验并挂死整条 QA 链路（表现为 503 "LLM provider unavailable"）。首次
+#   下载模型需要联网时以 HF_HUB_OFFLINE=0 覆盖。
+# - NO_PROXY='*'：macOS 系统代理会被 UURemote 等应用动态开关（指向 127.0.0.1
+#   僵尸端口），httpx trust_env 在客户端创建时读入并冻结，导致 LLM 调用进
+#   死代理；强制直连使服务端对系统代理免疫。
+export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
+export TRANSFORMERS_OFFLINE="${TRANSFORMERS_OFFLINE:-1}"
+export NO_PROXY="${NO_PROXY:-*}"
+export no_proxy="${no_proxy:-*}"
+
 if lsof -iTCP:"${PORT}" -sTCP:LISTEN -n -P >/dev/null 2>&1; then
   echo "Port ${PORT} is already in use."
   lsof -iTCP:"${PORT}" -sTCP:LISTEN -n -P
