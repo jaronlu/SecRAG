@@ -1087,6 +1087,28 @@ def _prioritize_primary_sources(results: list[RetrievalResult]) -> list[Retrieva
     return primary + [result for result in results if id(result) not in primary_ids]
 
 
+# ISSUE-30：语义重排后的相关性底线。bge-reranker-v2-m3 输出为原始 logit。
+# 2026-11-04 用本地权重实测校准：问题与真实相关证据的 logit ≥ -1.8（含
+# "适合买入吗"这类词面与文档不匹配的问法），明显无关问题对无关证据为
+# -9.3 ~ -11.0（如用理财产品揭示书回答行情问题）。底线取间隙中点 -6.0：
+# 相关证据保留，无关证据丢弃，让链路走 0 召回重试/no_results 终态而不是
+# 强行作答后 fail-closed。注意不能用 0.0 作底线——会误杀词面不匹配的
+# 相关证据（S6 实测 -1.8），导致合规拦截场景退化成 no_evidence。
+RERANK_MIN_RELEVANCE_SCORE = -6.0
+
+
+def _drop_below_relevance_floor(
+    results: list[RetrievalResult],
+) -> tuple[list[RetrievalResult], int]:
+    """重排后按相关性底线丢弃候选（ISSUE-30），返回 (保留列表, 丢弃数)。"""
+    kept = [
+        result
+        for result in results
+        if float(result.get(RR_SCORE, 0) or 0.0) >= RERANK_MIN_RELEVANCE_SCORE
+    ]
+    return kept, len(results) - len(kept)
+
+
 def _comparable_retrieval_scores(results: list[RetrievalResult]) -> dict[int, float]:
     """给候选池计算同量纲排序分，供 grade_and_filter 统一排序。
 
@@ -1165,6 +1187,15 @@ def grade_and_filter(state: AssistantState) -> dict[str, Any]:
         or state.get(STATE_ORIGINAL_QUERY, "")
     )
     reranked, reranker_status = _try_rerank_candidates(rerank_query, candidates)
+    # ISSUE-30：重排成功时按相关性底线丢弃明显无关候选（记录丢弃原因与数量）
+    if reranker_status == "applied":
+        reranked, dropped_count = _drop_below_relevance_floor(reranked)
+        if dropped_count:
+            _audit_node_logger.warning(
+                "grade_and_filter 语义重排后丢弃 %d 条低于相关性底线（logit >= %.1f）的候选",
+                dropped_count,
+                RERANK_MIN_RELEVANCE_SCORE,
+            )
     # ISSUE-22：一手来源（公告/财报原文）优先于研报转述后再截断
     filtered = _prioritize_primary_sources(reranked)[:GRADE_TOP_K]
 

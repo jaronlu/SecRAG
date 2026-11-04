@@ -256,7 +256,13 @@ class TestGradeAndFilter:
         scores = [r[RR_SCORE] for r in result[STATE_RETRIEVAL_RESULTS]]
         assert scores == [0.9, 0.7, 0.65]
 
-    def test_filters_low_relevance_results(self):
+    def test_filters_low_relevance_results(self, monkeypatch):
+        # 本用例验证 RETRIEVAL_MIN_SCORE 阈值过滤；固定 reranker 不可用，
+        # 避免语义重排底线（ISSUE-30）对合成短文本的负 logit 干扰断言
+        monkeypatch.setattr(
+            "src.agents.nodes._try_rerank_candidates",
+            lambda query, candidates: (candidates, "unavailable"),
+        )
         state = _state(**{
             STATE_RETRIEVAL_RESULTS: [_result("weak", score=0.52), _result("strong", score=0.8)]
         })
@@ -270,7 +276,12 @@ class TestGradeAndFilter:
         result = grade_and_filter(state)
         assert len(result[STATE_RETRIEVAL_RESULTS]) <= 10
 
-    def test_deduplicates_same_source_chunk_across_retrieval_hops(self):
+    def test_deduplicates_same_source_chunk_across_retrieval_hops(self, monkeypatch):
+        # 固定 reranker 不可用：本用例验证去重，不验证语义重排
+        monkeypatch.setattr(
+            "src.agents.nodes._try_rerank_candidates",
+            lambda query, candidates: (candidates, "unavailable"),
+        )
         duplicate = _result(
             "same",
             meta={META_SOURCE: "faq.html", META_CHUNK_ID: "chunk-1"},
@@ -281,7 +292,12 @@ class TestGradeAndFilter:
 
         assert len(result[STATE_RETRIEVAL_RESULTS]) == 1
 
-    def test_records_filtered_chunk_count(self):
+    def test_records_filtered_chunk_count(self, monkeypatch):
+        # 固定 reranker 不可用：本用例验证阈值过滤计数，不验证语义重排
+        monkeypatch.setattr(
+            "src.agents.nodes._try_rerank_candidates",
+            lambda query, candidates: (candidates, "unavailable"),
+        )
         state = _state(**{
             STATE_RETRIEVAL_RESULTS: [_result("weak", score=0.4), _result("strong", score=0.8)]
         })
@@ -331,9 +347,62 @@ class TestGradeAndFilter:
 
         assert result[STATE_RERANKER_STATUS].startswith("error:")
 
+    def test_rerank_floor_drops_irrelevant_candidates(self, monkeypatch):
+        """ISSUE-30：语义重排后 logit<0 的明显无关候选被丢弃，不得进入 reason。
+
+        S3 实测：行情问题检回理财产品揭示书（余弦分过阈值），重排虽给出
+        负分却被原样放行，reason 强行作答后验证 fail-closed。底线以下丢弃
+        让链路走 0 召回重试/no_results 终态，而不是无证据作答。
+        """
+
+        def _applied(query, candidates):
+            # 模拟 bge-reranker logit：相关证据轻度负分仍保留（S6 实测 -1.8），
+            # 无关证据深度负分丢弃（S3 实测 -9.8），底线 -6.0 取实测间隙中点
+            scored = [dict(r) for r in candidates]
+            scored[0][RR_SCORE] = -9.8
+            scored[1][RR_SCORE] = -1.8
+            return scored, "applied"
+
+        monkeypatch.setattr("src.agents.nodes._try_rerank_candidates", _applied)
+        irrelevant = _result("理财产品风险揭示", score=0.75)
+        relevant = _result("上证指数行情", score=0.72)
+        state = _state(**{STATE_RETRIEVAL_RESULTS: [irrelevant, relevant]})
+
+        result = grade_and_filter(state)
+
+        contents = [r[RR_CONTENT] for r in result[STATE_RETRIEVAL_RESULTS]]
+        assert contents == ["上证指数行情"]
+        assert result[STATE_RETRIEVAL_FILTERED_CHUNKS] == 1
+
+    def test_rerank_floor_logs_drop_reason(self, monkeypatch, caplog):
+        """ISSUE-30：底线丢弃必须留下日志（数量与底线），供审计对账。"""
+
+        def _applied(query, candidates):
+            scored = [dict(r) for r in candidates]
+            scored[0][RR_SCORE] = -9.8
+            return scored, "applied"
+
+        monkeypatch.setattr("src.agents.nodes._try_rerank_candidates", _applied)
+        state = _state(**{STATE_RETRIEVAL_RESULTS: [_result("无关内容", score=0.8)]})
+
+        with caplog.at_level(logging.WARNING, logger="secrag.audit_node"):
+            result = grade_and_filter(state)
+
+        assert result[STATE_RETRIEVAL_FILTERED_CHUNKS] == 0
+        assert any("相关性底线" in record.getMessage() for record in caplog.records)
+
 
 class TestPrimarySourcePriority:
     """ISSUE-22：同一问题命中一手来源（公告/财报原文）时优先于研报转述。"""
+
+    @pytest.fixture(autouse=True)
+    def _rerank_unavailable(self, monkeypatch):
+        # 本类验证一手来源优先级重排；固定 reranker 不可用，
+        # 避免语义重排底线（ISSUE-30）对合成短文本的负 logit 干扰断言
+        monkeypatch.setattr(
+            "src.agents.nodes._try_rerank_candidates",
+            lambda query, candidates: (candidates, "unavailable"),
+        )
 
     def test_primary_source_promoted_over_research_transcript(self):
         transcript = _result(

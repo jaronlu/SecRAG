@@ -65,6 +65,20 @@ frontend build，全部通过）。服务：8000 端口 uvicorn 直跑，Ark cod
 
 ### ISSUE-30（高）：验证 fail-closed 被映射为「已拦截」，语义误导
 
+> **已修复（fix: map verification fallback to no_evidence and floor rerank relevance）**：
+> ① `answer_status_from_state` 优先级改为 澄清 → 权限 → 无证据 → **blocked（仅合规
+> 拦截）** → no_evidence（验证未通过兜底，含工具上限）→ answered——验证 fail-closed
+> 不再冒充"已拦截"，blocked 只保留给合规层真实拦截的终态；② `grade_and_filter`
+> 语义重排后按 `RERANK_MIN_RELEVANCE_SCORE=-6.0`（logit）丢弃明显无关候选并记日志。
+> 阈值由本地权重实测校准：问题对真实相关证据 ≥ -1.8（含"适合买入吗"这类词面不匹配
+> 问法），明显无关对 ≤ -9.3，-6.0 取间隙中点；**不能用 0.0**——会误杀 S6 类相关证据
+> 使合规拦截场景退化成 no_evidence（实测踩中后校准）。③ 新增/更新测试：answer_status
+> 3 例（验证失败→no_evidence、工具上限→no_evidence、验证+合规同时失败→blocked）、
+> grade_and_filter 底线 2 例（丢弃无关保留相关、丢弃留痕）、S6 契约沿用 blocked 断言。
+> 验证：受影响 4 文件 209 passed；全量 714 passed（7 个失败经 master 基线对照全部为
+> 既有失败，与本修复无关）；ruff 全绿；basedpyright 无新增报错。
+> **未验证**：S3 实机终态是否变为「未找到资料」需起服务复测（随 ISSUE-32 一并执行）。
+
 - **现象**：S3 实时行情问题 → 兜底 plan 检回 1 个无关 product chunk（理财产品风险揭示）
   → reason 两轮各 35.5s/36.1s 强行作答 → 幻觉检测 50%/60% 两轮失败 → fail-closed 兜底
   文案，UI 显示「已拦截」。
