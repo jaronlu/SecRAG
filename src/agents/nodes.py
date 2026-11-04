@@ -8,6 +8,7 @@ import concurrent.futures
 import logging
 import re
 import time
+from collections.abc import Mapping, Sequence
 from functools import lru_cache
 from typing import Any, Callable, Literal, cast
 
@@ -577,8 +578,12 @@ def _widen_top_k(top_k: object) -> int:
     return min(current * WIDEN_TOP_K_FACTOR, MAX_WIDEN_TOP_K)
 
 
-def _plan_signature(plan: list[dict[str, Any]]) -> tuple[tuple[str, str, str], ...]:
-    """检索计划的实质指纹：源/查询/过滤器任一变化即为不同计划（ISSUE-24）。"""
+def _plan_signature(plan: Sequence[Mapping[str, Any]]) -> tuple[tuple[str, str, str], ...]:
+    """检索计划的实质指纹：源/查询/过滤器任一变化即为不同计划（ISSUE-24）。
+
+    同时接受原始计划（dict）与 planner 规范化后的 RetrievalPlanStep，用于
+    比较上一轮计划与新一轮 LLM 计划是否实质相同。
+    """
     signature = []
     for step in plan:
         filters = step.get(PLAN_FILTERS) or {}
@@ -1330,7 +1335,7 @@ def _reason_tools(state: AssistantState):
 
 
 @lru_cache(maxsize=64)
-def _get_bound_reason_model(role: str, excluded_sources: tuple[str, ...], profile: str):
+def _get_bound_reason_model(role: str, excluded_sources: tuple[str, ...], profile: ProductProfile):
     """Cache immutable tool bindings; prompts remain state-dependent.
 
     profile 参与缓存键，避免 profile 切换（如测试/部署回退）后复用过期绑定。
@@ -1663,7 +1668,9 @@ def verify(state: AssistantState) -> dict[str, Any]:
         )
 
     role = state.get(STATE_USER_ROLE)
-    issues = list(verification.get("issues", []))
+    # verification 经 dict() 复制/验证器返回，issues 字段类型不保证，先做防御收窄
+    raw_issues = verification.get("issues", [])
+    issues = list(raw_issues) if isinstance(raw_issues, list) else []
     attributed_target_price = _has_attributed_target_price(state)
     # 投顾/销售岗额外拦截业务建议关键词，防止越权输出
     if role in (ROLE_ADVISOR, ROLE_INSTITUTIONAL_SALES):
@@ -1677,11 +1684,13 @@ def verify(state: AssistantState) -> dict[str, Any]:
 
     # ISSUE-25：每轮 reason 的验证结果留痕（轮次 + failure_kind + issues）。
     # 审计只保存最终结果时，无法区分"验证器误判"与"真实无支撑"。
+    # snapshot 里的 issues 与上方 issues 同源：非空时 update 已把同一列表写回
+    # verification，为空时原值也是空列表，这里重新拷贝保持快照独立
     snapshot = {
         "round": state.get(STATE_REASON_ATTEMPTS, 1),
         "passed": bool(verification.get("passed")),
         "failure_kind": verification.get("failure_kind"),
-        "issues": list(verification.get("issues", [])),
+        "issues": list(issues),
         "confidence": verification.get("confidence", CONFIDENCE_MEDIUM),
     }
     attempts = list(state.get(STATE_VERIFICATION_ATTEMPTS, [])) + [snapshot]
