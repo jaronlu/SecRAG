@@ -2,6 +2,7 @@
 
 import logging
 import time
+from collections.abc import Hashable
 from typing import Any, Final, Literal, Protocol
 
 from langgraph.graph import END, START, StateGraph
@@ -229,7 +230,7 @@ def should_retry_retrieval(
 
 # grade_and_filter 的条件路由表。由图模块声明并供测试守护：低召回走 widen
 # 直接回到 retrieve（不经理解+规划），只有 0 召回才回到 query_understand。
-RETRIEVAL_RETRY_ROUTES: Final[dict[str, str]] = {
+RETRIEVAL_RETRY_ROUTES: Final[dict[Hashable, str]] = {
     "continue": "reason",
     "retrieve": "query_understand",
     "widen": "retrieve",
