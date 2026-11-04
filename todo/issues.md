@@ -231,6 +231,32 @@ frontend build，全部通过）。服务：8000 端口 uvicorn 直跑，Ark cod
 
 ---
 
+## 2026-11-04 批次：CI 基线失败归因（ISSUE-41）
+
+### ISSUE-41 (P1) 产品收敛战役后 5 个测试未对齐新契约，CI 全量连红
+
+- **现象**：CI test job 自 2026-11-03 23:43 起连续 failure（run 41741393342 起，
+  约 2m30s），全量 739 passed / 5 failed；本地复跑同样 5 failed，与 CI 一致，排除环境因素。
+- **归因（git bisect 实证，2026-11-04）**：
+  - `a6e3305` constrain default agent to knowledge qa tools → 4 个 calculator 失败：
+    `test_e2e_qa::test_tc023_tool_timeout_trips_circuit_breaker`、
+    `test_langfuse_wiring::test_tool_span_created_after_authorization`、
+    `test_e2e_langfuse_acceptance` ×2。默认 `knowledge_qa` profile 工具白名单不含
+    calculator，测试内工具调用一律返回「当前角色或检索计划无权调用该工具。」
+  - `c070e02` keep experimental tools out of default product →
+    `test_e2e_audit_cache::test_tc032_cache_hit_returns_stored_snapshot_and_persists_audit_event`：
+    缓存命中 payload 键失配（实测 thread_id 系 vs 期望 conversation_id/turn_id 系）。
+  - 同日早间留档「stash 对照与本批无关」仅排除未提交改动；本条 bisect 为最终归因。
+- **判定**：产品行为符合 README 产品范围定义（`61987d9`）：默认 `knowledge_qa`，
+  calculator 仅存于 `PRODUCT_PROFILE=full` 开发回退且「保留完整实现与测试」。
+  属测试未随战役更新，产品代码不改。
+- **修复方向**：calculator 相关 4 测试钉 full profile（验证 full 路径能力：工具授权后
+  span、超时熔断、回调链）；tc032 对齐新 payload 契约。
+- **漏网原因**：战役期间按全量测试门控只跑目标测试集；CI 全量 pytest 兜住，
+  正是其价值所在。
+
+---
+
 ## 2026-09-29 全链路演练实测证据
 
 演练方式：8001 现役服务（Ark deepseek-v4-flash）+ 2026-09-28 重建数据
