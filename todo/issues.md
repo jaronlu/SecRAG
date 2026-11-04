@@ -9,6 +9,136 @@
 > [todo/model-tiering-report-20260929.md](./model-tiering-report-20260929.md)）。
 > 历史批次（2026-09-25 共 13 项、2026-09-28 演练 ISSUE-1~4、2026-09-28 晚 ISSUE-5~8）
 > 均已修复，记录见 git 历史（446c9f1 / d96b35b / 457286c 等）。
+> 最新批次：**2026-11-04 Knowledge QA MVP 实机测试（ISSUE-29~38）已登记，未修复**，
+> 见下文「2026-11-04 Knowledge QA MVP 实机测试」。
+
+---
+
+## 2026-11-04 Knowledge QA MVP 实机测试（ISSUE-29 ~ ISSUE-38）
+
+测试方式：浏览器黑盒实测（ZCode 内置浏览器，operations 身份，UI 全程真实操作）+ API 交叉验证
+（curl：认证/threads/隔离/metrics/admin）+ 自动化矩阵复跑（双 profile pytest、56 契约、ruff、
+frontend build，全部通过）。服务：8000 端口 uvicorn 直跑，Ark coding 端点。截图证据：
+`artifacts/gui-test-20261104/`（截图通道中途故障，T6 之后以 DOM 快照 + audit.db 为证据）。
+
+**结果总览：10 个 UI 测试点 → 通过 4（T1 初始页 / T2 answered+引用 / T4 追问消解 / T9 空输入），
+失配 5，部分失配 1。API 安全边界全部通过（401×2、跨用户 thread 404、fail-closed 不伪装成功）。
+8 类 MVP 契约场景实机只有 S1/S7 按预期终态呈现。**
+
+| 场景（契约预期） | 实机终态 | 判定 |
+|---|---|---|
+| S1 产品风险等级（answered） | 已回答 + R2 + 引用 + medium（33s） | ✅ |
+| S2 FAQ 密码重置（answered+faq_search） | **未找到资料（no_evidence）**（26s） | ❌ ISSUE-29 |
+| S3 实时行情（no_evidence） | **已拦截（blocked）**（83s） | ❌ ISSUE-30 |
+| S4 PE 歧义（needs_clarification） | 已回答（诚实拒答式回答）（36s） | ❌ ISSUE-29 根因 |
+| S5 机密草稿（permission_denied） | 未找到资料（no_evidence）（~30s） | ❌ ISSUE-32 |
+| S6 买入建议（blocked） | 已回答（合规自律回答）（79s） | ❌ ISSUE-31 |
+| S7 同会话追问（answered×2） | 两轮均已回答，指代消解正确（27s×2） | ✅ |
+| S8 服务不可用（transport_error） | 未实机触发（杀 provider 属破坏性操作，由契约测试覆盖）；超长输入 422 走了 alert 路径见 ISSUE-33 | ➖ |
+
+### ISSUE-29（高，回归）：默认模型 glm-5.3-flash 烧穿 plan 预算，理解/规划 100% 退化兜底单源计划
+
+- **现象**：服务端日志每次理解/规划调用都打出 guard 告警："理解/规划调用输出预算
+  （plan_max_tokens=640）耗尽且正文为空（finish_reason=length），已退化为兜底检索计划"。
+  audit.db 中 query 的 query_type/intent 恒为 "unknown"。
+- **根因**：glm-5.3-flash 是强制 reasoning 模型且思考 token 计入 max_tokens（2026-11-03
+  超时事故同一根因，当时已回退 deepseek-v4-flash 并同步 .env.example）。当前
+  `.env` 与 `.env.example` 又配回 `OPENAI_MODEL=glm-5.3-flash`，**回归复发**。
+- **后果链**（实测）：① S2 FAQ 问题 plan 只产出 product_search 单源 → faq 8 chunks 永不
+  被检索 → no_evidence 误答；② S4 歧义澄清（needs_clarification 依赖理解节点输出
+  ambiguity）在真实 LLM 下不可达；③ planner 回环 3 次每次退化同一兜底 plan，不换源，
+  白烧 3×8~10s（S2 共 25.9s / S3 共 83.3s）。
+- **修复方向**：.env/.env.example 默认模型改回 deepseek-v4-flash（或调大
+  LLM_PLAN_MAX_TOKENS 并接受延迟）；guard 告警目前只在 uvicorn stdout，建议在审计
+  payload 增加 plan_fallback 标记，让兜底退化在审计/指标层可见。
+- **备注**：README 快速开始按 .env.example 配置的用户必然踩中；T2/S1 能答对纯属兜底
+  plan（product_search）恰好命中产品语料。
+
+### ISSUE-30（高）：验证 fail-closed 被映射为「已拦截」，语义误导
+
+- **现象**：S3 实时行情问题 → 兜底 plan 检回 1 个无关 product chunk（理财产品风险揭示）
+  → reason 两轮各 35.5s/36.1s 强行作答 → 幻觉检测 50%/60% 两轮失败 → fail-closed 兜底
+  文案，UI 显示「已拦截」。
+- **问题**：① answer_status 映射把"验证未通过"归入 blocked（合规拦截语义）——审计里
+  compliance_passed=1、flags 为空，实际并未触发合规规则，用户会误以为违规被拦；应为
+  no_evidence 或独立的"验证未通过"语义。② grade_and_filter 对明显无关 chunk（上证行情
+  vs 理财产品揭示书）无相关性底线拦截，任由无关证据进入 reason。
+- **修复方向**：答案文本为验证兜底文案时终态映射改走 no_evidence；grade_and_filter 增加
+  低分阈值丢弃（记录丢弃原因）。
+
+### ISSUE-31（中）：合规拦截（blocked）在真实 LLM 下不可触发
+
+- **现象**：S6 "适合买入吗？给我操作建议" → 模型自律地拒绝给时点建议并给出核实话流程
+  → 答案合规 → answered（medium）。契约预期合规规则拦截 → blocked。
+- **根因**：合规规则检查的是 LLM 生成的答案文本；真实模型规避了"建议买入"类表述，规则
+  永不触发。mock 契约按剧本输出触发词，掩盖了该分歧。
+- **修复方向**：合规层应在 query 理解/意图层增加确定性投资建议意图识别（不依赖生成文本），
+  或接受"模型自律优先"并在设计文档中修正 S6 预期。需设计决策。
+
+### ISSUE-32（高，安全演示失真）：permission_denied 终态在默认链路不可达
+
+- **现象**：S5 机密重组草稿问题（allowed_roles 不含 operations）→ no_evidence 而非
+  permission_denied。
+- **根因**：ISSUE-29 兜底 plan 永远只查 product_search，research_report 受限源根本不进
+  plan，"全部越权 → 权限拒绝"路径无输入。
+- **影响**：产品核心卖点"权限不足以明确 answer_status 呈现"在默认配置下不可演示；
+  权限过滤仍在（无泄露），但终态语义失真。ISSUE-29 修复后需复测本例。
+
+### ISSUE-33（中）：前后端输入长度契约脱节 + 422 错误文案误导
+
+- **现象**：前端 textarea 无长度限制（maxLength=-1），5306 字符可输入并提交；后端
+  QARequest `query max_length=500` 返回 422；前端把所有错误统一渲染为
+  "请求未完成，请稍后重试。"（重试永远无效，误导用户）。
+- **位置**：`src/schemas/request_response.py:25`、frontend `ChatPage.tsx:104` 错误分支。
+- **修复方向**：前端 maxLength=500 + 字数提示；422 按 detail 区分文案（如"输入超过
+  500 字上限"）。
+
+### ISSUE-34（低）：引用展开不显示原文
+
+- **现象**：引用区展开后只有 `[1] product` + 源文件绝对路径，无 chunk 原文文本；README
+  承诺"可展开查看引用原文"。运营人员无法就地核对引用内容。
+- **备注**：源文件绝对路径直接暴露给前端（`/Users/ryan/...`），生产环境属信息泄露面。
+
+### ISSUE-35（低）：进行中会话不出现在侧栏
+
+- **现象**：整轮 7 次问答期间侧栏一直"暂无会话"；点"+ 新建对话"后才出现条目。threads
+  API 数据正常（两个 thread 都在）——纯前端列表刷新缺陷，历史会话在会话中不可找回。
+
+### ISSUE-36（低，环境/运维）：Chroma 遗留空 collection + ingest 幂等跳过不校验向量库
+
+- **现象**：`secrag_documents` 空壳 collection 残留（历史常量改名遗留，现行
+  `CHROMA_COLLECTION_NAME="securities_docs"`）。ingest 对已登记文档按 path 哈希跳过，
+  不校验向量库中 chunk 实际存在——若只清 chroma 目录而保留 registry，入库会全部跳过，
+  检索静默为空（本次实测踩中前半段：0 chunks 状态下 ingest 全部跳过）。
+- **修复方向**：清理空 collection；ingest 增加"registry 有记录但向量库无 chunk"的对账
+  （至少 --full-scan 时重建）。
+
+### ISSUE-37（低）：UI 推荐问题与 knowledge_qa 语料失配
+
+- **现象**：欢迎页推荐问题为"货币基金风险等级 / 股票质押式回购新规 / 什么是量化交易"，
+  当前演示语料为理财产品揭示书/FAQ/合规制度，点击必然 no_evidence，首触体验失真。
+
+### ISSUE-38（低，测试封闭性）：双 profile 矩阵在本机 .env 下 1 例失败
+
+- **现象**：`tests/test_agents.py::test_agent_ollama_client_ignores_environment_proxy`
+  断言 `timeout: 30.0` 硬编码默认值，但 `_build_llm` 读 `config.llm.timeout`，本机
+  `.env` 的 `LLM_TIMEOUT_SECONDS=90` 穿透测试（CI 无 .env 可过）。设
+  `LLM_TIMEOUT_SECONDS=30` 复跑即通过，根因确认。
+- **修复方向**：测试内 monkeypatch `config.llm.timeout`（或对 Settings 整体打桩），
+  消除对宿主 .env 的隐式依赖。
+
+### 实测通过项（留档）
+
+- answered 主流程：R2 事实正确、结构化输出、引用标注 [来源N]、置信度呈现（T2/T4）。
+- 追问指代消解：新对话内"它的适当性匹配要求"正确消解到理财产品并带引用（S7）。
+- 输入防护：空输入/纯空白禁用发送。
+- 安全边界（API）：无 token 401、伪造 token 401、跨用户读他人 thread 404（不泄露存在性）。
+- fail-closed 全程未伪装成功：所有失败终态均无引用、无成功置信度。
+- 流式反馈：思考中状态、输入禁用、光标动画正常。
+- 自动化矩阵：双 profile pytest（除 ISSUE-38 外 194/195 通过）、API/契约 56 通过、
+  ruff 全绿、frontend build 成功。
+- 延迟： answered 26-36s / 拦截 83s，全部远超设计 SLO 10s；glm reason 单轮 35s+
+  为主要大头（ISSUE-29 修复后需复测）。
 
 ---
 
