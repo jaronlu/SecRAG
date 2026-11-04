@@ -142,6 +142,9 @@ def test_agent_ollama_client_ignores_environment_proxy(monkeypatch):
 
     chat_ollama = MagicMock()
     monkeypatch.setattr(nodes_module.config, "llm_provider", "ollama")
+    # ISSUE-38：timeout 断言的是默认值 30.0，必须显式固定，
+    # 否则宿主 .env 的 LLM_TIMEOUT_SECONDS 会穿透测试（CI 无 .env 可过）
+    monkeypatch.setattr(nodes_module.config, "llm_timeout_seconds", 30.0)
     monkeypatch.setattr("langchain_ollama.ChatOllama", chat_ollama)
 
     nodes_module._build_llm()
