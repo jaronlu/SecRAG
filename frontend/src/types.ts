@@ -5,6 +5,8 @@ export interface Citation {
   citation_id?: string
   // ISSUE-34：后端只回文件名，不再暴露服务端绝对路径
   source: string
+  // BUG-1：文档业务标题（后端 Citation.doc_title），展示优先于文件名
+  doc_title?: string
   title?: string
   doc_type?: string
   // 引用原文摘句（CitationExtractor 产出，支撑答案事实的句子）

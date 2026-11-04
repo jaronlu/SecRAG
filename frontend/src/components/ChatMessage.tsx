@@ -152,7 +152,9 @@ export default function ChatMessage({ message }: ChatMessageProps) {
                           <span className="text-slate-400">相似度 {(c.score * 100).toFixed(0)}%</span>
                         )}
                       </div>
-                      <div className="text-slate-600 truncate">{c.source}</div>
+                      {/* BUG-1：只展示文档标题，缺失时回退后端已脱敏的文件名，
+                          不得渲染服务端路径 */}
+                      <div className="text-slate-600 truncate">{c.doc_title || c.source}</div>
                       {/* ISSUE-34：展示引用原文摘句，运营人员可就地核对引用内容；
                           后端 quote 为空时回退旧 content 字段保持兼容 */}
                       {(c.quote || c.content) && (
