@@ -44,6 +44,11 @@ def test_health_endpoint_reachable(client):
     assert res.status_code == 200
     body = res.json()
     assert body["status"] == "ok"
+    # ENV-2：部署时效校验——/health 必须携带部署版本，发布流程据此核对
+    # 部署代码 == HEAD；测试仓库内 git 可用，应解析出真实提交
+    version = body["version"]
+    assert version["commit"] != "unknown"
+    assert isinstance(version["dirty"], bool)
 
 
 # ══════════════════════════════════════════════════════════════════════
