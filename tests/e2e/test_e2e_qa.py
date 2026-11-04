@@ -522,6 +522,7 @@ def test_tc023_tool_timeout_trips_circuit_breaker(
 
     from src.agents import nodes as agent_nodes
     from src.agents.nodes import authorize_reason_tool_call
+    from src.config import config
     from src.schemas.constants import (
         ROLE_ADVISOR,
         SOURCE_PRODUCT,
@@ -529,6 +530,8 @@ def test_tc023_tool_timeout_trips_circuit_breaker(
         STATE_USER_ROLE,
     )
 
+    # calculator 超时/熔断验证属 full profile 工具路径，默认 knowledge_qa 不暴露（ISSUE-41）。
+    monkeypatch.setattr(config, "product_profile", "full")
     monkeypatch.setattr(agent_nodes, "TOOL_TIMEOUT_SECONDS", 0.05)
     state = {
         STATE_USER_ROLE: ROLE_ADVISOR,
