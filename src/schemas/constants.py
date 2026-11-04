@@ -115,6 +115,9 @@ RETRIEVAL_CACHE_TTL_SECONDS: Final = 300.0  # 检索结果缓存 TTL（5分钟�
 STATE_CLARIFICATION_NEEDED: Final = "clarification_needed"  # 是否需要用户澄清
 STATE_PII_DETECTED: Final = "pii_detected"  # 查询中检测到的 PII 列表
 STATE_LANGUAGE: Final = "language"  # 检测到的查询语言（zh/en/mixed）
+# ISSUE-29：理解/规划退化兜底计划的原因标记（"" 表示未退化），
+# 值域 budget_starved | invalid_json | invalid_plan；随审计 payload 落盘可观测
+STATE_PLAN_FALLBACK: Final = "plan_fallback"
 STATE_MESSAGES: Final = "messages"
 STATE_TOOL_CALLS: Final = "tool_calls"
 STATE_INTERMEDIATE_STEPS: Final = "intermediate_steps"

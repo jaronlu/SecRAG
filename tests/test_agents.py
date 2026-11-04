@@ -102,6 +102,7 @@ from src.schemas.constants import (
     STATE_INTERMEDIATE_STEPS,
     STATE_LLM_USAGE,
     STATE_ORIGINAL_QUERY,
+    STATE_PLAN_FALLBACK,
     STATE_QUERY_TYPE,
     STATE_REASON_ATTEMPTS,
     STATE_REASON_MESSAGE_START,
@@ -830,6 +831,143 @@ class TestUnderstandAndPlanSingleRoundTrip:
         # 兜底计划仍生效（不阻断流程），但降级必须留下可定位的告警
         assert result[STATE_RETRIEVAL_PLAN_RAW], "空正文仍须走单源兜底计划"
         assert any("正文为空" in record.getMessage() for record in caplog.records)
+
+    def test_starved_budget_marks_plan_fallback_in_state(self, monkeypatch):
+        """ISSUE-29：预算烧穿退化兜底计划时，plan_fallback 原因随 state 返回。
+
+        告警只落在 uvicorn stdout；审计/指标层需要独立标记才能发现
+        "每次理解/规划都退化兜底" 的回归（如默认模型配回 glm 系）。
+        """
+        from types import SimpleNamespace
+
+        class _StarvedLLM:
+            def invoke(self, messages, **kwargs):
+                response = MagicMock()
+                response.content = ""
+                response.response_metadata = {"finish_reason": "length"}
+                return response
+
+        monkeypatch.setattr("src.agents.nodes.llm", _StarvedLLM())
+        monkeypatch.setattr(
+            "src.agents.nodes.config",
+            SimpleNamespace(
+                llm=SimpleNamespace(
+                    provider="openai", plan_max_tokens=640, plan_model="",
+                    model="glm-5.3-flash",
+                )
+            ),
+        )
+
+        result = query_understand(self._first_pass_state())
+
+        assert result[STATE_PLAN_FALLBACK] == "budget_starved"
+        assert result[STATE_RETRIEVAL_PLAN_RAW], "兜底计划仍生效，不阻断流程"
+
+    def test_invalid_json_marks_plan_fallback_reason(self, monkeypatch):
+        """ISSUE-29：正文非 JSON 时退化原因标记为 invalid_json。"""
+        from types import SimpleNamespace
+
+        class _GarbageLLM:
+            def invoke(self, messages, **kwargs):
+                response = MagicMock()
+                response.content = "抱歉，我无法完成该任务。"
+                response.response_metadata = {"finish_reason": "stop"}
+                return response
+
+        monkeypatch.setattr("src.agents.nodes.llm", _GarbageLLM())
+        monkeypatch.setattr(
+            "src.agents.nodes.config",
+            SimpleNamespace(
+                llm=SimpleNamespace(
+                    provider="openai", plan_max_tokens=640, plan_model=""
+                )
+            ),
+        )
+
+        result = query_understand(self._first_pass_state())
+
+        assert result[STATE_PLAN_FALLBACK] == "invalid_json"
+        assert result[STATE_RETRIEVAL_PLAN_RAW], "兜底计划仍生效，不阻断流程"
+
+    def test_valid_json_without_plan_marks_invalid_plan(self, monkeypatch):
+        """ISSUE-29：JSON 合法但缺 retrieval_plan 时退化原因标记为 invalid_plan。"""
+        from types import SimpleNamespace
+
+        class _BareJsonLLM:
+            def invoke(self, messages, **kwargs):
+                response = MagicMock()
+                response.content = json.dumps({"intent": "产品咨询", "ambiguity": []})
+                response.response_metadata = {"finish_reason": "stop"}
+                return response
+
+        monkeypatch.setattr("src.agents.nodes.llm", _BareJsonLLM())
+        monkeypatch.setattr(
+            "src.agents.nodes.config",
+            SimpleNamespace(
+                llm=SimpleNamespace(
+                    provider="openai", plan_max_tokens=640, plan_model=""
+                )
+            ),
+        )
+
+        result = query_understand(self._first_pass_state())
+
+        assert result[STATE_PLAN_FALLBACK] == "invalid_plan"
+        assert result[STATE_RETRIEVAL_PLAN_RAW], "兜底计划仍生效，不阻断流程"
+
+    def test_healthy_plan_has_no_fallback_marker(self, monkeypatch):
+        """ISSUE-29：正常计划不携带退化标记，避免审计侧误报。"""
+        from types import SimpleNamespace
+
+        class _HealthyLLM:
+            def invoke(self, messages, **kwargs):
+                response = MagicMock()
+                response.content = json.dumps({
+                    "intent": "产品咨询",
+                    "query_type": "product_inquiry",
+                    "entities": {},
+                    "rewritten_query": "改写查询",
+                    "ambiguity": [],
+                    "retrieval_plan": [
+                        {PLAN_SOURCE: SOURCE_PRODUCT, PLAN_QUERY: "改写查询", PLAN_TOP_K: 3}
+                    ],
+                })
+                response.response_metadata = {"finish_reason": "stop"}
+                return response
+
+        monkeypatch.setattr("src.agents.nodes.llm", _HealthyLLM())
+        monkeypatch.setattr(
+            "src.agents.nodes.config",
+            SimpleNamespace(
+                llm=SimpleNamespace(
+                    provider="openai", plan_max_tokens=640, plan_model=""
+                )
+            ),
+        )
+
+        result = query_understand(self._first_pass_state())
+
+        assert result[STATE_PLAN_FALLBACK] == ""
+
+
+class TestPlanFallbackAuditMarker:
+    """ISSUE-29：plan_fallback 标记随审计 payload 落盘，兜底退化在审计层可见。"""
+
+    def test_audit_query_includes_plan_fallback_reason(self):
+        state = _state(**{STATE_PLAN_FALLBACK: "budget_starved"})
+
+        result = audit_log(state)
+
+        entry = result[STATE_AUDIT_TRAIL]
+        assert entry.get(AUDIT_QUERY, {}).get("plan_fallback") == "budget_starved"
+
+    def test_audit_query_defaults_plan_fallback_to_empty(self):
+        state = _state()
+
+        result = audit_log(state)
+
+        entry = result[STATE_AUDIT_TRAIL]
+        assert entry.get(AUDIT_QUERY, {}).get("plan_fallback") == ""
 
 
 class TestPlanCallLatencyAccounting:

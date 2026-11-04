@@ -43,6 +43,7 @@ from src.schemas.constants import (
     STATE_CLARIFICATION_NEEDED,
     STATE_PII_DETECTED,
     STATE_LANGUAGE,
+    STATE_PLAN_FALLBACK,
     STATE_QUERY_SANITIZED,
     AUDIT_REQUEST_ID,
     META_CHUNK_ID,
@@ -179,8 +180,8 @@ def _build_llm():
     )
 
 
-def _warn_if_plan_budget_starved(response: Any) -> None:
-    """理解/规划调用输出预算耗尽且正文为空时告警，而不是静默走兜底计划。
+def _warn_if_plan_budget_starved(response: Any) -> bool:
+    """理解/规划调用输出预算耗尽且正文为空时告警，返回是否命中该故障。
 
     典型根因：配置了思考 token 计入 max_tokens 的强制 reasoning 模型
     （2026-10-13 实测 glm-5.3-flash：640 预算全被思考链消耗，正文恒为空，
@@ -200,6 +201,8 @@ def _warn_if_plan_budget_starved(response: Any) -> None:
             config.llm.plan_max_tokens,
             config.llm.model,
         )
+        return True
+    return False
 
 
 def _invoke_with_plan_budget(messages: list[HumanMessage]) -> Any:
@@ -597,6 +600,20 @@ def _widen_raw_plan(plan: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return widened
 
 
+def _plan_fallback_reason(budget_starved: bool, parse_failed: bool) -> str:
+    """理解/规划输出不可用时的退化原因标记（ISSUE-29），随审计 payload 落盘。
+
+    值域 budget_starved（输出预算耗尽正文为空）| invalid_json（JSON 解析失败）
+    | invalid_plan（解析成功但计划形状非法）；预算烧穿优先归因，因为空正文
+    必然同时触发 JSON 解析失败。
+    """
+    if budget_starved:
+        return "budget_starved"
+    if parse_failed:
+        return "invalid_json"
+    return "invalid_plan"
+
+
 def _plan_only_llm_call(state: AssistantState) -> dict[str, Any]:
     """多跳重试轮的合并节点分支：只补检索计划，不重问查询理解（ISSUE-11）。
 
@@ -629,13 +646,24 @@ def _plan_only_llm_call(state: AssistantState) -> dict[str, Any]:
 格式：[{{"source": "report_search", "query": "...", "top_k": 5, "filters": {{}}}}]"""
 
     response = _invoke_with_plan_budget([HumanMessage(content=prompt)])
+    budget_starved = _warn_if_plan_budget_starved(response)
+    parse_failed = False
     try:
         raw = response.content
         if not isinstance(raw, str):
             raw = str(raw)
         parsed_plan = json.loads(raw)
     except json.JSONDecodeError:
+        parse_failed = True
         parsed_plan = _fallback_raw_plan(allowed_sources, rewritten_query)
+
+    # ISSUE-29：理解/规划退化（预算烧穿/JSON 非法/计划形状非法）时标记原因，
+    # 让兜底退化在审计/指标层可见，而不只在 uvicorn stdout 告警
+    plan_fallback = (
+        _plan_fallback_reason(budget_starved, parse_failed)
+        if budget_starved or parse_failed or not isinstance(parsed_plan, list)
+        else ""
+    )
 
     if not isinstance(parsed_plan, list):
         parsed_plan = []
@@ -646,6 +674,7 @@ def _plan_only_llm_call(state: AssistantState) -> dict[str, Any]:
         parsed_plan = _widen_raw_plan(parsed_plan)
     return {
         STATE_RETRIEVAL_PLAN_RAW: parsed_plan,
+        STATE_PLAN_FALLBACK: plan_fallback,
         STATE_LLM_USAGE: _llm_usage_metadata(response),
     }
 
@@ -709,6 +738,8 @@ retrieval_plan 只列当前角色允许的数据源，元素为 source/query/top
 计划源与查询主题匹配，可多源互补：公司/证券数字（业绩/预测/评级）必含 report_search；制度/法规/处罚必含 regulation_search；产品条款/风险等级必含 product_search；办理流程/常见疑问必含 faq_search；无关源不进计划。"""
 
     response = _invoke_with_plan_budget([HumanMessage(content=prompt)])
+    budget_starved = _warn_if_plan_budget_starved(response)
+    parse_failed = False
     try:
         raw = response.content
         if not isinstance(raw, str):
@@ -717,6 +748,7 @@ retrieval_plan 只列当前角色允许的数据源，元素为 source/query/top
     except json.JSONDecodeError:
         # LLM 未按格式返回 JSON 时，不阻断流程，用默认值兜底
         result = None
+        parse_failed = True
 
     # issues.md 二.5：合法 JSON 不一定是正确对象（如 [] 或 null），
     # 运行时逐字段校验类型，不符合契约的字段回退默认值
@@ -748,8 +780,11 @@ retrieval_plan 只列当前角色允许的数据源，元素为 source/query/top
 
     # 计划部分：缺失或非法时回退到角色首个允许数据源的单源计划
     raw_plan = result.get("retrieval_plan")
+    plan_fallback = ""
     if not isinstance(raw_plan, list):
         raw_plan = _fallback_raw_plan(allowed_sources, rewritten_query)
+        # ISSUE-29：退化兜底计划的原因随 state 进审计（预算烧穿优先归因）
+        plan_fallback = _plan_fallback_reason(budget_starved, parse_failed)
 
     return {
         STATE_INTENT: intent if isinstance(intent, str) and intent else "unknown",
@@ -758,6 +793,7 @@ retrieval_plan 只列当前角色允许的数据源，元素为 source/query/top
         STATE_REWRITTEN_QUERY: rewritten_query,
         STATE_AMBIGUITY: ambiguity,
         STATE_RETRIEVAL_PLAN_RAW: raw_plan,
+        STATE_PLAN_FALLBACK: plan_fallback,
         STATE_QUERY_SANITIZED: injection_detected,
         STATE_PII_DETECTED: pii_findings,
         STATE_LANGUAGE: language,

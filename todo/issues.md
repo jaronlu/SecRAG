@@ -38,6 +38,15 @@ frontend build，全部通过）。服务：8000 端口 uvicorn 直跑，Ark cod
 
 ### ISSUE-29（高，回归）：默认模型 glm-5.3-flash 烧穿 plan 预算，理解/规划 100% 退化兜底单源计划
 
+> **已修复（fix: restore deepseek plan model and mark plan fallback in audit）**：
+> ① `.env`/`.env.example` 默认模型改回 `deepseek-v4-flash`；② `query_understand` 与
+> `_plan_only_llm_call` 退化兜底计划时写入 `STATE_PLAN_FALLBACK` 原因标记
+> （budget_starved | invalid_json | invalid_plan），随审计 payload `query.plan_fallback`
+> 落盘，兜底退化不再只在 uvicorn stdout 可见；③ 新增 6 个测试守护标记语义
+> （test_agents.py：4 个 state 标记 + 2 个审计落盘）。验证：test_agents.py 161 passed
+> （唯一失败为 ISSUE-38 既有环境依赖项）、ruff 全绿、basedpyright 无新增报错。
+> **未验证**：真实 LLM 下不再出现 guard 告警需起服务实测（随 ISSUE-32 复测一并执行）。
+
 - **现象**：服务端日志每次理解/规划调用都打出 guard 告警："理解/规划调用输出预算
   （plan_max_tokens=640）耗尽且正文为空（finish_reason=length），已退化为兜底检索计划"。
   audit.db 中 query 的 query_type/intent 恒为 "unknown"。

@@ -187,6 +187,7 @@ class AuditQuery(TypedDict, total=False):
     sanitized: bool  # AUDIT_QUERY_SANITIZED；查询命中注入指令并已加固
     pii: list[dict[str, str]]  # AUDIT_QUERY_PII；detect_pii 结果
     language: str  # AUDIT_QUERY_LANGUAGE；查询语言（zh/en/mixed）
+    plan_fallback: str  # STATE_PLAN_FALLBACK；理解/规划退化兜底计划的原因（ISSUE-29）
 
 
 class AuditRetrieval(TypedDict, total=False):
