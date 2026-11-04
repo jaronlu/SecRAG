@@ -119,7 +119,9 @@ export default function ChatPage() {
   }
 
   const handleSend = async () => {
-    if (!input.trim() || isStreaming) return
+    // BUG-3：textarea 的 maxLength 只约束真实键入，程序化注入可绕过；
+    // 发送前以 trim 后长度再做一道防线，与后端 query max_length=500 对齐
+    if (!input.trim() || isStreaming || input.trim().length > MAX_QUERY_LENGTH) return
 
     const userMessage: ChatMessageType = {
       id: Date.now().toString(),
@@ -337,7 +339,7 @@ export default function ChatPage() {
               />
               <button
                 onClick={handleSend}
-                disabled={isStreaming || !input.trim()}
+                disabled={isStreaming || !input.trim() || input.trim().length > MAX_QUERY_LENGTH}
                 className="px-5 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-xl text-sm font-medium transition-colors"
               >
                 {isStreaming ? '思考中...' : '发送'}
