@@ -231,6 +231,58 @@ frontend build，全部通过）。服务：8000 端口 uvicorn 直跑，Ark cod
 
 ---
 
+## 2026-11-04 复测（修复批次 build 3b58bd0 + deepseek-v4-flash，浏览器实测）
+
+对 8c4602b..3b58bd0 修复批次做实机回归复测（同一浏览器黑盒方法，operations 身份）。
+服务：8000 端口现役 uvicorn（/health version.commit=3b58bd0）。
+
+| 场景 | 修复前（57b05d0） | 复测结果（3b58bd0） | 判定 |
+|---|---|---|---|
+| S2 FAQ 密码重置 | no_evidence ❌ | **仍 no_evidence**（42s；audit: plan_fallback=invalid_json → 兜底 product_search 单源） | ❌ ISSUE-39 |
+| S6 买入建议 | answered ❌ | **已拦截**（18.1s，查询层确定性拦截，标准合规文案） | ✅ 修复验证 |
+| S3 实时行情 | 已拦截（误导）❌ | **无权访问**（24.1s；plan 成功选 faq_search → 命中 technical 专属文档全部越权 → 显式拒绝，无泄露） | ⚠️ ISSUE-40 |
+| S5 机密草稿 | no_evidence ❌ | **无权访问**（26.5s；plan 选 faq_search → 9 个 technical 专属 chunk 全拒 → permission_denied） | ✅ 契约终态达成（有保留，见下） |
+| S4 PE 歧义 | answered ❌ | **仍 answered**（诚实解释 PE 不适用理财产品；ambiguity=[] 按提示词设计保守） | ⚠️ ISSUE-40 |
+| T10 超长输入 | 422 + 误导文案 ❌ | **前端 maxLength=500** + 0/500 计数器，超限无法输入 | ✅ 修复验证 |
+| 引用展开（ISSUE-34） | 无原文 + 绝对路径 ❌ | **显示 chunk 原文 + 文档标题**，路径已脱敏 | ✅ 修复验证 |
+| 会话侧栏（ISSUE-35） | 进行中会话不显示 ❌ | 历史会话全部显示、点击恢复完整消息、新会话实时入列 | ✅ 修复验证 |
+| 推荐问题（ISSUE-37） | 与语料失配 ❌ | 已对齐演示语料（产品/密码重置/适当性） | ✅ 修复验证 |
+
+### ISSUE-39（高，ISSUE-29 残余，新立）：plan 预算 640 对 deepseek-v4-flash 同样不可靠，S2 仍未修复
+
+- **现象**：修复批次后 S2 FAQ 问题仍 no_evidence。audit `plan_fallback=invalid_json`
+  ——理解调用有正文但 JSON 解析失败（截断的非法 JSON）。
+- **根因（实测证实）**：本 Ark 端点上 **deepseek-v4-flash 的思考 token 同样计入
+  max_tokens**（usage 证据：completion_tokens=531 = reasoning 418 + 正文 113）。
+  生产合并提示词下思考链长度随输入波动，可吃满 640 预算 → 正文为空（budget_starved）
+  或中途截断（invalid_json），两种形态都已复现。2026-11-03「deepseek 思考不计入
+  max_tokens」的实测结论已过时（网关/模型版本行为变化）。
+- **修复方向（已验证）**：`LLM_PLAN_MAX_TOKENS=2000` 重跑同一生产提示词 → 干净 JSON、
+  plan 正确含 faq_search。一行 env 配置即可修复 S2 的 plan 可靠性。
+- **连带影响**：S5 的 permission_denied 当前依赖 plan 恰好选中 technical 专属 faq 文档
+  的偶然性；plan 预算修复后源选择更稳定，该路径需重新观察。
+
+### ISSUE-40（低，设计-契约分歧，新立）：S3/S4 实机终态与 MVP 契约预期不一致
+
+- S3 行情：实机 permission_denied（plan 命中 technical 专属 faq 文档全拒），契约预期
+  no_evidence。行为按设计工作（显式拒绝、无泄露），但「行情问题 → 权限拒绝」语义存疑
+  （行情是知识库范围问题而非权限问题）；需设计决策：约束 plan 源选择、或更新契约预期。
+- S4 PE 歧义：实机 answered（诚实解释 PE 不适用），契约预期 needs_clarification。
+  ambiguity 门按提示词设计保守（「绝大多数应为 []」），澄清终态只在模型自判无法回答时
+  触发。需设计决策：放宽歧义判定或更新契约。
+- 相比修复前已是改善：S3 不再把验证失败伪装成「已拦截」（answer_status 优先级修复生效）。
+
+### 复测通过项（追加留档）
+
+- 查询层投资建议拦截：<20s 显式 blocked，标准合规文案，不再依赖生成文本触发。
+- fail-closed 保持：permission_denied/blocked 均无引用、无成功置信度。
+- 服务端审计 plan_fallback 标记生效（invalid_json 可见），ISSUE-29 的可观测性修复确认。
+- 长输入由前端 maxLength=500 拦截，后端 422 路径未被触达（防线前移）。
+- 遗留未测：S8 服务不可用（避免动现役服务，仍由契约测试覆盖）；ISSUE-36 空
+  collection 清理未复核。
+
+---
+
 ## 2026-11-04 批次：CI 基线失败归因（ISSUE-41）
 
 ### ISSUE-41 (P1) 产品收敛战役后 5 个测试未对齐新契约，CI 全量连红
