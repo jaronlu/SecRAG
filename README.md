@@ -1,5 +1,23 @@
 # SecRAG
 
+**一句话**：问答给出原文引用；查不到、没权限或被合规拦截时明确说失败，不编一个看起来像样的答案。
+
+**30 秒可跑**
+
+```sh
+uv run pytest -q tests/test_product_scope.py
+```
+
+本次实跑：`8 passed in 0.06s`。
+
+![架构图](docs/architecture-overview.svg)
+
+**可核对**：`git rev-list --count HEAD` → 303 次提交；`find src -name '*.py' | wc -l` → 79 个源码文件 / 16,703 行；`grep -rho 'def test_' tests --include='*.py' | wc -l` → 683 个测试用例定义。数字取自本地工作区 HEAD，以你 clone 到的分支为准。
+
+**不解决什么**：不是生产系统，不含客户数据或客户定制代码；demo token 与样例数据只能证明流程，不能证明生产安全性、吞吐量或回答质量（详见「当前边界」）。
+
+---
+
 面向机构内部运营/支持场景的带引用知识问答系统（Agentic RAG）。默认产品形态（`knowledge_qa`
 profile）只暴露产品文档与 FAQ 检索：运营人员输入产品、FAQ 或操作流程问题，得到带 1–3 条原文
 引用的答案；检索耗尽、权限不足、歧义和合规拦截都以明确的 `answer_status` 呈现，不伪装成成功
